@@ -20,6 +20,7 @@
 ### Contents
 
 **In this README:** [Installation](#installation) · [Usage](#usage) ·
+[Scripting, automation, and the GUI](#scripting-automation-and-the-gui) ·
 [About this repository](#about-this-repository)
 
 **In [`docs/`](docs/):**
@@ -60,6 +61,24 @@ pip install git+https://github.com/jowinjohnchemban/miunlock.git
 ```sh
 miunlock
 ```
+
+### Scripting, automation, and the GUI
+
+```sh
+miunlock login            # log in (or reuse a saved session), prints JSON
+miunlock status           # account + device info, prints JSON
+miunlock check            # is this account/device eligible to unlock right now?
+miunlock unlock --confirm-wipe   # actually unlocks -- WIPES THE DEVICE, no undo
+
+miunlock-gui               # simple Tkinter GUI with the same three steps
+```
+
+`login`, `status`, and `check` are safe and read-only. `unlock` refuses
+to do anything unless `--confirm-wipe` is passed explicitly -- there is
+no default that enables it. A Python API (`miunlock.api`) backs all of
+this for agents/scripts that want structured calls instead of a
+subprocess; see [docs/CHANGES.md](docs/CHANGES.md#the-safety-gate-please-read-this-if-youre-wiring-up-automation)
+for the safety design before you build on it.
 
 ---
 

@@ -42,6 +42,46 @@ No functional network destination was changed anywhere: every request
 still goes only to `account.xiaomi.com`, `api.account.xiaomi.com`, and the
 regional `*.unlock.update*.miui.com` endpoints, exactly as upstream.
 
+## Added: a programmatic API, CLI subcommands, and a GUI
+
+Running `miunlock` with no arguments still does exactly what it always
+did -- that interactive flow is byte-for-byte unchanged. Everything below
+is new and additive.
+
+**`src/miunlock/api.py`** -- a plain Python API for scripts, CI, and
+agents: `login()`, `get_account_zone()`, `get_device_codename()`,
+`check_unlock_eligibility()` (safe, read-only, asks Xiaomi's server
+whether unlock is currently possible without fetching a token), and
+`perform_unlock()`.
+
+**`miunlock login|status|check|unlock`** -- non-interactive CLI
+subcommands built on the API above, each printing JSON. `login`,
+`status`, and `check` are all safe and read-only.
+
+**`miunlock-gui`** -- a Tkinter GUI (no new dependency) with the same
+three steps as buttons.
+
+### The safety gate (please read this if you're wiring up automation)
+
+`perform_unlock()` -- the only function that calls `fastboot oem
+unlock` -- raises `UnlockError` and refuses to run unless called with
+`confirm_wipe=True`. There is no default, config value, or environment
+variable that sets this for you. The `unlock` CLI subcommand mirrors
+this with a required `--confirm-wipe` flag; omit it and the command
+prints an error and exits 1 without touching the device. The GUI backs
+this with an actual `askyesno` dialog showing the server's own
+data-wipe notice -- there is no "don't ask again" checkbox.
+
+This exists because unlocking wipes the device's user data immediately
+and permanently, with nothing after that point to stop it. If you are
+building an agent, a script, or any automation on top of this API: the
+`confirm_wipe=True` / `--confirm-wipe` call site should be the one line
+a human reviews and sets on purpose, every single run -- not inferred
+from context, not hardcoded "to save a step," and not something an
+agent decides on its own. Everything else in this tool (login, account
+info, device info, eligibility checks) is unrestricted, because none of
+it can destroy anything.
+
 ## Notes from real-world testing (India / POCO M2 Pro, MIUI 12, Nov 2026)
 
 Documented here because neither Xiaomi nor upstream documents these

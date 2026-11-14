@@ -31,6 +31,7 @@ Repository = "https://github.com/jowinjohnchemban/miunlock"
 
 [project.scripts]
 miunlock = "miunlock.cli:main"
+miunlock-gui = "miunlock.gui:main"
 
 [build-system]
 requires = ["setuptools>=77", "wheel"]
