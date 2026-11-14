@@ -28,7 +28,7 @@
 ## Installation
 
 ```sh
-pip install miunlock
+pip install git+https://github.com/jowinjohnchemban/miunlock.git
 ```
 
 > See the **[Installation Guide](INSTALL.md)** for detailed instructions.

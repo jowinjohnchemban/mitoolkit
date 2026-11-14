@@ -112,10 +112,10 @@ source anyname/bin/activate.csh
 <p>Install MiUnlockTool</p>
 
 ```
-pip install miunlock
+pip install git+https://github.com/jowinjohnchemban/miunlock.git
 ```
 > [!NOTE]
-> These steps make **MiUnlockTool** available to your **current** shell session, step 3 will have to be redone if you ever wish to use the tool again
+> This installs the hardened standalone fork directly from source, not the upstream PyPI package -- see [CHANGES.md](CHANGES.md) for why. These steps make **MiUnlockTool** available to your **current** shell session, step 3 will have to be redone if you ever wish to use the tool again
 
 ---
 
@@ -130,7 +130,7 @@ pip install miunlock
 ### Quick Installation
 
 ```sh
-curl -sS https://raw.githubusercontent.com/MiForge/MiUnlockTool/main/.install | bash
+curl -sS https://raw.githubusercontent.com/jowinjohnchemban/miunlock/main/.install | bash
 ```
 
 ### Step-by-step Installation
@@ -142,7 +142,7 @@ pkg install python-pip
 
 #### Install MiUnlockTool
 ```sh
-pip install miunlock
+pip install git+https://github.com/jowinjohnchemban/miunlock.git
 ```
 
 > [!NOTE]
