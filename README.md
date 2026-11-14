@@ -43,6 +43,32 @@ miunlock
 
 ---
 
+## About this repository
+
+This is a **standalone fork**, detached from the GitHub fork network of
+the original projects, merging two previously separate repositories into
+one for simpler installation (no external git dependency):
+
+- **[MiForge/MiUnlockTool](https://github.com/MiForge/MiUnlockTool)** by
+  [**offici5l**](https://github.com/offici5l) -- the `miunlock` package
+  (`src/miunlock/`).
+- **[offici5l/migate](https://github.com/MiForge/migate)** by
+  [**offici5l**](https://github.com/offici5l) -- the `migate` package
+  (`src/migate/`), vendored in directly rather than installed as a
+  separate dependency.
+
+All credit for the original design, the Xiaomi authentication/unlock
+protocol implementation, and the vast majority of this code belongs to
+**offici5l**. This repository only adds the security hardening and
+documentation changes described in `CHANGES.md` -- see that file for the
+exact diff and rationale. `migate`'s original MIT license and copyright
+notice are preserved in `THIRD_PARTY_LICENSE_migate.txt`.
+
+If you don't need the hardening changes, use the original projects linked
+above instead -- they're actively maintained by their original author.
+
+---
+
 <div align="center">
 
 

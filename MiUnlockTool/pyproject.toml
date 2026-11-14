@@ -17,12 +17,17 @@ classifiers = [
 requires-python = ">=3.7"
 
 dependencies = [
-    "migate >= 1.1.11",
+    # migate is vendored directly into src/migate (sanitized: password-login
+    # path removed, session file locked down) -- see CHANGES.md. Its own
+    # upstream dependencies are listed here instead.
+    "requests",
+    "rich",
+    "qrcode",
     "pyaes",
 ]
 
 [project.urls]
-Repository = "https://github.com/MiForge/MiUnlockTool"
+Repository = "https://github.com/jowinjohnchemban/miunlock"
 
 [project.scripts]
 miunlock = "miunlock.cli:main"
@@ -33,3 +38,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+migate = ["login/captcha.html"]
