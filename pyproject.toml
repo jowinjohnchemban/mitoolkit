@@ -4,6 +4,7 @@ name = "miunlock"
 description = "Retrieve Xiaomi encryptData(token) to unlock bootloader"
 authors = [{name = "offici5l"}]
 license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 
 keywords = ["xiaomi", "miunlock", "MiUnlockTool", "bootloader", "unlock", "MIUI", "HyperOS", "Tools"]
 

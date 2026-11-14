@@ -105,7 +105,7 @@ automation API/GUI, and documentation changes described in
 [`CHANGES.md`](docs/CHANGES.md) -- see that file for the exact diff and
 rationale. Merging the code into one namespace doesn't change who wrote
 it: `migate`'s original MIT license and copyright notice are preserved
-in [`THIRD_PARTY_LICENSE_migate.txt`](THIRD_PARTY_LICENSE_migate.txt).
+in [`NOTICE`](NOTICE).
 
 If you don't need the hardening changes, use the original projects linked
 above instead -- they're actively maintained by their original author.

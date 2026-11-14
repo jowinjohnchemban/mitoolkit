@@ -40,7 +40,7 @@ to offici5l -- see the README's "About this repository" section.
    `requests`/`rich`/`qrcode`/`pyaes` from PyPI (its own and miunlock's
    ordinary dependencies). Full attribution to its original author,
    offici5l, and its original MIT license are preserved in
-   `THIRD_PARTY_LICENSE_migate.txt` and the README's credits section --
+   `NOTICE` and the README's credits section --
    merging the code doesn't change who wrote it.
 
 No functional network destination was changed anywhere: every request
