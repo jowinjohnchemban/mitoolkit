@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="https://github.com/MiForge/MiUnlockTool/releases/latest">
+<a href="https://github.com/jowinjohnchemban/miunlock">
   <img src="https://img.shields.io/badge/MiUnlockTool-%23FF6900?style=flat&logo=xiaomi&logoColor=white" alt="MiUnlockTool" width="200"/>
 </a>
 
@@ -8,9 +8,29 @@
 
 ---
 
-[![Version](https://img.shields.io/pypi/v/miunlock?label=Version&labelColor=black&color=brightgreen)](https://pypi.org/project/miunlock/)
+[![Standalone fork](https://img.shields.io/badge/standalone_fork-password--login_removed-brightgreen)](docs/CHANGES.md)
 [![Changelog](https://img.shields.io/badge/Changelog-blue?style=flat&logoColor=white)](docs/CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
+
+> Not published to PyPI -- install from source (see [Installation](#installation)).
+> For the original upstream project and its PyPI package, see the credits below.
+
+---
+
+### Contents
+
+**In this README:** [Installation](#installation) · [Usage](#usage) ·
+[About this repository](#about-this-repository)
+
+**In [`docs/`](docs/):**
+[Installation Guide](docs/INSTALL.md) ·
+[FAQ & Troubleshooting](docs/FAQ.md) ·
+[Bootloader Unlock Guide](docs/unlock_guide.md) ·
+[encryptData Reference](docs/encryptData.md) ·
+[Error Codes & Messages Reference](docs/miunlock-codes-reference.md) ·
+[Changes in this Fork](docs/CHANGES.md) ·
+[Changelog](docs/CHANGELOG.md) ·
+[Contributing](docs/CONTRIBUTING.md)
 
 ---
 
