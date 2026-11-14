@@ -26,8 +26,9 @@ miunlock --help
 ```
 
 The code is in `src/miunlock/`; see [docs/architecture.md](docs/architecture.md).
-There is no automated test suite yet. Contributions that add one are especially
-welcome, in particular tests for the confirmation gate.
+Run the tests with `python -m unittest discover -s tests -v`. They use only dummy values and
+never touch the network, a real session or a device. Please add a test with any fix that
+touches credentials, logging or the unlock confirmation.
 
 ## Guidelines
 

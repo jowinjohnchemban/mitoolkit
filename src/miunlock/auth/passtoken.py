@@ -2,6 +2,7 @@ import json
 import os
 import platform
 import stat
+import subprocess
 from pathlib import Path
 
 # SANITIZED BUILD: the password-based terminal login path (miunlock.auth.login.terminal,
@@ -13,22 +14,49 @@ from pathlib import Path
 from miunlock.auth.login.browser_qr import handle_browser_qr
 from miunlock.auth.config import SERVICELOGIN_URL, console, GREEN, WHITE, ORANGE, RED, DIM
 from miunlock.auth.requester import session, get
+from miunlock.auth.redact import redact_response
 
 
-def _lock_down(path: Path):
-    """Best-effort: restrict the session file to the current user only."""
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def _restrict_to_current_user(path: Path) -> bool:
+    """Limit a file or folder to the current user. True only if it was applied."""
     try:
         if platform.system() == "Windows":
-            import subprocess
-            subprocess.run(
-                ["icacls", str(path), "/inheritance:r", "/grant:r",
-                 f"{os.environ.get('USERNAME', '')}:F"],
-                capture_output=True, text=True, check=False,
+            user = os.environ.get("USERNAME")
+            if not user:
+                return False
+            grant = f"{user}:(OI)(CI)F" if path.is_dir() else f"{user}:F"
+            result = subprocess.run(
+                ["icacls", str(path), "/inheritance:r", "/grant:r", grant],
+                capture_output=True, text=True, check=False, creationflags=_NO_WINDOW,
             )
-        else:
-            os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+            return result.returncode == 0
+        os.chmod(path, stat.S_IRWXU if path.is_dir() else stat.S_IRUSR | stat.S_IWUSR)
+        return True
     except Exception:
-        pass  # locking down is defense-in-depth, never block on it
+        return False
+
+
+def _write_session(path: Path, data: dict) -> bool:
+    """Save the session so it is never readable by other users, not even briefly.
+
+    The folder is restricted first, and on POSIX the file is created with mode 0600
+    from the start instead of being tightened after it was written. Returns whether
+    the restrictions could be applied, so the caller never claims protection it
+    does not have.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    safe = _restrict_to_current_user(path.parent)
+    text = json.dumps(data)
+    if os.name == "nt":
+        path.write_text(text, encoding="utf-8")
+    else:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+    return _restrict_to_current_user(path) and safe
 
 
 def get_passtoken(auth_data=None, silent=False, login_method=None):
@@ -104,21 +132,24 @@ def get_passtoken(auth_data=None, silent=False, login_method=None):
     required = {"deviceId", "passToken", "userId"}
     missing  = required - cookies.keys()
     if missing:
-        console.print(f"\n[{RED}]Missing keys: {', '.join(missing)} | Response: {response_text}[/]\n")
+        console.print(f"\n[{RED}]Missing keys: {', '.join(missing)} | Response: {redact_response(response_text)}[/]\n")
         return None
 
     passToken = {k: cookies[k] for k in required}
 
-    cookies_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(cookies_file, "w") as f:
-        json.dump(passToken, f)
-    _lock_down(cookies_file)
+    protected = _write_session(cookies_file, passToken)
 
     console.print("\nLogin successful", style=GREEN)
-    console.print(
-        f"[{DIM}]Session saved to {cookies_file} (access restricted to your user account). "
-        f"Delete this file when you're done to end the saved session.[/]"
-    )
+    if protected:
+        console.print(
+            f"[{DIM}]Session saved to {cookies_file} (access restricted to your user account). "
+            f"Delete it when you're done to end the saved session.[/]"
+        )
+    else:
+        console.print(
+            f"[{ORANGE}]Session saved to {cookies_file}, but its permissions could not be restricted "
+            f"to your user account. Delete it as soon as you're done.[/]"
+        )
     session.cookies.clear()
 
     return passToken

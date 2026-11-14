@@ -1,10 +1,7 @@
-import os
 import json
 import time
 import base64
-import platform
 import threading
-import webbrowser
 import http.server
 import socketserver
 from dataclasses import dataclass
@@ -13,6 +10,7 @@ from typing import Optional
 from urllib.parse import unquote, urlparse, parse_qs
 
 from miunlock.auth.config import BASE_URL, console, WHITE, ORANGE
+from miunlock.auth.browser import open_url
 from miunlock.auth.requester import get, post
 
 _TEMPLATE = (Path(__file__).parent / "captcha.html").read_text(encoding="utf-8")
@@ -66,10 +64,7 @@ def handle_captcha(send_url, response, payload, capt_key):
         thread.start()
 
         url = f"http://127.0.0.1:{port}"
-        if platform.system() in ("Linux", "Android"):
-            os.system(f"xdg-open '{url}' 2>/dev/null")
-        else:
-            webbrowser.open(url)
+        open_url(url)
         console.print(f"[{WHITE}]Captcha opened at: [/][{ORANGE}]{url}[/]")
 
         while True:

@@ -1,6 +1,7 @@
 import json
 from miunlock.auth.config import CONFIG_URL, console, RED
 from miunlock.auth.requester import session, get
+from miunlock.auth.redact import redact_response
 
 def get_uRegion():
 
@@ -15,7 +16,7 @@ def get_uRegion():
     uRegion = response_text.get("uRegion")
 
     if not uRegion:
-        console.print(f"\n[{RED}]Failed to get uRegion | Response: {response_text}[/]\n")
+        console.print(f"\n[{RED}]Failed to get uRegion | Response: {redact_response(response_text)}[/]\n")
         return None
 
     return uRegion

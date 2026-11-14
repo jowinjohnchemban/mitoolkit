@@ -1,9 +1,7 @@
 import json
-import os
-import platform
-import webbrowser
 import qrcode
 from miunlock.auth.config import LONGPOLLING_URL, console, RED, WHITE
+from miunlock.auth.browser import open_url
 from miunlock.auth.requester import get
 
 def handle_browser_qr(auth_data: dict, choice: str) -> dict:
@@ -23,10 +21,11 @@ def handle_browser_qr(auth_data: dict, choice: str) -> dict:
         lp = response_text["lp"]
 
         if choice == "1":
-            if platform.system() in ("Linux", "Android"):
-                os.system(f"xdg-open '{url}' 2>/dev/null")
-            else:
-                webbrowser.open(url)
+            try:
+                open_url(url)
+            except ValueError as e:
+                console.print(f"\n[{RED}]{e}[/]\n")
+                return None
         elif choice == "3":
             qrTips = response_text["qrTips"]
             console.print(f"\n[{WHITE}]{qrTips}[/]\n")

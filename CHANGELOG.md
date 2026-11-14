@@ -53,4 +53,18 @@ both by offici5l.
 
 ### Security
 
+- Error messages no longer print login or config responses, which carry session
+  tokens; only status fields and field names are shown.
+- Failed requests no longer report the URL, which contains one-time login tokens, and no
+  longer chain the original exception into tracebacks.
+- The session file is created owner-only from the start (and its folder restricted) instead
+  of being tightened afterwards, and the program no longer claims it is protected if the
+  restriction could not be applied.
+- The signed unlock token goes to a private, randomly named temporary file, not a
+  predictable file in the home folder.
+- URLs from Xiaomi's responses are opened without a shell (previously a quote in the URL
+  could run a command on Linux and Termux) and only if they are https.
+- The GUI masks the account ID.
+- CI: actions pinned to commits, read-only default token permissions, checkout no longer
+  persists the token, and a regression test suite runs on every push.
 - See [docs/safety.md](docs/safety.md) for the full model and its limits.

@@ -1,6 +1,7 @@
 import json
 from miunlock.auth.config import CONFIG_URL, console, RED
 from miunlock.auth.requester import session, get
+from miunlock.auth.redact import redact_response
 
 def get_areaConfig(country_code: str) -> dict:
 
@@ -15,7 +16,7 @@ def get_areaConfig(country_code: str) -> dict:
     areas = response_text.get("areaConfig")
 
     if not areas:
-        console.print(f"\n[{RED}]Failed to get areaConfig | Response: {response_text}[/]\n")
+        console.print(f"\n[{RED}]Failed to get areaConfig | Response: {redact_response(response_text)}[/]\n")
         return None
 
     for letter, countries in areas.items():

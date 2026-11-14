@@ -53,7 +53,7 @@ Returns the Xiaomi data center for the account: `"Singapore"`, `"China"`,
 
 ### `get_device_codename(fastboot_cmd=None) -> str`
 
-Returns the device codename, for example `"gram"`. The device must be in fastboot
+Returns the device codename, for example `"example"`. The device must be in fastboot
 mode. If no device is connected this waits for one. `fastboot_cmd` is the path to
 a `fastboot` binary; when omitted it is found or downloaded.
 

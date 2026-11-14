@@ -68,6 +68,22 @@ side. When you are finished:
 2. Check the signed-in devices for your account at `account.xiaomi.com`.
 3. Consider changing the Mi Account password.
 
+### What is kept out of messages and logs
+
+A login response from Xiaomi contains session tokens, so the program never prints one.
+Error messages show only the status fields Xiaomi returns (such as the code and
+description) and the *names* of the other fields. A failed network request reports the
+kind of failure, not the request URL, because that URL carries one-time login tokens.
+The GUI shows your account ID with the middle hidden, for example `123***890`, so a
+screenshot does not expose it. Details you copy from the GUI or terminal are safe to
+paste into an issue, but still glance at them first.
+
+The signed unlock token is written to an owner-only temporary file with an unpredictable
+name and deleted as soon as `fastboot` has used it.
+
+Links are opened in your browser as a single argument and never through a shell, and
+only `https` links (or the local captcha page) are opened.
+
 ## Network activity
 
 In the code reviewed when this fork was made, requests go only to:

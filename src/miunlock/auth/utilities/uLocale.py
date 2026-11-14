@@ -1,6 +1,7 @@
 import json
 from miunlock.auth.config import CONFIG_URL, console, RED
 from miunlock.auth.requester import session, get
+from miunlock.auth.redact import redact_response
 
 def get_uLocale():
 
@@ -17,7 +18,7 @@ def get_uLocale():
     uLocale = response_text.get("uLocale")
 
     if not uLocale:
-        console.print(f"\n[{RED}]Failed to get uLocale | Response: {response_text}[/]\n")
+        console.print(f"\n[{RED}]Failed to get uLocale | Response: {redact_response(response_text)}[/]\n")
         return None
 
     return uLocale

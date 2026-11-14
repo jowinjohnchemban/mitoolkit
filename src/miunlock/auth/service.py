@@ -5,6 +5,7 @@ from urllib.parse import quote
 
 from miunlock.auth.config import SERVICELOGIN_URL, console, RED
 from miunlock.auth.requester import session, get
+from miunlock.auth.redact import redact_response
 
 
 def get_service(auth_cookies, params=None):
@@ -33,7 +34,7 @@ def get_service(auth_cookies, params=None):
     psecurity = response_text.get("psecurity")
 
     if not nonce or not ssecurity:
-        console.print(f"\n[{RED}]Missing service data | Response: {response_text}[/]\n")
+        console.print(f"\n[{RED}]Missing service data | Response: {redact_response(response_text)}[/]\n")
         return None
 
     client_sign = quote(base64.b64encode(

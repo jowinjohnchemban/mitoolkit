@@ -1,11 +1,11 @@
 from miunlock.utils import _send
 from miunlock.commands import get_device_token, get_product
-from miunlock.system import console, GREEN, ORANGE, RED, WHITE
+from miunlock.system import console, GREEN, ORANGE, RED, WHITE, NO_WINDOW
 import random
 import hashlib
-import io
+import os
 import subprocess
-import time
+import tempfile
 from pathlib import Path
 
 def unlock_device(domain, service, fastboot_cmd):
@@ -91,14 +91,15 @@ def unlock_device(domain, service, fastboot_cmd):
         return
 
     encryptData = unlock_result["encryptData"]
-    ed = io.BytesIO(bytes.fromhex(encryptData))
-    filename = Path.home() / f"{int(time.time())}encryptData"
-    with open(filename, "wb") as edfile:
-        edfile.write(ed.getvalue())
+    # A private (owner-only), unpredictably named file, deleted as soon as fastboot is done.
+    fd, name = tempfile.mkstemp(prefix="miunlock-", suffix=".encryptData")
+    filename = Path(name)
+    with os.fdopen(fd, "wb") as edfile:
+        edfile.write(bytes.fromhex(encryptData))
 
     try:
-        subprocess.run([fastboot_cmd, "stage", filename], check=True, capture_output=True, text=True)
-        subprocess.run([fastboot_cmd, "oem", "unlock"], check=True, capture_output=True, text=True)
+        subprocess.run([fastboot_cmd, "stage", str(filename)], check=True, capture_output=True, text=True, creationflags=NO_WINDOW)
+        subprocess.run([fastboot_cmd, "oem", "unlock"], check=True, capture_output=True, text=True, creationflags=NO_WINDOW)
         console.print(f"\n[{GREEN}]Unlock successful[/]\n")
     except subprocess.CalledProcessError as e:
         console.print(f"\n[{RED}]{e.stderr}[/]\n")

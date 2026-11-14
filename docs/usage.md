@@ -60,7 +60,7 @@ $ miunlock status
   "logged_in": true,
   "userId": "1234567890",
   "zone": "India",
-  "device_codename": "gram"
+  "device_codename": "example"
 }
 ```
 
@@ -68,7 +68,7 @@ $ miunlock status
 $ miunlock check
 {
   "eligible": false,
-  "product": "gram",
+  "product": "example",
   "zone": "India",
   "code": 20036,
   "description": "Please unlock 168 hours later. ..."

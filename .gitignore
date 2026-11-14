@@ -6,3 +6,20 @@ dist/
 .venv/
 venv/
 *.log
+
+# Never commit credentials, sessions, logs or device data
+.miunlocksession/
+.migatesession/
+session.json
+session.log
+*.log
+*.encryptData
+*encryptData
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+bugreport*
+*.tsv
+screen*.png

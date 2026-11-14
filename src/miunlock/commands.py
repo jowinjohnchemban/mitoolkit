@@ -1,7 +1,7 @@
 import subprocess
 import threading
 import time
-from miunlock.system import console, WHITE, RED, ORANGE
+from miunlock.system import console, WHITE, RED, ORANGE, NO_WINDOW
 
 def read_stream(stream, output_list, process, restart_flag, status):
     try:
@@ -28,7 +28,8 @@ def CheckB(cmd, var_name, *fastboot_args):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     bufsize=1,
-                    universal_newlines=True
+                    universal_newlines=True,
+                    creationflags=NO_WINDOW,
                 )
 
             except FileNotFoundError:

@@ -28,15 +28,17 @@ def _request(method, url, timeout=30, **kwargs):
         response.raise_for_status()
         return response
     except requests.exceptions.Timeout:
-        raise ConnectionError("Request timed out")
+        raise ConnectionError("Request timed out") from None
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 403:
-            raise ConnectionError("Access denied")
-        raise ConnectionError(f"HTTP error: {e.response.status_code}")
+            raise ConnectionError("Access denied") from None
+        raise ConnectionError(f"HTTP error: {e.response.status_code}") from None
     except Exception as e:
-        error = str(e)
-        if "Failed to resolve" in error:
-            raise ConnectionError("No internet connection")
-        raise ConnectionError(f"Request failed: {e}")
+        # The text of a requests error contains the full URL, including one-time
+        # login tokens in its query string. Report only the kind of failure, and
+        # drop the chained exception so a traceback can't print the URL either.
+        if "Failed to resolve" in str(e):
+            raise ConnectionError("No internet connection") from None
+        raise ConnectionError(f"Request failed ({type(e).__name__})") from None
     finally:
         loader.stop()

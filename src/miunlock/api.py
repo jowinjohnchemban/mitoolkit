@@ -25,15 +25,17 @@ changes, both this file and unlock.py need updating -- see CHANGES.md.
 from __future__ import annotations
 
 import hashlib
+import os
 import random
 import subprocess
-import time
+import tempfile
 from pathlib import Path
 from typing import Optional
 
 from miunlock.auth import get_passtoken, get_service, get_region, get_dataCenterZone
 from miunlock.fastboot import get_fastboot
 from miunlock.commands import get_product, get_device_token
+from miunlock.system import NO_WINDOW
 from miunlock.utils import _send
 
 DOMAIN_BY_ZONE = {
@@ -221,13 +223,15 @@ def perform_unlock(passtoken: dict, eligibility: dict, *, confirm_wipe: bool) ->
         raise UnlockError(str(unlock_result.get("descEN", unlock_result)))
 
     encrypt_data = unlock_result["encryptData"]
-    filename = Path.home() / f"{int(time.time())}encryptData"
+    # A private (owner-only), unpredictably named file, deleted as soon as fastboot is done.
+    fd, name = tempfile.mkstemp(prefix="miunlock-", suffix=".encryptData")
+    filename = Path(name)
     try:
-        with open(filename, "wb") as f:
+        with os.fdopen(fd, "wb") as f:
             f.write(bytes.fromhex(encrypt_data))
 
-        subprocess.run([fastboot_cmd, "stage", str(filename)], check=True, capture_output=True, text=True)
-        subprocess.run([fastboot_cmd, "oem", "unlock"], check=True, capture_output=True, text=True)
+        subprocess.run([fastboot_cmd, "stage", str(filename)], check=True, capture_output=True, text=True, creationflags=NO_WINDOW)
+        subprocess.run([fastboot_cmd, "oem", "unlock"], check=True, capture_output=True, text=True, creationflags=NO_WINDOW)
     except subprocess.CalledProcessError as e:
         raise UnlockError(e.stderr) from e
     finally:
