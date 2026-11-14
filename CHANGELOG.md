@@ -8,6 +8,8 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-15
+
 First release of this fork. It starts from MiUnlockTool 1.7.5 and migate 1.1.11,
 both by offici5l.
 
@@ -23,6 +25,11 @@ both by offici5l.
   prompt.
 - `NOTICE` file with attribution and the MIT notice for migate-derived code.
 - Documentation rewritten into `docs/` with an index.
+- `miunlock --version`.
+- Release builds: Windows, Linux and macOS executables (`miunlock` and
+  `miunlock-gui`), a wheel and an sdist, with SHA-256 checksums, built by GitHub
+  Actions from the tagged source.
+- CI that installs on three operating systems and checks the confirmation gate.
 
 ### Changed
 
@@ -31,11 +38,14 @@ both by offici5l.
 - The saved session moved from `~/.migatesession` to `~/.miunlocksession`.
 - The session file is restricted to the current user after it is written.
 - Installation is from this repository, not PyPI.
+- The version number lives in one place, `miunlock.__version__`, and starts at
+  1.8.0 (upstream was at 1.7.5).
 - Minimum Python raised to 3.9, which the build backend requires.
 - Running `miunlock` with no arguments behaves as before.
 
 ### Removed
 
+- Upstream's manual "Publish to PyPI" workflow; this fork is not published on PyPI.
 - Password ("Terminal") login and its two-factor helpers (`login/terminal.py`,
   `verify.py`, `sendcode.py`, `verifycode.py`). Only browser and QR login remain.
   The old code sent an unsalted MD5 of the account password to Xiaomi's login

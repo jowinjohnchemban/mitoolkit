@@ -114,6 +114,38 @@ curl -s https://raw.githubusercontent.com/nohajc/termux-adb/master/install.sh | 
 
 Read scripts before piping them to a shell, including `.install` here.
 
+## Prebuilt executables
+
+If you would rather not install Python, download a ready-made program from the
+[Releases page](https://github.com/jowinjohnchemban/miunlock/releases/latest):
+
+| File | What it is |
+|---|---|
+| `miunlock-windows-x64.exe`, `miunlock-linux-x64`, `miunlock-macos-arm64` | Command line tool |
+| `miunlock-gui-windows-x64.exe`, `miunlock-gui-linux-x64`, `miunlock-gui-macos-arm64` | GUI |
+| `miunlock-<version>-py3-none-any.whl`, `miunlock-<version>.tar.gz` | Python packages |
+| `SHA256SUMS.txt` | Checksums |
+
+They are built by GitHub Actions from the tagged source. Check your download
+against `SHA256SUMS.txt` before running it:
+
+```sh
+# Linux
+sha256sum -c SHA256SUMS.txt --ignore-missing
+# macOS
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
+```
+
+```powershell
+# Windows PowerShell: compare the printed hash with the line in SHA256SUMS.txt
+Get-FileHash .\miunlock-windows-x64.exe -Algorithm SHA256
+```
+
+The programs are **not code-signed**, so Windows SmartScreen or macOS Gatekeeper may
+warn, and some antivirus tools flag programs made with PyInstaller. If that worries
+you, install from source instead. On Linux the GUI also needs Tk on the system
+(for example `sudo apt install python3-tk`). The macOS build is for Apple silicon.
+
 ## Install from a local clone
 
 ```sh

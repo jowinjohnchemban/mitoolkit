@@ -7,7 +7,7 @@ from miunlock.auth import get_passtoken, get_service, get_region, get_dataCenter
 from miunlock.unlock import unlock_device
 from miunlock.fastboot import get_fastboot
 from miunlock.system import console, GREEN, WHITE, ORANGE
-from miunlock import api
+from miunlock import api, __version__
 
 
 def interactive_main():
@@ -145,6 +145,7 @@ def main():
                      "for the interactive flow, or use a subcommand below "
                      "for scripting/automation (all output is JSON).",
     )
+    parser.add_argument("--version", action="version", version=f"miunlock {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_login = sub.add_parser("login", help="Log in (or reuse a saved session) and print account info as JSON.")

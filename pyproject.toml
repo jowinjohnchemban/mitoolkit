@@ -1,6 +1,6 @@
 [project]
-version = "1.7.5"
 name = "miunlock"
+dynamic = ["version"]
 description = "Retrieve Xiaomi encryptData(token) to unlock bootloader"
 authors = [{name = "offici5l"}]
 license = "Apache-2.0"
@@ -44,3 +44,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "miunlock.auth.login" = ["captcha.html"]
+
+[tool.setuptools.dynamic]
+version = {attr = "miunlock.__version__"}

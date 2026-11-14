@@ -41,8 +41,10 @@ does **not** bypass the waiting period or any account requirement.
 pip install git+https://github.com/jowinjohnchemban/miunlock.git
 ```
 
-This project is not published on PyPI; install from source as shown. Full
-instructions, including virtual environments and Termux, are in the
+This project is not published on PyPI; install from source as shown. Prebuilt
+Windows, Linux and macOS programs are on the
+[Releases page](https://github.com/jowinjohnchemban/miunlock/releases/latest).
+Full instructions, including virtual environments and Termux, are in the
 [installation guide](docs/installation.md).
 
 ## Quick start
