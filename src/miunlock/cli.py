@@ -7,7 +7,7 @@ from miunlock.auth import get_passtoken, get_service, get_region, get_dataCenter
 from miunlock.unlock import unlock_device
 from miunlock.fastboot import get_fastboot
 from miunlock.system import console, GREEN, WHITE, ORANGE
-from miunlock import api, __version__
+from miunlock import api, log, __version__
 
 
 def interactive_main():
@@ -83,6 +83,22 @@ def _cmd_login(args):
         sys.exit(1)
 
 
+def _cmd_devices(args):
+    try:
+        _print_json(api.list_devices())
+    except api.UnlockError as e:
+        _print_json({"error": str(e)})
+        sys.exit(1)
+
+
+def _cmd_reboot_fastboot(args):
+    try:
+        _print_json(api.reboot_to_fastboot(args.serial))
+    except api.UnlockError as e:
+        _print_json({"success": False, "error": str(e)})
+        sys.exit(1)
+
+
 def _cmd_status(args):
     try:
         token = api.login(silent_if_cached=True)
@@ -133,10 +149,48 @@ def _cmd_unlock(args):
         sys.exit(1)
 
 
+def _start_gui() -> bool:
+    """Open the GUI. False (after saying why) if it cannot, so the caller can fall back."""
+    try:
+        from miunlock import gui
+    except ImportError:
+        print("The graphical app needs Tkinter, which is not installed. Using the command line instead.\n"
+              "(Linux: sudo apt install python3-tk)", file=sys.stderr)
+        return False
+    _hide_console()
+    gui.main()
+    return True
+
+
+def _hide_console():
+    """A built Windows program opens a console window; close it when only we are using it."""
+    if sys.platform == "win32" and getattr(sys, "frozen", False):
+        try:
+            import ctypes
+            ids = (ctypes.c_uint * 2)()
+            if ctypes.windll.kernel32.GetConsoleProcessList(ids, 2) <= 1:
+                ctypes.windll.kernel32.FreeConsole()
+        except Exception:
+            pass
+
+
 def main():
-    # Bare `miunlock` with no arguments: run the original interactive flow,
-    # byte-for-byte the same as every previous version of this tool.
-    if len(sys.argv) == 1:
+    log.setup()
+    # One program, two modes: the GUI by default, the command line with --cli
+    # (a subcommand such as `check` also means command line).
+    args = sys.argv[1:]
+    cli_flag = "--cli" in args
+    gui_flag = "--gui" in args
+    if "--mcp" in args:  # an AI agent controls the program directly
+        from miunlock import mcp
+        return mcp.serve()
+    args = [a for a in args if a not in ("--cli", "--gui")]
+    sys.argv = [sys.argv[0]] + args
+    if gui_flag or (not args and not cli_flag):
+        if _start_gui():
+            return
+        return interactive_main()
+    if not args:
         return interactive_main()
 
     parser = argparse.ArgumentParser(
@@ -145,6 +199,9 @@ def main():
                      "for the interactive flow, or use a subcommand below "
                      "for scripting/automation (all output is JSON).",
     )
+    parser.add_argument("--cli", action="store_true", help="Command-line mode (the default when a command is given). With no command: the interactive prompt.")
+    parser.add_argument("--gui", action="store_true", help="Open the graphical app (the default when run with no arguments).")
+    parser.add_argument("--mcp", action="store_true", help="Let an AI agent control the program over MCP (stdin/stdout). Cannot unlock.")
     parser.add_argument("--version", action="version", version=f"miunlock {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -152,6 +209,13 @@ def main():
     p_login.add_argument("--method", choices=["1", "3"], default="1", help="1=browser (default), 3=QR code")
     p_login.add_argument("--force", action="store_true", help="Ignore any saved session and log in again.")
     p_login.set_defaults(func=_cmd_login)
+
+    p_dev = sub.add_parser("devices", help="List phones seen by adb and fastboot. Read-only.")
+    p_dev.set_defaults(func=_cmd_devices)
+
+    p_rb = sub.add_parser("reboot-fastboot", help="Use adb to reboot a phone running Android into fastboot mode. Erases nothing.")
+    p_rb.add_argument("--serial", help="Device serial, if more than one phone is connected.")
+    p_rb.set_defaults(func=_cmd_reboot_fastboot)
 
     p_status = sub.add_parser("status", help="Print account + device status as JSON. Never touches fastboot oem unlock.")
     p_status.set_defaults(func=_cmd_status)

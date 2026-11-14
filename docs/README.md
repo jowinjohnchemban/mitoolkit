@@ -8,6 +8,7 @@
 
 ## Reference
 
+- [AI agents](agents.md): control and read miunlock from an agent (MCP)
 - [Python API](api.md): `miunlock.api`
 - [Error codes](error-codes.md): messages returned by Xiaomi's servers
 - [Safety model](safety.md): hardening, the confirmation gate, what to watch for

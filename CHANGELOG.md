@@ -15,6 +15,14 @@ both by offici5l.
 
 ### Added
 
+- One program: `miunlock` opens the GUI; `--cli` or any command runs the command line.
+  `miunlock-gui` remains as an alias. Release builds are a single executable per system.
+- adb support (`miunlock.adb`, `miunlock devices`, `miunlock reboot-fastboot`, and a
+  "Reboot to fastboot" button in the GUI): sees the phone while Android is running, shows
+  its model, MIUI version and lock state, and reboots it into fastboot.
+- `miunlock --mcp`: an MCP server so AI agents can list phones, reboot to fastboot, check
+  eligibility and read the log directly. Unlocking is deliberately not offered to agents.
+- Project logo (`assets/`), shown in the README, the GUI window and the Windows executables.
 - Python API, `miunlock.api`, with `login`, `get_account_zone`,
   `get_device_codename`, `check_unlock_eligibility` and `perform_unlock`.
 - Command line subcommands that print JSON: `login`, `status`, `check`, `unlock`.
@@ -53,6 +61,10 @@ both by offici5l.
 
 ### Security
 
+- The saved session is stored in the OS credential store (with `miunlock[secure]`) or
+  encrypted with Windows DPAPI, expires after 24 hours (`MIUNLOCK_SESSION_TTL_HOURS`), and
+  sessions without a timestamp are discarded.
+- A scrubbed `miunlock.log` is written next to the executable.
 - Error messages no longer print login or config responses, which carry session
   tokens; only status fields and field names are shown.
 - Failed requests no longer report the URL, which contains one-time login tokens, and no

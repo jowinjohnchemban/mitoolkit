@@ -75,7 +75,7 @@ Check it works:
 miunlock --help
 ```
 
-This also installs the `miunlock-gui` command. To update later, run the same
+Run `miunlock` for the GUI or `miunlock --cli` for the command line. To update later, run the same
 command with `--upgrade`. To remove it, run `pip uninstall miunlock`.
 
 ## fastboot
@@ -121,8 +121,7 @@ If you would rather not install Python, download a ready-made program from the
 
 | File | What it is |
 |---|---|
-| `miunlock-windows-x64.exe`, `miunlock-linux-x64`, `miunlock-macos-arm64` | Command line tool |
-| `miunlock-gui-windows-x64.exe`, `miunlock-gui-linux-x64`, `miunlock-gui-macos-arm64` | GUI |
+| `miunlock-windows-x64.exe`, `miunlock-linux-x64`, `miunlock-macos-arm64` | The program: opens the GUI, or runs on the command line with `--cli` |
 | `miunlock-<version>-py3-none-any.whl`, `miunlock-<version>.tar.gz` | Python packages |
 | `SHA256SUMS.txt` | Checksums |
 

@@ -28,6 +28,10 @@ dependencies = [
     "pyaes",
 ]
 
+[project.optional-dependencies]
+# Store the session in the OS credential store (macOS Keychain, Linux Secret Service).
+secure = ["keyring>=24"]
+
 [project.urls]
 Repository = "https://github.com/jowinjohnchemban/miunlock"
 
@@ -43,6 +47,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
+miunlock = ["assets/*.png"]
 "miunlock.auth.login" = ["captcha.html"]
 
 [tool.setuptools.dynamic]

@@ -32,6 +32,8 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
+from miunlock import adb, log
+from miunlock.auth.redact import redact_response
 from miunlock.auth import get_passtoken, get_service, get_region, get_dataCenterZone
 from miunlock.fastboot import get_fastboot
 from miunlock.commands import get_product, get_device_token
@@ -55,6 +57,9 @@ REGION_TO_ZONE = {"CN": "China", "IN": "India", "RU": "Russia",
                    **{c: "Europe" for c in _EUROPE_CODES}}
 
 
+_log = log.get("api")
+
+
 class UnlockError(Exception):
     """Raised for any rejected or failed step. str(e) is human-readable."""
 
@@ -73,9 +78,12 @@ def login(login_method: str = "1", silent_if_cached: bool = True) -> dict:
     around that step, and there will not be one added.
     """
     param = {"sid": "unlockApi", "checkSafeAddress": True}
+    _log.info("login: start (method=%s, reuse saved=%s)", login_method, silent_if_cached)
     token = get_passtoken(param, silent=silent_if_cached, login_method=login_method)
     if token is None:
+        _log.warning("login: failed or cancelled")
         raise UnlockError("Login failed or was cancelled.")
+    _log.info("login: ok")
     return token
 
 
@@ -126,7 +134,7 @@ def check_unlock_eligibility(passtoken: dict, zone: Optional[str] = None) -> dic
     r = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=16))
     nonce_resp = _send("/api/v2/nonce", {"r": r}, domain, ssecurity, cookies)
     if "error" in nonce_resp or nonce_resp.get("code") != 0:
-        raise UnlockError(str(nonce_resp.get("error", nonce_resp)))
+        raise UnlockError(str(nonce_resp.get("error") or redact_response(nonce_resp)))
 
     clear = _send(
         "/api/v2/unlock/device/clear",
@@ -134,12 +142,15 @@ def check_unlock_eligibility(passtoken: dict, zone: Optional[str] = None) -> dic
         domain, ssecurity, cookies,
     )
     if "error" in clear:
+        _log.warning("check: transport error for product=%s zone=%s", product, zone)
         return {"eligible": False, "product": product, "zone": zone, "error": clear["error"]}
     if clear.get("code") != 0:
+        _log.info("check: not eligible, code=%s product=%s zone=%s", clear.get("code"), product, zone)
         return {
             "eligible": False, "product": product, "zone": zone,
-            "code": clear.get("code"), "description": clear.get("descEN", clear),
+            "code": clear.get("code"), "description": clear.get("descEN") or redact_response(clear),
         }
+    _log.info("check: eligible product=%s zone=%s wipes_data=%s", product, zone, bool(clear.get("cleanOrNot")))
 
     return {
         "eligible": True,
@@ -191,6 +202,7 @@ def perform_unlock(passtoken: dict, eligibility: dict, *, confirm_wipe: bool) ->
     cookies = service["cookies"]
     device_id = service["servicedata"]["deviceId"]
 
+    _log.warning("unlock: confirmed by caller, starting for product=%s zone=%s", product, zone)
     fastboot_cmd = get_fastboot()
     device_token = get_device_token(fastboot_cmd)
     if isinstance(device_token, dict) and "error" in device_token:
@@ -211,7 +223,7 @@ def perform_unlock(passtoken: dict, eligibility: dict, *, confirm_wipe: bool) ->
     r = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=16))
     nonce_resp = _send("/api/v2/nonce", {"r": r}, domain, ssecurity, cookies)
     if "error" in nonce_resp or nonce_resp.get("code") != 0:
-        raise UnlockError(str(nonce_resp.get("error", nonce_resp)))
+        raise UnlockError(str(nonce_resp.get("error") or redact_response(nonce_resp)))
 
     unlock_result = _send(
         "/api/v3/ahaUnlock", {"appId": "1", "data": data, "nonce": nonce_resp["nonce"]},
@@ -220,7 +232,7 @@ def perform_unlock(passtoken: dict, eligibility: dict, *, confirm_wipe: bool) ->
     if "error" in unlock_result:
         raise UnlockError(str(unlock_result["error"]))
     if unlock_result.get("code") != 0:
-        raise UnlockError(str(unlock_result.get("descEN", unlock_result)))
+        raise UnlockError(str(unlock_result.get("descEN") or redact_response(unlock_result)))
 
     encrypt_data = unlock_result["encryptData"]
     # A private (owner-only), unpredictably named file, deleted as soon as fastboot is done.
@@ -233,9 +245,54 @@ def perform_unlock(passtoken: dict, eligibility: dict, *, confirm_wipe: bool) ->
         subprocess.run([fastboot_cmd, "stage", str(filename)], check=True, capture_output=True, text=True, creationflags=NO_WINDOW)
         subprocess.run([fastboot_cmd, "oem", "unlock"], check=True, capture_output=True, text=True, creationflags=NO_WINDOW)
     except subprocess.CalledProcessError as e:
+        _log.error("unlock: fastboot failed (exit %s): %s", e.returncode, (e.stderr or "").strip()[:300])
         raise UnlockError(e.stderr) from e
     finally:
         if filename.exists():
             filename.unlink()
+    _log.warning("unlock: fastboot reported success for product=%s", product)
 
     return {"success": True, "product": product}
+
+
+def list_devices() -> dict:
+    """Phones currently connected, found with adb (running Android) and fastboot (bootloader).
+
+    Returns {"android": [{"serial", "state", plus model/codename/android/miui/
+    bootloader_locked when the state is "device"}], "fastboot": [serials]}.
+    Read-only; it never changes anything on the phone.
+    """
+    android = []
+    try:
+        for dev in adb.devices():
+            if dev["state"] == "device":
+                try:
+                    dev.update(adb.device_info(dev["serial"]))
+                except adb.AdbError as err:
+                    dev["error"] = str(err)
+            android.append(dev)
+    except adb.AdbError as err:
+        raise UnlockError(str(err)) from None
+
+    fast = []
+    out = subprocess.run([get_fastboot(), "devices"], capture_output=True, text=True,
+                         timeout=15, creationflags=NO_WINDOW).stdout
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[1] == "fastboot":
+            fast.append(parts[0])
+    return {"android": android, "fastboot": fast}
+
+
+def reboot_to_fastboot(serial: Optional[str] = None) -> dict:
+    """Reboot a phone that is running Android into fastboot mode using adb.
+
+    Needs USB debugging on and the computer authorised on the phone. This only
+    restarts the phone; it does not erase anything and does not unlock it.
+    """
+    try:
+        adb.reboot_to_bootloader(serial)
+    except adb.AdbError as err:
+        raise UnlockError(str(err)) from None
+    _log.info("rebooted a phone to fastboot through adb")
+    return {"success": True}

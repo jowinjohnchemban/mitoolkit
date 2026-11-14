@@ -15,7 +15,6 @@ from __future__ import annotations
 import ctypes
 import io
 import queue
-import shutil
 import subprocess
 import sys
 import threading
@@ -26,7 +25,8 @@ from tkinter import font as tkfont
 from tkinter import messagebox, ttk
 from typing import Callable, Optional
 
-from miunlock import __version__, api
+from miunlock import __version__, adb, api, log
+from miunlock.auth import store
 from miunlock.auth.redact import mask_id
 from miunlock.fastboot import get_fastboot
 from miunlock.hints import explain
@@ -39,6 +39,7 @@ GREEN = "#1a7f37"
 RED = "#b3261e"
 AMBER = "#9a5b00"
 MUTED = "#5f6368"
+ORANGE_DOT = "#e8710a"
 ACCENT = "#e8590c"
 WARN_BG = "#fff4ce"
 WARN_FG = "#5c4400"
@@ -71,6 +72,12 @@ class App:
         root.title(f"miunlock {__version__}")
         root.geometry("780x660")
         root.minsize(700, 560)
+        try:
+            icon = Path(__file__).parent / "assets" / "logo.png"
+            self._icon = tk.PhotoImage(file=str(icon))  # keep a reference
+            root.iconphoto(True, self._icon)
+        except Exception:  # the logo is cosmetic; never fail because of it
+            pass
 
         self.q: "queue.Queue[tuple]" = queue.Queue()
         self.token: Optional[dict] = None
@@ -81,6 +88,9 @@ class App:
         self.unlocked = False
         self.busy = False
         self._polling = False
+        self.android: Optional[dict] = None  # phone seen by adb while running Android
+        self._adb: Optional[str] = None
+        self._info: dict = {}
         self._wrap_labels: list[ttk.Label] = []
 
         self._style()
@@ -116,6 +126,7 @@ class App:
         bar = tk.Menu(self.root)
         file_menu = tk.Menu(bar, tearoff=0)
         file_menu.add_command(label="Sign out and delete saved session...", command=self._sign_out)
+        file_menu.add_command(label="Show log file", command=self._show_log)
         file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self.root.destroy)
         bar.add_cascade(label="File", menu=file_menu)
@@ -211,6 +222,7 @@ class App:
         self.dev_dot.pack(side="left")
         self.dev_text = ttk.Label(drow, text="Preparing fastboot...", foreground=MUTED)
         self.dev_text.pack(side="left", padx=6)
+        self.fb_btn = ttk.Button(drow, text="Reboot to fastboot", command=self._to_fastboot)
         row2 = ttk.Frame(b2)
         row2.pack(fill="x", pady=(10, 0))
         self.check_btn = ttk.Button(row2, text="Check eligibility", style="Primary.TButton", command=self._check)
@@ -325,7 +337,7 @@ class App:
                 elif kind == "fastboot":
                     self._fastboot_ready(*rest)
                 elif kind == "device":
-                    self._device_seen(rest[0])
+                    self._device_seen(rest[0], rest[1] if len(rest) > 1 else None)
         except queue.Empty:
             pass
         self.root.after(100, self._pump)
@@ -410,6 +422,7 @@ class App:
 
             def work():
                 serial = None
+                android = None
                 try:
                     out = subprocess.run(
                         [self.fastboot, "devices"], capture_output=True, text=True,
@@ -422,29 +435,78 @@ class App:
                             break
                 except Exception:
                     serial = None
+                if serial is None:
+                    try:  # no phone in fastboot: see whether one is running Android
+                        self._adb = self._adb or adb.get_adb()
+                        found = adb.devices(self._adb)
+                        if found:
+                            android = dict(found[0])
+                            if android["state"] == "device":
+                                if android["serial"] not in self._info:
+                                    self._info[android["serial"]] = adb.device_info(android["serial"], self._adb)
+                                android.update(self._info[android["serial"]])
+                    except Exception:
+                        android = None
                 self._polling = False
-                self.q.put(("device", serial))
+                self.q.put(("device", serial, android))
 
             threading.Thread(target=work, daemon=True).start()
         self.root.after(2000, self._poll_device)
 
-    def _device_seen(self, serial: Optional[str]):
-        if serial == self.device:
+    def _device_seen(self, serial: Optional[str], android: Optional[dict] = None):
+        if serial == self.device and android == self.android:
             return
-        self.device = serial
+        was_connected = self.device is not None
+        self.device, self.android = serial, android
+        self.fb_btn.pack_forget()
         if serial:
             self.dev_dot.configure(fg=GREEN)
             self.dev_text.configure(text=f"Phone detected in fastboot mode ({serial})", foreground=GREEN)
-            self._log(f"Device detected: {serial}")
+            self._log(f"Device detected in fastboot: {serial}")
+        elif android and android["state"] == "device":
+            name = android.get("model") or android["serial"]
+            ver = android.get("hyperos") or android.get("miui") or ""
+            lock = {True: ", bootloader locked", False: ", bootloader unlocked"}.get(android.get("bootloader_locked"), "")
+            self.dev_dot.configure(fg=ORANGE_DOT)
+            self.dev_text.configure(
+                text=f"{name} is on (Android {android.get('android') or '?'} {ver}{lock}). It must be in fastboot mode.",
+                foreground=MUTED)
+            self.fb_btn.pack(side="left", padx=6)
+            self._log(f"Phone seen by adb: {name}")
+        elif android:
+            self.dev_dot.configure(fg=ORANGE_DOT)
+            self.dev_text.configure(
+                text="Phone connected, but USB debugging is not allowed yet. Accept the prompt on the phone.",
+                foreground=MUTED)
         else:
             self.dev_dot.configure(fg=MUTED)
             self.dev_text.configure(text="No phone detected. Waiting...", foreground=MUTED)
-            self._log("Device disconnected.")
+            if was_connected:
+                self._log("Device disconnected.")
             if self.eligibility is not None and not self.unlocked:
                 self.eligibility = None
                 self._show_check("", "", "", MUTED)
                 self.r2_raw.configure(text="")
         self._refresh()
+
+    def _to_fastboot(self):
+        serial = (self.android or {}).get("serial")
+        if not serial or not self._adb:
+            return
+        self._log("Asking the phone to reboot into fastboot mode (nothing is erased)...")
+        self.fb_btn.configure(state="disabled")
+
+        def work():
+            adb.reboot_to_bootloader(serial, self._adb)
+            return None
+
+        def done(status, result):
+            self.fb_btn.configure(state="normal")
+            if status == "error":
+                self._log(f"Could not reboot to fastboot: {result}")
+                messagebox.showerror("Reboot to fastboot", str(result))
+
+        self._run(work, done, "Rebooting the phone into fastboot mode...")
 
     # ------------------------------------------------------------------ step 1
     def _login(self):
@@ -576,12 +638,25 @@ class App:
             default="no",
         ):
             return
-        shutil.rmtree(folder, ignore_errors=True)
+        store.delete_all()
         self.token = self.zone = self.eligibility = None
         self.r1.configure(text="Signed out. Saved session deleted.", foreground=MUTED)
         self._show_check("", "", "", MUTED)
         self._log("Saved session deleted.")
         self._refresh()
+
+    def _show_log(self):
+        path = log.log_path()
+        if path is None:
+            messagebox.showinfo("Log file", "Logging to a file is off: the program's folder is not writable.")
+        elif messagebox.askyesno("Log file", f"The log is saved here:\n\n{path}\n\nIt never contains tokens. Open its folder?"):
+            try:
+                if sys.platform == "win32":
+                    subprocess.Popen(["explorer", "/select,", str(path)], creationflags=NO_WINDOW)
+                else:
+                    webbrowser.open(path.parent.as_uri())
+            except Exception as err:
+                self._log(f"Could not open the folder: {err}")
 
     def _about(self):
         messagebox.showinfo(
@@ -601,6 +676,7 @@ def _enable_dpi_awareness():
 
 
 def main():
+    log.setup()
     _enable_dpi_awareness()
     root = tk.Tk()
     app = App(root)

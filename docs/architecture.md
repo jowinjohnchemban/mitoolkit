@@ -8,9 +8,14 @@ used to be the separate `migate` library lives inside it as `miunlock.auth`.
 ```text
 src/miunlock/
 ├── __main__.py        python -m miunlock
-├── cli.py             entry point: interactive mode and JSON subcommands
-├── gui.py             Tkinter GUI (miunlock-gui)
-├── api.py             programmatic API used by the subcommands and GUI
+├── cli.py             entry point: GUI by default, --cli, JSON subcommands, --mcp
+├── gui.py             Tkinter GUI
+├── mcp.py             MCP server for AI agents (no unlock tool)
+├── api.py             programmatic API used by the subcommands, GUI and MCP
+├── adb.py             adb: list phones, device info, reboot to fastboot
+├── log.py             scrubbed miunlock.log next to the executable
+├── hints.py           plain-English explanations of Xiaomi error codes
+├── assets/logo.png    window icon
 ├── unlock.py          the original interactive unlock sequence
 ├── commands.py        fastboot queries: product, device token
 ├── fastboot.py        locate or download fastboot
@@ -20,7 +25,8 @@ src/miunlock/
 └── auth/              Xiaomi account login (formerly migate)
     ├── config.py          endpoint URLs and console styling
     ├── requester.py       shared HTTP session
-    ├── passtoken.py       login and the saved session file
+    ├── passtoken.py       login flow
+    ├── store.py           saved session: credential store, DPAPI or private file, 24 h expiry
     ├── service.py         service tokens for the unlock API
     ├── login/
     │   ├── browser_qr.py  browser and QR-code login
@@ -78,7 +84,7 @@ The account region selects the unlock server:
 Defined in `pyproject.toml`:
 
 - `miunlock` → `miunlock.cli:main`
-- `miunlock-gui` → `miunlock.gui:main`
+- `miunlock-gui` → `miunlock.gui:main` (alias; `miunlock` alone opens the GUI too)
 
-With no arguments, `miunlock` runs the interactive flow unchanged. With a
-subcommand it uses `miunlock.api`.
+With no arguments `miunlock` opens the GUI; `--cli` alone runs the interactive flow;
+a subcommand uses `miunlock.api`; `--mcp` starts the agent interface.

@@ -1,4 +1,6 @@
-# miunlock
+<p align="center"><img src="assets/logo.png" alt="miunlock logo" width="120"></p>
+
+<h1 align="center">miunlock</h1>
 
 Unlock the bootloader of Xiaomi, Redmi and POCO devices from any operating
 system, using Xiaomi's own unlock service.
@@ -20,7 +22,9 @@ does **not** bypass the waiting period or any account requirement.
 ## Features
 
 - Works on Windows, macOS, Linux and Android (Termux)
-- Interactive mode, scriptable CLI with JSON output, and a small GUI
+- One program, three ways to drive it: a GUI (default), a command line (`--cli`, JSON output)
+  and an AI-agent interface (`--mcp`)
+- Uses adb to see your phone, show its details and reboot it into fastboot for you
 - Python API for your own scripts and automation
 - Login happens on Xiaomi's own page (browser or QR code); your password never
   passes through this program
@@ -52,22 +56,21 @@ Full instructions, including virtual environments and Termux, are in the
 1. Add your account and device in *Developer options → Mi Unlock status* and wait
    out Xiaomi's waiting period. See the [unlock guide](docs/unlock-guide.md).
 2. Put the device in fastboot mode and connect it.
-3. Run:
+3. Run `miunlock`: it opens the GUI. The same program is the command line when you
+add `--cli`, or give it a command:
 
 ```sh
-miunlock
-```
-
-For scripting, use the subcommands (all print JSON):
-
-```sh
+miunlock --cli                    # interactive prompt
+miunlock devices                  # phones seen by adb and fastboot
+miunlock reboot-fastboot          # adb: reboot a running phone into fastboot
 miunlock login                    # log in or reuse a saved session
 miunlock status                   # account and device info
 miunlock check                    # is this device eligible right now? (read-only)
 miunlock unlock --confirm-wipe    # unlock; ERASES THE DEVICE
+miunlock --mcp                    # let an AI agent control it (cannot unlock)
 ```
 
-GUI: `miunlock-gui`. See the [usage guide](docs/usage.md) and the
+See the [usage guide](docs/usage.md), the [AI agent guide](docs/agents.md) and the
 [Python API](docs/api.md).
 
 ## Documentation
@@ -77,6 +80,7 @@ GUI: `miunlock-gui`. See the [usage guide](docs/usage.md) and the
 | [Installation](docs/installation.md) | Python, virtual environments, Termux |
 | [Unlock guide](docs/unlock-guide.md) | Step-by-step process on the device |
 | [Usage](docs/usage.md) | Interactive mode, CLI, GUI, session handling |
+| [AI agents](docs/agents.md) | Control and read miunlock from an agent over MCP |
 | [Python API](docs/api.md) | `miunlock.api` reference |
 | [Safety model](docs/safety.md) | What is hardened, what is gated, what to watch for |
 | [FAQ](docs/faq.md) | Common questions and device troubleshooting |

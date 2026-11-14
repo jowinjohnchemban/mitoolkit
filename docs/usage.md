@@ -1,7 +1,15 @@
 # Usage
 
-`miunlock` can be used three ways: an interactive prompt, a scriptable command
-line, and a small GUI. All three talk to the same code and the same Xiaomi
+`miunlock` is one program with three ways to drive it:
+
+| Run | You get |
+|---|---|
+| `miunlock` | The GUI |
+| `miunlock --cli` | The interactive prompt |
+| `miunlock <command>` (optionally `--cli <command>`) | Scriptable commands that print JSON |
+| `miunlock --mcp` | An interface for AI agents, see [agents](agents.md) |
+
+The built Windows program closes its console window when it opens the GUI. All three talk to the same code and the same Xiaomi
 servers.
 
 Before you start, follow the [unlock guide](unlock-guide.md) to add your account
@@ -10,10 +18,10 @@ and device in *Mi Unlock status*, and read the [safety model](safety.md).
 ## Interactive mode
 
 ```sh
-miunlock
+miunlock --cli
 ```
 
-Run with no arguments, it walks through the whole process:
+It walks through the whole process:
 
 1. Finds `fastboot`, or downloads Google's platform-tools if it is missing.
 2. Logs in. If a saved session exists it offers to reuse it; otherwise it asks for
@@ -34,6 +42,8 @@ and exits with status `0` on success and `1` on failure.
 | Command | What it does | Changes the device? |
 |---|---|---|
 | `miunlock login [--method 1\|3] [--force]` | Log in, or reuse a saved session | No |
+| `miunlock devices` | Phones seen by adb (model, MIUI, lock state) and fastboot | No |
+| `miunlock reboot-fastboot [--serial S]` | adb: reboot a running phone into fastboot | Restarts only |
 | `miunlock status` | Account, region and device codename | No |
 | `miunlock check` | Ask Xiaomi if the device is eligible right now | No |
 | `miunlock unlock --confirm-wipe` | Unlock the bootloader | **Yes, erases data** |
@@ -85,36 +95,22 @@ When eligible, `check` returns `"eligible": true` together with
 ## GUI
 
 ```sh
-miunlock-gui
+miunlock          # or: miunlock --gui
 ```
 
-Three buttons run the same steps in order: **Log in**, **Check eligibility** and
-**Unlock device**. The unlock button stays disabled until the check says the
-device is eligible. Clicking it opens a confirmation dialog that shows the
-server's data-erase notice; nothing happens unless you answer **Yes**. There is
-no "don't ask again" option.
+Three steps run in order: **Sign in**, **Check** and **Unlock**. The GUI detects a
+phone in fastboot mode by itself and explains Xiaomi's error codes in plain words. The
+unlock button stays disabled until the check says the device is eligible, you tick the
+confirmation box and you type the phone's name exactly. There is no "don't ask again" option.
 
 The GUI uses Tkinter, which ships with Python on Windows and macOS. On some Linux
 distributions install it separately, for example `sudo apt install python3-tk`.
 
-## Saved session
+## Saved session and log
 
-After a successful login the session is saved to:
+The session is stored encrypted where the system allows it (credential store or Windows
+DPAPI), expires after 24 hours, and is removed by logging out. Details, including how to
+change the expiry, are in the [safety model](safety.md#saved-session).
 
-```text
-~/.miunlocksession/unlockApi/session.json
-```
-
-It contains a long-lived `passToken`, which acts like a password for your Mi
-Account until it expires. The file is restricted to your user account, but you
-should still delete it when you are done:
-
-```sh
-# Windows (PowerShell)
-Remove-Item -Recurse $HOME\.miunlocksession
-# macOS / Linux / Termux
-rm -rf ~/.miunlocksession
-```
-
-Then review the account's signed-in devices at `account.xiaomi.com`. Deleting the
-file does not end the session on Xiaomi's side.
+Everything the program does is also recorded in `miunlock.log`, next to the executable.
+It contains no tokens. In the GUI, **File > Show log file** opens its folder.

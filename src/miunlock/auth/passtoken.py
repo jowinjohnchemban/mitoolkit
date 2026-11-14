@@ -1,9 +1,4 @@
 import json
-import os
-import platform
-import stat
-import subprocess
-from pathlib import Path
 
 # SANITIZED BUILD: the password-based terminal login path (miunlock.auth.login.terminal,
 # plus its verify.py/sendcode.py/verifycode.py 2FA helpers) has been deleted
@@ -14,49 +9,8 @@ from pathlib import Path
 from miunlock.auth.login.browser_qr import handle_browser_qr
 from miunlock.auth.config import SERVICELOGIN_URL, console, GREEN, WHITE, ORANGE, RED, DIM
 from miunlock.auth.requester import session, get
-from miunlock.auth.redact import redact_response
-
-
-_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
-
-def _restrict_to_current_user(path: Path) -> bool:
-    """Limit a file or folder to the current user. True only if it was applied."""
-    try:
-        if platform.system() == "Windows":
-            user = os.environ.get("USERNAME")
-            if not user:
-                return False
-            grant = f"{user}:(OI)(CI)F" if path.is_dir() else f"{user}:F"
-            result = subprocess.run(
-                ["icacls", str(path), "/inheritance:r", "/grant:r", grant],
-                capture_output=True, text=True, check=False, creationflags=_NO_WINDOW,
-            )
-            return result.returncode == 0
-        os.chmod(path, stat.S_IRWXU if path.is_dir() else stat.S_IRUSR | stat.S_IWUSR)
-        return True
-    except Exception:
-        return False
-
-
-def _write_session(path: Path, data: dict) -> bool:
-    """Save the session so it is never readable by other users, not even briefly.
-
-    The folder is restricted first, and on POSIX the file is created with mode 0600
-    from the start instead of being tightened after it was written. Returns whether
-    the restrictions could be applied, so the caller never claims protection it
-    does not have.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    safe = _restrict_to_current_user(path.parent)
-    text = json.dumps(data)
-    if os.name == "nt":
-        path.write_text(text, encoding="utf-8")
-    else:
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(text)
-    return _restrict_to_current_user(path) and safe
+from miunlock.auth import store
+from miunlock.auth.redact import mask_id, redact_response
 
 
 def get_passtoken(auth_data=None, silent=False, login_method=None):
@@ -73,32 +27,22 @@ def get_passtoken(auth_data=None, silent=False, login_method=None):
         auth_data = {"sid": "passport"}
 
     sid = auth_data["sid"]
-    cookies_file = Path.home() / ".miunlocksession" / f"{sid}" / "session.json"
+    passToken = store.load(sid)
 
-    if cookies_file.exists():
-        try:
-            with open(cookies_file, "r") as f:
-                passToken = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            cookies_file.unlink(missing_ok=True)
-            console.print("Session corrupted, please log in again.\n", style=RED)
-            passToken = None
+    if passToken is not None:
+        if silent:
+            return passToken
 
-        if passToken is not None:
+        choice = console.input(
+            f"\n[{GREEN}]Already logged in[/][{WHITE}]\nAccount ID: [/][{ORANGE}]{mask_id(passToken['userId'])}[/]\n\n"
+            f"[{WHITE}](Enter to continue, [{RED}]2[/] To log out) > [/]"
+        ).strip().lower()
 
-            if silent:
-                return passToken
-
-            choice = console.input(
-                f"\n[{GREEN}]Already logged in[/][{WHITE}]\nAccount ID: [/][{ORANGE}]{passToken['userId']}[/]\n\n"
-                f"[{WHITE}](Enter to continue, [{RED}]2[/] To log out) > [/]"
-            ).strip().lower()
-
-            if choice == "2":
-                cookies_file.unlink(missing_ok=True)
-                console.print("Logged out.", style=RED)
-            else:
-                return passToken
+        if choice == "2":
+            store.delete(sid)
+            console.print("Logged out.", style=RED)
+        else:
+            return passToken
 
     auth_data["_json"] = True
 
@@ -137,18 +81,20 @@ def get_passtoken(auth_data=None, silent=False, login_method=None):
 
     passToken = {k: cookies[k] for k in required}
 
-    protected = _write_session(cookies_file, passToken)
+    where = store.save(sid, passToken)
 
     console.print("\nLogin successful", style=GREEN)
-    if protected:
+    if where in (store.KEYRING, store.DPAPI):
+        console.print(f"[{DIM}]Session saved ({where}). Choose log out to remove it.[/]")
+    elif where == store.FILE:
         console.print(
-            f"[{DIM}]Session saved to {cookies_file} (access restricted to your user account). "
-            f"Delete it when you're done to end the saved session.[/]"
+            f"[{DIM}]Session saved in {store.ROOT} (readable only by your user account, but not "
+            f"encrypted). Delete it when you're done.[/]"
         )
     else:
         console.print(
-            f"[{ORANGE}]Session saved to {cookies_file}, but its permissions could not be restricted "
-            f"to your user account. Delete it as soon as you're done.[/]"
+            f"[{ORANGE}]Session saved in {store.ROOT}, NOT encrypted and its permissions could not be "
+            f"restricted. Delete it as soon as you're done.[/]"
         )
     session.cookies.clear()
 

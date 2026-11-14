@@ -23,7 +23,8 @@ interface puts a deliberate human action in front of it.
 | Interactive (`miunlock`) | Shows Xiaomi's data-erase notice, then waits for Enter |
 | Command line | `miunlock unlock` refuses without `--confirm-wipe` |
 | Python API | `perform_unlock(..., confirm_wipe=True)` is required; there is no default |
-| GUI | A confirmation dialog with the server notice; default answer is No |
+| AI agent (`--mcp`) | Unlocking is not offered at all; agents can only read and check |
+| GUI | A tick box plus typing the phone's name exactly; the button stays disabled until both are done |
 
 Nothing in the project sets these for you, and there is no environment variable or
 config option that does. Reading and checking (`login`, `status`, `check`) can be
@@ -56,17 +57,33 @@ disabling it, so it cannot run.
 
 ### Saved session
 
-After login the session is stored at `~/.miunlocksession/unlockApi/session.json`.
-It holds a long-lived `passToken`. In this fork the file is restricted to the
-current user after it is written (`icacls` on Windows, `chmod 600` elsewhere) and
-its path is printed with a reminder to delete it.
+After login the session (a long-lived `passToken`) is stored in the strongest place
+available, and the program tells you which one it used:
 
-The file is still plain JSON, and deleting it does not end the session on Xiaomi's
-side. When you are finished:
+| Where | When |
+|---|---|
+| OS credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service) | `keyring` is installed: `pip install "miunlock[secure]"` |
+| `~/.miunlocksession/<name>/session.dpapi`, encrypted with Windows DPAPI | Windows, no extra package |
+| `~/.miunlocksession/<name>/session.json`, readable only by your user | everywhere else (not encrypted) |
 
-1. Delete `~/.miunlocksession/`.
+**Expiry.** Every saved session carries a timestamp and is trusted for 24 hours. After
+that it is deleted and you log in again. Set `MIUNLOCK_SESSION_TTL_HOURS` to change it
+(`0` means never reuse a session). A session saved by an older version has no timestamp and
+is treated as expired.
+
+Deleting the session does not end it on Xiaomi's side. When you are finished:
+
+1. Sign out (`miunlock` then choose log out, or **File > Sign out** in the GUI).
 2. Check the signed-in devices for your account at `account.xiaomi.com`.
 3. Consider changing the Mi Account password.
+
+### Log file
+
+`miunlock.log` is written in the same folder as the executable (the current folder when
+run from source), is limited to your user, and rotates at 512 KB with three old copies. It
+records steps, result codes and error types. A scrubber hides token-like values and
+account IDs even if one reaches a message. Even so, glance through it before posting it in
+a bug report. If the folder is not writable the program runs without a log file.
 
 ### What is kept out of messages and logs
 
