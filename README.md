@@ -4,12 +4,12 @@
   <img src="https://img.shields.io/badge/MiUnlockTool-%23FF6900?style=flat&logo=xiaomi&logoColor=white" alt="MiUnlockTool" width="200"/>
 </a>
 
-**Developed to retrieve [`encryptData(token)`](encryptData.md) for Xiaomi devices to unlock the bootloader.**
+**Developed to retrieve [`encryptData(token)`](docs/encryptData.md) for Xiaomi devices to unlock the bootloader.**
 
 ---
 
 [![Version](https://img.shields.io/pypi/v/miunlock?label=Version&labelColor=black&color=brightgreen)](https://pypi.org/project/miunlock/)
-[![Changelog](https://img.shields.io/badge/Changelog-blue?style=flat&logoColor=white)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/Changelog-blue?style=flat&logoColor=white)](docs/CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
 ---
@@ -31,7 +31,7 @@
 pip install git+https://github.com/jowinjohnchemban/miunlock.git
 ```
 
-> See the **[Installation Guide](INSTALL.md)** for detailed instructions.
+> See the **[Installation Guide](docs/INSTALL.md)** for detailed instructions.
 
 ---
 
@@ -72,7 +72,7 @@ above instead -- they're actively maintained by their original author.
 <div align="center">
 
 
-❓ [FAQ & Troubleshooting](FAQ.md)
+❓ [FAQ & Troubleshooting](docs/FAQ.md)
 
 
 </div>
