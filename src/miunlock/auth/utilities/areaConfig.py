@@ -1,6 +1,6 @@
 import json
-from migate.config import CONFIG_URL, console, RED
-from migate.requester import session, get
+from miunlock.auth.config import CONFIG_URL, console, RED
+from miunlock.auth.requester import session, get
 
 def get_areaConfig(country_code: str) -> dict:
 

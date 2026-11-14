@@ -12,7 +12,7 @@ to offici5l -- see the README's "About this repository" section.
 ## What changed from upstream
 
 1. **Removed the password-based "Terminal" login path entirely.**
-   Deleted `migate/login/terminal.py`, `verify.py`, `sendcode.py`, and
+   Deleted `login/terminal.py`, `verify.py`, `sendcode.py`, and
    `verifycode.py`. `terminal.py` read the Mi Account password from the
    console and computed an unsalted `hashlib.md5(password).hexdigest().upper()`,
    POSTed to Xiaomi's own `serviceLoginAuth2` endpoint -- this mirrors
@@ -23,20 +23,25 @@ to offici5l -- see the README's "About this repository" section.
    touches this project's code at all.
 
 2. **The saved session file is locked down.** After writing
-   `~/.migatesession/<sid>/session.json` (which holds a long-lived
+   `~/.miunlocksession/<sid>/session.json` (which holds a long-lived
    `passToken` -- effectively a bearer credential for the account),
-   `migate/passtoken.py` now restricts that file to the current user
-   account (`icacls ... /grant:r` on Windows, `chmod 600` elsewhere) and
-   prints its path with a reminder to delete it when done.
+   `passtoken.py` now restricts that file to the current user account
+   (`icacls ... /grant:r` on Windows, `chmod 600` elsewhere) and prints
+   its path with a reminder to delete it when done.
 
-3. **`migate` is vendored into `src/migate/` instead of being an external
-   dependency.** Previously this project depended on `migate` from PyPI
-   (no supply-chain provenance linking the package back to its GitHub
-   source) or, in an earlier revision of this fork, from a separate git
-   branch. Merging it directly into this repository means `pip install .`
-   builds everything from one reviewed source tree, with no external
-   fetch at install time beyond `requests`/`rich`/`qrcode`/`pyaes` from
-   PyPI (migate's and miunlock's own ordinary dependencies).
+3. **The Xiaomi auth gateway is fully merged into this codebase, not
+   just vendored alongside it.** It started life as a separate package
+   (`migate`), was first pinned as an external git dependency, then
+   vendored in as a sibling package under the same `src/` tree, and is
+   now merged all the way in as `miunlock.auth` -- one package, one
+   namespace, no second top-level import (`import migate` no longer
+   works; everything is `miunlock.auth.*`). `pip install .` builds one
+   reviewed source tree, with no external fetch at install time beyond
+   `requests`/`rich`/`qrcode`/`pyaes` from PyPI (its own and miunlock's
+   ordinary dependencies). Full attribution to its original author,
+   offici5l, and its original MIT license are preserved in
+   `THIRD_PARTY_LICENSE_migate.txt` and the README's credits section --
+   merging the code doesn't change who wrote it.
 
 No functional network destination was changed anywhere: every request
 still goes only to `account.xiaomi.com`, `api.account.xiaomi.com`, and the

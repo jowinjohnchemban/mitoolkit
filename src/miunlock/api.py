@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from migate import get_passtoken, get_service, get_region, get_dataCenterZone
+from miunlock.auth import get_passtoken, get_service, get_region, get_dataCenterZone
 from miunlock.fastboot import get_fastboot
 from miunlock.commands import get_product, get_device_token
 from miunlock.utils import _send
@@ -64,7 +64,7 @@ def login(login_method: str = "1", silent_if_cached: bool = True) -> dict:
     login_method: "1" for browser (default) or "3" for QR code. Ignored
     if a cached session is reused.
 
-    If a saved session already exists (~/.migatesession/unlockApi/),
+    If a saved session already exists (~/.miunlocksession/unlockApi/),
     it's reused with no prompt when silent_if_cached is True (default).
     Otherwise this opens a real browser / prints a QR code and WAITS for
     a human to finish logging in on Xiaomi's own page. There is no way

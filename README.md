@@ -86,22 +86,26 @@ for the safety design before you build on it.
 
 This is a **standalone fork**, detached from the GitHub fork network of
 the original projects, merging two previously separate repositories into
-one for simpler installation (no external git dependency):
+one single codebase (one package, one namespace, no external git
+dependency):
 
 - **[MiForge/MiUnlockTool](https://github.com/MiForge/MiUnlockTool)** by
-  [**offici5l**](https://github.com/offici5l) -- the `miunlock` package
-  (`src/miunlock/`).
+  [**offici5l**](https://github.com/offici5l) -- most of `src/miunlock/`
+  (`cli.py`, `unlock.py`, `commands.py`, `fastboot.py`, `utils.py`, ...).
 - **[offici5l/migate](https://github.com/MiForge/migate)** by
-  [**offici5l**](https://github.com/offici5l) -- the `migate` package
-  (`src/migate/`), vendored in directly rather than installed as a
-  separate dependency.
+  [**offici5l**](https://github.com/offici5l) -- the Xiaomi
+  authentication gateway, merged in as the `src/miunlock/auth/`
+  subpackage (`import miunlock.auth`) rather than kept as its own
+  top-level package or an external dependency.
 
 All credit for the original design, the Xiaomi authentication/unlock
 protocol implementation, and the vast majority of this code belongs to
-**offici5l**. This repository only adds the security hardening and
-documentation changes described in `CHANGES.md` -- see that file for the
-exact diff and rationale. `migate`'s original MIT license and copyright
-notice are preserved in `THIRD_PARTY_LICENSE_migate.txt`.
+**offici5l**. This repository only adds the security hardening,
+automation API/GUI, and documentation changes described in
+[`CHANGES.md`](docs/CHANGES.md) -- see that file for the exact diff and
+rationale. Merging the code into one namespace doesn't change who wrote
+it: `migate`'s original MIT license and copyright notice are preserved
+in [`THIRD_PARTY_LICENSE_migate.txt`](THIRD_PARTY_LICENSE_migate.txt).
 
 If you don't need the hardening changes, use the original projects linked
 above instead -- they're actively maintained by their original author.

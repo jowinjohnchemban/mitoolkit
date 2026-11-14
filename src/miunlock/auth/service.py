@@ -3,8 +3,8 @@ import base64
 import hashlib
 from urllib.parse import quote
 
-from migate.config import SERVICELOGIN_URL, console, RED
-from migate.requester import session, get
+from miunlock.auth.config import SERVICELOGIN_URL, console, RED
+from miunlock.auth.requester import session, get
 
 
 def get_service(auth_cookies, params=None):

@@ -2,7 +2,7 @@ import argparse
 import json
 import sys
 
-from migate import get_passtoken, get_service, get_region, get_dataCenterZone
+from miunlock.auth import get_passtoken, get_service, get_region, get_dataCenterZone
 
 from miunlock.unlock import unlock_device
 from miunlock.fastboot import get_fastboot

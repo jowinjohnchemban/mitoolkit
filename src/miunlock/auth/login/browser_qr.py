@@ -3,8 +3,8 @@ import os
 import platform
 import webbrowser
 import qrcode
-from migate.config import LONGPOLLING_URL, console, RED, WHITE
-from migate.requester import get
+from miunlock.auth.config import LONGPOLLING_URL, console, RED, WHITE
+from miunlock.auth.requester import get
 
 def handle_browser_qr(auth_data: dict, choice: str) -> dict:
 

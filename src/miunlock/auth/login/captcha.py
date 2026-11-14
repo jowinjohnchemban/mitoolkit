@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import unquote, urlparse, parse_qs
 
-from migate.config import BASE_URL, console, WHITE, ORANGE
-from migate.requester import get, post
+from miunlock.auth.config import BASE_URL, console, WHITE, ORANGE
+from miunlock.auth.requester import get, post
 
 _TEMPLATE = (Path(__file__).parent / "captcha.html").read_text(encoding="utf-8")
 

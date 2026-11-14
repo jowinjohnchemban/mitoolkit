@@ -1,5 +1,5 @@
 import requests, json
-from migate.config import loader
+from miunlock.auth.config import loader
 
 def parse_res(response):
     return json.loads(response.text[11:])

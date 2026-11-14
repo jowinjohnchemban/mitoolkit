@@ -4,15 +4,15 @@ import platform
 import stat
 from pathlib import Path
 
-# SANITIZED BUILD: the password-based terminal login path (migate.login.terminal,
+# SANITIZED BUILD: the password-based terminal login path (miunlock.auth.login.terminal,
 # plus its verify.py/sendcode.py/verifycode.py 2FA helpers) has been deleted
 # from this fork entirely, not just unused. It computed an unsalted MD5 of the
 # account password and posted it to Xiaomi's login API -- password-equivalent
 # if ever leaked. This build only offers browser/QR login, where the password
 # is entered on Xiaomi's own login page and never touches this code at all.
-from migate.login.browser_qr import handle_browser_qr
-from migate.config import SERVICELOGIN_URL, console, GREEN, WHITE, ORANGE, RED, DIM
-from migate.requester import session, get
+from miunlock.auth.login.browser_qr import handle_browser_qr
+from miunlock.auth.config import SERVICELOGIN_URL, console, GREEN, WHITE, ORANGE, RED, DIM
+from miunlock.auth.requester import session, get
 
 
 def _lock_down(path: Path):
@@ -45,7 +45,7 @@ def get_passtoken(auth_data=None, silent=False, login_method=None):
         auth_data = {"sid": "passport"}
 
     sid = auth_data["sid"]
-    cookies_file = Path.home() / ".migatesession" / f"{sid}" / "session.json"
+    cookies_file = Path.home() / ".miunlocksession" / f"{sid}" / "session.json"
 
     if cookies_file.exists():
         try:

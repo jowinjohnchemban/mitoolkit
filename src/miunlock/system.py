@@ -2,7 +2,7 @@ import os
 import platform
 import stat
 
-from migate.config import console, ORANGE, WHITE, DIM, RED, GREEN
+from miunlock.auth.config import console, ORANGE, WHITE, DIM, RED, GREEN
 
 SYSTEM = platform.system()
 IS_TERMUX = "com.termux" in os.environ.get("PREFIX", "") or os.path.isdir("/data/data/com.termux/files/usr")

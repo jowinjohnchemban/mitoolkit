@@ -1,6 +1,6 @@
 import json
-from migate.config import REGION_URL, console, RED
-from migate.requester import session, get
+from miunlock.auth.config import REGION_URL, console, RED
+from miunlock.auth.requester import session, get
 
 def get_region(auth_cookies):
 

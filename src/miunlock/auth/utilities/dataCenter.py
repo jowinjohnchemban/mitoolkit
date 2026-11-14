@@ -1,6 +1,6 @@
 import json
-from migate.config import CONFIG_URL, CONFIGURATION_URL, console, WHITE, ORANGE, RED, GREEN
-from migate.requester import session, get
+from miunlock.auth.config import CONFIG_URL, CONFIGURATION_URL, console, WHITE, ORANGE, RED, GREEN
+from miunlock.auth.requester import session, get
 
 def select_manually():
     _ZONES = ["Singapore", "China", "Russia", "India", "Europe"]
