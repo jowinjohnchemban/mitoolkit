@@ -1,0 +1,114 @@
+# Safety model
+
+This page explains what `miunlock` protects, what it deliberately does not do, and
+what you are still responsible for. It also lists how this fork differs from the
+original projects on security.
+
+## What can go wrong
+
+Two things in this process are sensitive:
+
+- **Your Mi Account.** Logging in produces a session token that can act as your
+  account until it expires.
+- **Your device's data.** Unlocking the bootloader erases user data on most models
+  and cannot be reversed.
+
+## The destructive step is gated
+
+Only one operation touches the device's lock state: `fastboot oem unlock`. Every
+interface puts a deliberate human action in front of it.
+
+| Interface | Gate |
+|---|---|
+| Interactive (`miunlock`) | Shows Xiaomi's data-erase notice, then waits for Enter |
+| Command line | `miunlock unlock` refuses without `--confirm-wipe` |
+| Python API | `perform_unlock(..., confirm_wipe=True)` is required; there is no default |
+| GUI | A confirmation dialog with the server notice; default answer is No |
+
+Nothing in the project sets these for you, and there is no environment variable or
+config option that does. Reading and checking (`login`, `status`, `check`) can be
+automated freely because none of it can erase anything.
+
+If you wire this into automation, a person should decide to set the confirmation
+every time. Do not hard-code it, and do not let an unattended job or an AI agent
+decide it.
+
+A rejected request does not touch the device. Errors such as 20031 or 20036 are
+returned by Xiaomi's server before any token is issued, so `fastboot oem unlock`
+never runs.
+
+## Authentication
+
+### Browser or QR login only
+
+Login opens Xiaomi's real login page in your browser, or prints a QR code to scan.
+The password is typed into Xiaomi's page and never passes through this program.
+Always check the address bar says `account.xiaomi.com` before entering anything.
+
+### Password login was removed
+
+The original `migate` library also offered a "Terminal" login that read your
+password in the console, computed an unsalted MD5 hash of it, and sent that to
+Xiaomi's login endpoint. That mirrors Xiaomi's own legacy login protocol, but an
+unsalted MD5 is equivalent to the password if it is ever intercepted or logged.
+This fork deletes that code (`login/terminal.py` and its 2FA helpers) rather than
+disabling it, so it cannot run.
+
+### Saved session
+
+After login the session is stored at `~/.miunlocksession/unlockApi/session.json`.
+It holds a long-lived `passToken`. In this fork the file is restricted to the
+current user after it is written (`icacls` on Windows, `chmod 600` elsewhere) and
+its path is printed with a reminder to delete it.
+
+The file is still plain JSON, and deleting it does not end the session on Xiaomi's
+side. When you are finished:
+
+1. Delete `~/.miunlocksession/`.
+2. Check the signed-in devices for your account at `account.xiaomi.com`.
+3. Consider changing the Mi Account password.
+
+## Network activity
+
+In the code reviewed when this fork was made, requests go only to:
+
+| Destination | Purpose |
+|---|---|
+| `account.xiaomi.com`, `api.account.xiaomi.com` | Login and account lookups |
+| `unlock.update.miui.com`, `unlock.update.intl.miui.com`, `in-/ru-/eu-unlock.update.intl.miui.com` | Unlock service, chosen by account region |
+| `dl.google.com` | Download of Google's platform-tools (`fastboot`), only if not installed |
+
+No analytics or telemetry calls were found. On Android (Termux) only, the original
+code additionally downloads a GPG key and an install script from the third-party
+`nohajc/termux-adb` project and runs it; this path is not used on other systems.
+
+## What was reviewed, and its limits
+
+Every Python file in the original MiUnlockTool and migate was read when this fork
+was created, looking for network destinations, credential handling and unsafe
+subprocess use. The `fastboot` calls use fixed argument lists, not a shell, so
+there is no shell-injection path.
+
+This was a source review by the fork's maintainers, not an independent security
+audit, and it covered the code as it was at that time. Review changes before you
+trust new versions.
+
+## Things to know
+
+- **Request signing.** Requests to Xiaomi are signed with a key embedded in the
+  code. It is Xiaomi's client signing scheme, not a secret that protects you, and
+  the original project uses the same one.
+- **Client version string.** `unlock.py` and `api.py` send `clientVersion`
+  `7.6.727.43`. It is an identity string Xiaomi's server expects, not this tool's
+  version.
+- **Upstream report.** The original project's issue tracker has an unverified
+  report of a password leak during Xiaomi's own two-factor step. Login happens on
+  Xiaomi's page, which this project cannot change, so verify the page URL and
+  consider changing your password afterwards.
+- **Not on PyPI.** Install from this repository so the code you run is the code
+  you can read. The unpatched upstream package on PyPI still contains the
+  password-login path.
+
+## Reporting a problem
+
+See [SECURITY.md](../SECURITY.md).

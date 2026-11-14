@@ -1,10 +1,15 @@
-# What is `encryptData`?
+# How it works
+
+This page explains the two values at the heart of the unlock: `deviceToken` and
+`encryptData`. For the code layout see [architecture](architecture.md).
+
+## What is `encryptData`?
 
 It is the `deviceToken` signed by Xiaomi's server.
 
 ---
 
-## What is `deviceToken`?
+### What is `deviceToken`?
 
 `deviceToken` is a value retrieved via:
 
@@ -28,7 +33,7 @@ For example, on all modern devices the token includes the following fields:
 
 ---
 
-## How does the tool work (in short)?
+## The unlock sequence in short
 
 The tool retrieves the `deviceToken`.
 

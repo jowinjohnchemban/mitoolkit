@@ -1,50 +1,39 @@
-<div align="center">
+# miunlock
 
-<a href="https://github.com/jowinjohnchemban/miunlock">
-  <img src="https://img.shields.io/badge/MiUnlockTool-%23FF6900?style=flat&logo=xiaomi&logoColor=white" alt="MiUnlockTool" width="200"/>
-</a>
+Unlock the bootloader of Xiaomi, Redmi and POCO devices from any operating
+system, using Xiaomi's own unlock service.
 
-**Developed to retrieve [`encryptData(token)`](docs/encryptData.md) for Xiaomi devices to unlock the bootloader.**
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 
----
+`miunlock` logs in to your Mi Account, asks Xiaomi's server for a signed unlock
+token for your device (the `encryptData` value, see
+[How it works](docs/how-it-works.md)), and hands that token to `fastboot`. It
+follows the same official process as Xiaomi's Windows-only Mi Unlock tool, so it
+does **not** bypass the waiting period or any account requirement.
 
-[![Standalone fork](https://img.shields.io/badge/standalone_fork-password--login_removed-brightgreen)](docs/CHANGES.md)
-[![Changelog](https://img.shields.io/badge/Changelog-blue?style=flat&logoColor=white)](docs/CHANGELOG.md)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
+> [!WARNING]
+> Unlocking a bootloader erases all user data on most devices, voids the
+> warranty and lowers the device's security. It cannot be undone once started.
+> Back up first. Read the [safety model](docs/safety.md).
 
-> Not published to PyPI -- install from source (see [Installation](#installation)).
-> For the original upstream project and its PyPI package, see the credits below.
+## Features
 
----
+- Works on Windows, macOS, Linux and Android (Termux)
+- Interactive mode, scriptable CLI with JSON output, and a small GUI
+- Python API for your own scripts and automation
+- Login happens on Xiaomi's own page (browser or QR code); your password never
+  passes through this program
+- The one destructive step is gated behind an explicit `--confirm-wipe`
 
-### Contents
+## Requirements
 
-**In this README:** [Installation](#installation) · [Usage](#usage) ·
-[Scripting, automation, and the GUI](#scripting-automation-and-the-gui) ·
-[About this repository](#about-this-repository)
+- Python 3.9 or newer
+- A USB data cable and a device that can enter fastboot mode
+- A Mi Account that has been added to the device under
+  *Developer options → Mi Unlock status* (see the [unlock guide](docs/unlock-guide.md))
 
-**In [`docs/`](docs/):**
-[Installation Guide](docs/INSTALL.md) ·
-[FAQ & Troubleshooting](docs/FAQ.md) ·
-[Bootloader Unlock Guide](docs/unlock_guide.md) ·
-[encryptData Reference](docs/encryptData.md) ·
-[Error Codes & Messages Reference](docs/miunlock-codes-reference.md) ·
-[Changes in this Fork](docs/CHANGES.md) ·
-[Changelog](docs/CHANGELOG.md) ·
-[Contributing](docs/CONTRIBUTING.md)
-
----
-
-| | MiUnlockTool | Official MiFlashUnlock |
-|---|---|---|
-| Supported platforms | All | Windows only |
-| Save login session | ✅ | ❌ |
-| Verification methods | SMS / Email | SMS |
-| dataCenterZone config | Automatic / Manual | Automatic |
-
-</div>
-
----
+`fastboot` is downloaded automatically from Google if it is not already installed.
 
 ## Installation
 
@@ -52,70 +41,71 @@
 pip install git+https://github.com/jowinjohnchemban/miunlock.git
 ```
 
-> See the **[Installation Guide](docs/INSTALL.md)** for detailed instructions.
+This project is not published on PyPI; install from source as shown. Full
+instructions, including virtual environments and Termux, are in the
+[installation guide](docs/installation.md).
 
----
+## Quick start
 
-## Usage
+1. Add your account and device in *Developer options → Mi Unlock status* and wait
+   out Xiaomi's waiting period. See the [unlock guide](docs/unlock-guide.md).
+2. Put the device in fastboot mode and connect it.
+3. Run:
 
 ```sh
 miunlock
 ```
 
-### Scripting, automation, and the GUI
+For scripting, use the subcommands (all print JSON):
 
 ```sh
-miunlock login            # log in (or reuse a saved session), prints JSON
-miunlock status           # account + device info, prints JSON
-miunlock check            # is this account/device eligible to unlock right now?
-miunlock unlock --confirm-wipe   # actually unlocks -- WIPES THE DEVICE, no undo
-
-miunlock-gui               # simple Tkinter GUI with the same three steps
+miunlock login                    # log in or reuse a saved session
+miunlock status                   # account and device info
+miunlock check                    # is this device eligible right now? (read-only)
+miunlock unlock --confirm-wipe    # unlock; ERASES THE DEVICE
 ```
 
-`login`, `status`, and `check` are safe and read-only. `unlock` refuses
-to do anything unless `--confirm-wipe` is passed explicitly -- there is
-no default that enables it. A Python API (`miunlock.api`) backs all of
-this for agents/scripts that want structured calls instead of a
-subprocess; see [docs/CHANGES.md](docs/CHANGES.md#the-safety-gate-please-read-this-if-youre-wiring-up-automation)
-for the safety design before you build on it.
+GUI: `miunlock-gui`. See the [usage guide](docs/usage.md) and the
+[Python API](docs/api.md).
 
----
+## Documentation
 
-## About this repository
+| Page | Contents |
+|---|---|
+| [Installation](docs/installation.md) | Python, virtual environments, Termux |
+| [Unlock guide](docs/unlock-guide.md) | Step-by-step process on the device |
+| [Usage](docs/usage.md) | Interactive mode, CLI, GUI, session handling |
+| [Python API](docs/api.md) | `miunlock.api` reference |
+| [Safety model](docs/safety.md) | What is hardened, what is gated, what to watch for |
+| [FAQ](docs/faq.md) | Common questions and device troubleshooting |
+| [Error codes](docs/error-codes.md) | Messages returned by Xiaomi's servers |
+| [How it works](docs/how-it-works.md) | `deviceToken`, `encryptData`, the unlock sequence |
+| [Architecture](docs/architecture.md) | Package layout and request flow |
+| [Upstream changelog](docs/upstream-changelog.md) | History of the original MiUnlockTool |
 
-This is a **standalone fork**, detached from the GitHub fork network of
-the original projects, merging two previously separate repositories into
-one single codebase (one package, one namespace, no external git
-dependency):
+Project files: [CHANGELOG](CHANGELOG.md) · [CONTRIBUTING](CONTRIBUTING.md) ·
+[SECURITY](SECURITY.md) · [LICENSE](LICENSE) · [NOTICE](NOTICE)
 
-- **[MiForge/MiUnlockTool](https://github.com/MiForge/MiUnlockTool)** by
-  [**offici5l**](https://github.com/offici5l) -- most of `src/miunlock/`
-  (`cli.py`, `unlock.py`, `commands.py`, `fastboot.py`, `utils.py`, ...).
-- **[offici5l/migate](https://github.com/MiForge/migate)** by
-  [**offici5l**](https://github.com/offici5l) -- the Xiaomi
-  authentication gateway, merged in as the `src/miunlock/auth/`
-  subpackage (`import miunlock.auth`) rather than kept as its own
-  top-level package or an external dependency.
+## Project status
 
-All credit for the original design, the Xiaomi authentication/unlock
-protocol implementation, and the vast majority of this code belongs to
-**offici5l**. This repository only adds the security hardening,
-automation API/GUI, and documentation changes described in
-[`CHANGES.md`](docs/CHANGES.md) -- see that file for the exact diff and
-rationale. Merging the code into one namespace doesn't change who wrote
-it: `migate`'s original MIT license and copyright notice are preserved
-in [`NOTICE`](NOTICE).
+This is an independent, standalone fork. It is **derived from** two projects by
+[offici5l](https://github.com/offici5l), and most of the code is theirs:
 
-If you don't need the hardening changes, use the original projects linked
-above instead -- they're actively maintained by their original author.
+- [MiForge/MiUnlockTool](https://github.com/MiForge/MiUnlockTool) (Apache-2.0)
+- [MiForge/migate](https://github.com/MiForge/migate) (MIT), now merged in as
+  `miunlock.auth`
 
----
+This fork adds the changes listed in the [CHANGELOG](CHANGELOG.md): the password
+login path was removed, the saved session file is locked down, and a Python API,
+JSON CLI and GUI were added. If you do not need those, use the original projects.
 
-<div align="center">
+## Contributing
 
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-❓ [FAQ & Troubleshooting](docs/FAQ.md)
+## License
 
+Apache License 2.0, see [LICENSE](LICENSE). Code that originated in `migate` is
+MIT-licensed by its author; its notice is kept in [NOTICE](NOTICE).
 
-</div>
+This project is not affiliated with or endorsed by Xiaomi.

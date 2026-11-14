@@ -10,18 +10,18 @@ keywords = ["xiaomi", "miunlock", "MiUnlockTool", "bootloader", "unlock", "MIUI"
 
 
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
 
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 
 dependencies = [
     # The Xiaomi auth gateway (originally a separate "migate" package) is
     # merged into miunlock.auth as part of this single codebase (sanitized:
     # password-login path removed, session file locked down) -- see
-    # CHANGES.md. Its own upstream dependencies are listed here instead.
+    # docs/safety.md. Its own upstream dependencies are listed here instead.
     "requests",
     "rich",
     "qrcode",

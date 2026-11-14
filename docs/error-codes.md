@@ -1,12 +1,12 @@
-<div align="center">
+# Error codes
 
-### A reference for codes | messages returned by the Mi Unlock Tools
+Messages and codes returned by Xiaomi's unlock servers, with their usual cause and
+fix. Wording is Xiaomi's and can change. This list comes from the original
+MiUnlockTool reference and is not exhaustive. See also the [FAQ](faq.md).
 
-*(this reference is updated regularly)*
-
-</div>
-
----
+Codes `20031` (account not added in Mi Unlock status) and `20036` (waiting
+period) are the ones you will most likely meet first; both are rejected before any
+unlock token is issued, so they never change the device.
 
 ---
 
@@ -18,7 +18,6 @@
 
 **Solution:** Restart the tool. Make sure you're using the latest version.
 
----
 ---
 
 ### This device is not activated, please activate it and try to unlock it again
@@ -37,7 +36,6 @@
 If you encounter the same problem, please wait around 24 hours and try again. If the problem persists, please contact Xiaomi.
 
 ---
----
 
 ### This device has been activated for less than 7 days, please activate it for 7 days before trying to unlock it again
 
@@ -55,7 +53,6 @@ If you encounter the same problem, please wait around 24 hours and try again. If
 Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 
 ---
----
 
 ### Your device's activation time is too short, please try again in \*\* hours
 
@@ -65,7 +62,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 
 **Solution:** Wait for the displayed time to expire, then run the tool again.
 
----
 ---
 
 ### Sorry, couldn't unlock more devices
@@ -77,7 +73,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 **Solution:** Use a new account, or wait a year.
 
 ---
----
 
 ### Sorry, couldn't unlock more devices by this account this month
 
@@ -87,7 +82,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 
 **Solution:** Wait until the 1st of next month.
 
----
 ---
 
 ### Please add your account in Settings > Developer options > Mi Unlock status
@@ -101,7 +95,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 > If you've already linked the account and still get this error, manually select the `dataCenterZone` in the tool.
 
 ---
----
 
 ### Your account is not authorized to unlock. Please change to another account
 
@@ -112,7 +105,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 **Solution:** Try enabling "Find Device" in settings. If it doesn't help, create a new account.
 
 ---
----
 
 ### Please upgrade your unlock tool
 
@@ -122,7 +114,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 
 **Solution:** If using the official tool, download the latest version. If using MiUnlockTool, update `clientVersion` to a higher value.
 
----
 ---
 
 ### Please unlock \*\*\* hours later
@@ -138,7 +129,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 > If the waiting time doesn't decrease or resets to 144 hours, your account has been suspended — use a different Xiaomi account.
 
 ---
----
 
 ### 该手机已被账号 \*\*\*\* 通过查找手机锁定，无法解锁
 
@@ -149,7 +139,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 **Solution:** Log in to account \*\*\*\* at [i.mi.com/mobile/find](https://i.mi.com/mobile/find), select the device, then disable Locate Device.
 
 ---
----
 
 ### Device basic data verification failed. This device couldn't be unlocked
 
@@ -159,7 +148,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 
 **Solution:** No confirmed solution at this time.
 
----
 ---
 
 ### Sorry, your Mi ID is not associated with a phone number
@@ -172,7 +160,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 [account.xiaomi.com/pass/serviceLogin?checkSafePhone=true](https://account.xiaomi.com/pass/serviceLogin?checkSafePhone=true)
 
 ---
----
 
 ### Please use the common user tool on the official website
 
@@ -183,7 +170,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 **Solution:** Change `dataCenterZone` in the tool.
 
 ---
----
 
 ### The place where the account is registered does not match the place where the phone is sold
 
@@ -193,7 +179,6 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 
 **Solution:** Use a Xiaomi account from the same region as the device. Chinese device → Chinese account.
 
----
 ---
 
 ### Couldn't unlock. Please go to Mi Community to apply for authorization and try again
