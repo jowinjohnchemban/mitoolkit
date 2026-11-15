@@ -15,10 +15,11 @@ from __future__ import annotations
 import os
 import subprocess
 import tempfile
+import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 from mitoolkit import fastboot_usb, platform_tools, usbio
 from mitoolkit.system import NO_WINDOW
@@ -127,6 +128,41 @@ class UsbBackend(Backend):
             fb.reboot(mode)
 
 
+_children: Set["subprocess.Popen"] = set()      # Google's fastboot programs MiToolkit is running right now
+_children_lock = threading.Lock()
+
+
+def _run_tracked(cmd: List[str], timeout: Optional[float]) -> "subprocess.CompletedProcess":
+    """Like subprocess.run for a short program, but the process is remembered while it runs, so closing MiToolkit
+    in the middle of a call can stop it instead of leaving a fastboot holding the phone."""
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=NO_WINDOW)
+    with _children_lock:
+        _children.add(proc)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        raise
+    finally:
+        with _children_lock:
+            _children.discard(proc)
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+
+def terminate_children() -> int:
+    """Stop the Google fastboot programs MiToolkit started that are still running. Returns how many."""
+    with _children_lock:
+        running = [p for p in _children if p.poll() is None]
+    for proc in running:
+        try:
+            proc.kill()
+        except OSError:
+            # it ended by itself a moment ago
+            pass
+    return len(running)
+
+
 class ExeBackend(Backend):
     """Google's fastboot program (already installed; never downloaded)."""
 
@@ -138,7 +174,7 @@ class ExeBackend(Backend):
     def _run(self, *args: str, serial: Optional[str] = None, timeout: Optional[int] = 30) -> str:
         cmd = [self.path] + (["-s", serial] if serial else []) + list(args)
         try:
-            done = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, creationflags=NO_WINDOW)
+            done = _run_tracked(cmd, timeout)
         except subprocess.TimeoutExpired:
             raise FastbootError("Google's fastboot did not answer in time.") from None
         except OSError as err:
@@ -153,8 +189,7 @@ class ExeBackend(Backend):
             raise FastbootError("Google's fastboot is not installed.")
 
     def devices(self) -> List[Dict[str, object]]:
-        out = subprocess.run([self.path, "devices"], capture_output=True, text=True, timeout=10,
-                             creationflags=NO_WINDOW).stdout
+        out = _run_tracked([self.path, "devices"], 10).stdout
         return [{"serial": ln.split()[0], "accessible": True, "via": self.name}
                 for ln in out.splitlines() if len(ln.split()) >= 2 and ln.split()[1] == "fastboot"]
 

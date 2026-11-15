@@ -367,3 +367,19 @@ def forget(serial: str) -> None:
         dev = _devices.pop(serial, None)
     if dev is not None:
         dev.close()
+
+
+def close_all() -> int:
+    """Let go of every phone: close our USB connections so nothing keeps holding them. Returns how many."""
+    with _reg_lock:
+        held = list(_devices.values())
+        _devices.clear()
+    closed = 0
+    for dev in held:
+        try:
+            dev.close()
+            closed += 1
+        except Exception:
+            # a phone that was already unplugged cannot be closed any further: it is let go of either way
+            pass
+    return closed

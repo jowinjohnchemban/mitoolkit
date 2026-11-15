@@ -44,6 +44,8 @@ does **not** bypass the waiting period or any account requirement.
   fastboot without unlocking); export device details as text, CSV or Markdown
 - Updates over the air for the single-file program (checked against the release's SHA-256 list), and
   automatic releases from GitHub
+- A doctor (`mitoolkit doctor`, or Help > Check and fix problems) that finds what is wrong with the setup, and fixes
+  what is safe to fix by itself
 - Wireless adb: use the phone over Wi-Fi for everything except fastboot and unlocking (those need a cable)
 - App manager: remove preinstalled bloat for your user, with plain ratings, and restore it
 - Security check: missing Android security fixes (from OSV / Android Security Bulletins),

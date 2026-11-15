@@ -24,7 +24,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, List, Optional
 
-from mitoolkit import adb, api, build, details, export, fastboot, log, memory, security, updater, usbio, watchdog
+from mitoolkit import adb, api, build, details, export, fastboot, log, memory, security, shutdown, updater, usbio, watchdog
 from mitoolkit.auth import store
 from mitoolkit.auth.redact import mask_id
 from mitoolkit.errors import MitoolkitError
@@ -1115,15 +1115,17 @@ class App:
     def _stop_google_adb(self):
         if not messagebox.askyesno(
                 "Stop Google's adb", "Google's adb server is running and holding the phone, so MiToolkit can't "
-                "use it.\n\nStop it now? It starts again by itself the next time you use adb."):
+                "use it.\n\nStop it now? It starts again by itself the next time you use adb. If it was started "
+                "with administrator rights, the system asks for your permission first."):
             return
 
         def done(status, result):
-            self._log("Stopped Google's adb server." if status == "ok" and result else f"adb: {result}")
+            self._log(f"{result}" if status == "ok" else f"Could not stop Google's adb: {result}")
             self._info.clear()
             self._scan()
 
-        self._run(usbio.stop_google_adb, done, "Stopping Google's adb...")
+        from mitoolkit import doctor
+        self._run(lambda: doctor.with_admin("stop-adb"), done, "Stopping Google's adb...")
 
     def _driver_help(self):
         DriverHelpDialog(self)
@@ -1201,6 +1203,27 @@ class App:
         else:
             self._guide = GuideWindow(self)
 
+    def _doctor_dialog(self) -> None:
+        from mitoolkit.ui.doctor_dialog import DoctorDialog
+        if getattr(self, "_doctor", None) is not None and self._doctor.alive():
+            self._doctor.focus()
+        else:
+            self._doctor = DoctorDialog(self)
+
+    def start_self_check(self) -> None:
+        """At start-up, quietly: repair what is safe to repair (permissions on private files, a damaged settings
+        file, files left by an update) and say so in the Activity log. Nothing that needs a decision runs here."""
+        from mitoolkit import doctor
+
+        def work():
+            try:
+                for message in doctor.auto_fix():
+                    self._log(f"Fixed automatically: {message}")
+            except Exception as err:
+                log.get("gui").debug("Start-up self check failed: %s", err)
+
+        threading.Thread(target=work, daemon=True, name="self-check").start()
+
     def _update_dialog(self, release=None) -> None:
         from mitoolkit.ui.update_dialog import UpdateDialog
         if getattr(self, "_updates", None) is not None and self._updates.alive():
@@ -1250,11 +1273,13 @@ def _enable_dpi_awareness():
 
 def main():
     log.setup(True if "--debug" in sys.argv[1:] else None)
+    shutdown.register()                       # also at exit, if the window is not closed in the usual way
     watchdog.install_crash_logging()          # background-thread errors and hard crashes go to the log file
     _enable_dpi_awareness()
     root = tk.Tk()
     app = App(root)
     updater.cleanup()                          # remove the copy a previous update left behind
+    root.after(1500, app.start_self_check)     # repairs what is safe to repair, and says so in the Activity log
     root.after(4000, app.start_update_check)   # once a day, after the window is up
     guard = watchdog.UiWatchdog(root, on_stall=app.window_stalled)
     guard.start()                              # records what froze, if the window ever stops answering
@@ -1280,6 +1305,7 @@ def main():
         guard.stop()
         tidy.stop()
         sys.stdout, sys.stderr = saved
+        shutdown.run()                         # the window is closed: let go of the phones, stop the adb we started
 
 
 if __name__ == "__main__":

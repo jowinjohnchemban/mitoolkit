@@ -7,6 +7,7 @@ device, usually through a udev rule for Android phones.
 """
 from __future__ import annotations
 
+import functools
 import sys
 from typing import Any, List, Optional, Tuple
 
@@ -25,14 +26,9 @@ class UsbTimeout(UsbError):
     """The phone did not answer in time."""
 
 
-_backend: Any = None
-
-
+@functools.lru_cache(maxsize=1)           # found once per run (a failure is not remembered: it is looked up again)
 def backend():
     """The libusb backend, from the libusb-package wheel if present, else the system libusb."""
-    global _backend
-    if _backend is not None:
-        return _backend
     from mitoolkit.system import IS_ANDROID
     if IS_ANDROID:
         raise UsbUnavailable("mitoolkit runs on a computer (Windows, macOS or Linux). Running it on an "
@@ -53,7 +49,6 @@ def backend():
     if found is None:
         raise UsbUnavailable("libusb was not found. Install it (Linux: sudo apt install libusb-1.0-0; "
                              "macOS: brew install libusb) or run: pip install libusb-package")
-    _backend = found
     return found
 
 
@@ -71,7 +66,7 @@ _BLOCKERS = {
     "adb": "Google's adb", "fastboot": "Google's fastboot", "scrcpy": "scrcpy",
     "studio64": "Android Studio", "studio": "Android Studio",
     "miflash": "Mi Flash", "xiaomiflash": "Mi Flash", "miflash_unlock": "Mi Unlock",
-    "mitoolkit": "Mi Unlock", "miphoneassistant": "Mi PC Suite",
+    "miunlock": "Mi Unlock", "miphoneassistant": "Mi PC Suite",      # Xiaomi's own tools, not this program
 }
 
 

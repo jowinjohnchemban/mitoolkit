@@ -160,6 +160,27 @@ Wi-Fi, mobile network (modem), SIM, Bluetooth, USB and power readings with plain
 `--network-test` also has the phone ping its router and `8.8.8.8` and look up a name; without it no
 traffic is sent.
 
+### doctor
+
+```sh
+mitoolkit doctor                # what is wrong, as JSON; exit code 1 if something is broken
+mitoolkit doctor --fix          # also repair what is safe to repair
+mitoolkit doctor --fix --all    # and what needs a decision
+mitoolkit doctor --no-phone     # leave the USB bus alone
+```
+
+Checks Python and the window toolkit, USB access (libusb), the adb key, the saved Mi Account session's
+permissions, the settings file, files left by an update, the log file, Google's adb, and any connected phone
+(waiting for you to allow it, not answering, held by another program, missing driver). Each problem says what
+is wrong in plain words. In the window it is **Help > Check and fix problems...**.
+
+**Safe fixes** run by themselves at start-up (listed in the Activity log) and with `--fix`: making the adb key
+and the saved session private to you, resetting a damaged settings file (the old one is kept as `.damaged`),
+removing files an update left behind, and dropping a stuck phone connection. **Fixes that need a decision**
+(stopping Google's adb, making a new adb key because the old one is damaged: each phone then asks to allow it
+once) run only when you press their button or pass `--all`. It never touches the phone's data, Xiaomi's
+servers or the contents of the session, and makes no network request. AI agents get the diagnosis only.
+
 ### driver-help
 
 ```sh
@@ -272,6 +293,13 @@ Handy features:
   skipped, every copy is written under a temporary name and checked against the size the phone reported, a
   failed file is retried, and anything that still fails is listed in `backup-problems.txt` in the backup folder.
 - **Sign out** (Mi Account section, or File menu) deletes the saved session on this computer.
+- **Closing MiToolkit puts things away.** It closes its own USB connections to phones, stops any Google `fastboot`
+  it started that is still running, stops the Google adb server it started (for Wi-Fi), so nothing keeps
+  holding the phone behind it, and last of all closes the files it keeps open (the log file and `crash.log`),
+  so they can be moved or deleted. An adb server that was already running when it began is left alone, because
+  Android Studio or a terminal may be using it. In `~/.mitoolkit/settings.json`, `"stop_any_adb_on_exit": true`
+  stops that one too, and `"stop_adb_on_exit": false` stops none. A phone connected over Wi-Fi is disconnected
+  when the adb server stops, so reconnect it the next time.
 - **Help > Check for updates...** shows what is new in the latest release. For the single-file program from
   the Releases page, **Install and restart** downloads the update, checks it against the release's
   `SHA256SUMS.txt`, swaps it in and starts it again; a pip or source install is pointed to the release page

@@ -138,6 +138,9 @@ def devices() -> List[Dict[str, str]]:
     return out
 
 
+_started = {"by_us": False}      # did MiToolkit start the adb server that is running? (then it also stops it)
+
+
 def start() -> bool:
     """Start Google's adb server if it is installed and not running. Wi-Fi connections need it:
     mitoolkit's own adb speaks USB only. Returns True when a server is running afterwards."""
@@ -153,7 +156,29 @@ def start() -> bool:
         subprocess.run([exe, "start-server"], capture_output=True, timeout=20, creationflags=NO_WINDOW)
     except (OSError, subprocess.SubprocessError):
         return False
-    return running()
+    up = running()
+    _started["by_us"] = _started["by_us"] or up
+    return up
+
+
+def stop_started(also_others: bool = False) -> str:
+    """Stop Google's adb server so it does not keep holding phones after MiToolkit closes. Only a server MiToolkit
+    started is stopped: one that was already running may belong to Android Studio or a terminal. ``also_others``
+    stops that one too. Returns what was done ("" when nothing)."""
+    if not (_started["by_us"] or also_others) or not running():
+        return ""
+    from mitoolkit import platform_tools
+    from mitoolkit.system import NO_WINDOW
+    exe = platform_tools.find("adb")
+    if not exe:
+        return ""
+    import subprocess
+    try:
+        subprocess.run([exe, "kill-server"], capture_output=True, timeout=10, creationflags=NO_WINDOW)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    _started["by_us"] = False
+    return "Stopped Google's adb server."
 
 
 def _host_command(text: str, timeout: float = 15.0) -> str:

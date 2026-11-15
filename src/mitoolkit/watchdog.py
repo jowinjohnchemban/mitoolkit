@@ -15,12 +15,13 @@ window from its thread (Tk is not thread safe).
 """
 from __future__ import annotations
 
+import atexit
 import faulthandler
 import sys
 import threading
 import time
 import traceback
-from typing import Callable, Optional, TextIO, TypeVar
+from typing import Callable, List, Optional, TextIO, TypeVar
 
 from mitoolkit import log
 
@@ -116,19 +117,22 @@ def thread_stacks() -> str:
     return "\n".join(out)
 
 
-_crash_file: Optional[TextIO] = None
+_crash_files: List[TextIO] = []       # at most one: faulthandler writes to it for the life of the process
 
 
 def install_crash_logging() -> None:
     """Write background-thread errors and hard crashes to the log file."""
-    global _crash_file
     path = log.log_path()
-    if path is not None and _crash_file is None:
+    if path is not None and not _crash_files:
+        crash_file = None
         try:
-            _crash_file = open(path.with_name("crash.log"), "a", encoding="utf-8")
-            faulthandler.enable(file=_crash_file, all_threads=True)  # a crash of the interpreter itself
+            crash_file = open(path.with_name("crash.log"), "a", encoding="utf-8")
+            faulthandler.enable(file=crash_file, all_threads=True)  # a crash of the interpreter itself
+            _crash_files.append(crash_file)
+            atexit.register(crash_file.close)                       # closed on a normal exit
         except Exception:
-            _crash_file = None
+            if crash_file is not None:
+                crash_file.close()                                  # opened, but faulthandler could not use it
 
     def thread_hook(args) -> None:
         if args.exc_type is SystemExit:
@@ -137,3 +141,20 @@ def install_crash_logging() -> None:
                                 "".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)))
 
     threading.excepthook = thread_hook
+
+
+def close_crash_log() -> bool:
+    """Stop writing crashes to crash.log and close it (on exit). faulthandler is switched off first: it holds on to
+    the file, and closing the file under it could itself crash. Returns True if a file was closed."""
+    files = list(_crash_files)
+    _crash_files.clear()
+    if not files:
+        return False
+    faulthandler.disable()
+    for crash_file in files:
+        try:
+            crash_file.close()
+        except OSError:
+            # the disk went away: there is nothing more to flush
+            pass
+    return True

@@ -2,8 +2,9 @@ import argparse
 import functools
 import json
 import sys
+from pathlib import Path
 
-from mitoolkit import adb, api, bloat, build, drivers, log
+from mitoolkit import adb, api, bloat, build, drivers, log, shutdown
 from mitoolkit.errors import MitoolkitError
 from mitoolkit.unlock import InteractiveUnlock
 
@@ -127,6 +128,43 @@ def _cmd_connections(args):
     return report
 
 
+def _run_named_fix(args):
+    """`doctor --run-fix NAME --result-file FILE`: what the administrator copy of the program runs. Only the fixes
+    named in doctor.PRIVILEGED exist; the result goes to a file because an elevated process's output is not readable."""
+    from mitoolkit import doctor
+    try:
+        result = {"ok": True, "message": doctor.run_privileged(args.run_fix)}
+    except Exception as err:
+        result = {"ok": False, "message": str(err)}
+    if args.result_file:
+        try:
+            Path(args.result_file).write_text(json.dumps(result), encoding="utf-8")
+        except OSError:
+            pass                                          # the exit code still says whether it worked
+    if not result["ok"]:
+        raise _Failed(result)
+    return result
+
+
+@json_command()
+def _cmd_doctor(args):
+    """Check the setup, and with --fix repair what is safe to repair (--all: what needs a decision too)."""
+    from mitoolkit import doctor
+    if args.run_fix:                                       # the elevated copy: one named fix, then report back
+        return _run_named_fix(args)
+    checks = doctor.run(phone=not args.no_phone)
+    fixed = []
+    if args.fix:
+        fixed = [{"id": c.id, "result": message} for c, message in doctor.apply(checks, include_decisions=args.all)]
+        if fixed:
+            checks = doctor.run(phone=not args.no_phone)           # look again: what is left
+    left = doctor.problems(checks)
+    result = {"ok": not left, "problems": len(left), "fixed": fixed, "checks": [c.to_dict() for c in checks]}
+    if any(c.status == doctor.FAIL for c in left):
+        raise _Failed(result)
+    return result
+
+
 @json_command(installed=False)
 def _cmd_driver_help(args):
     """Plain text, not JSON: it is for people."""
@@ -224,6 +262,7 @@ def main():
     if "--gui" not in argv and (argv or "--cli" in argv):
         _attach_console()  # command-line use needs a console; the GUI must not have one
     log.setup(True if debug else None)
+    shutdown.register()        # when the program ends: close the phone connections, stop the adb it started
     # One program, two modes: the GUI by default, the command line with --cli
     # (a subcommand such as `check` also means command line).
     args = sys.argv[1:]
@@ -299,6 +338,18 @@ def main():
     p_con.add_argument("--network-test", action="store_true",
                        help="Also ping the router and 8.8.8.8 and look up a name, from the phone.")
     p_con.set_defaults(func=_cmd_connections)
+
+    p_doc = sub.add_parser("doctor", help="Check the setup (Python, USB access, adb key, saved session, settings, the "
+                                          "phone) and say what is wrong. --fix repairs what is safe to repair.")
+    p_doc.add_argument("--fix", action="store_true", help="Repair what is safe: permissions on private files, a damaged "
+                       "settings file, files left by an update, a stuck connection.")
+    p_doc.add_argument("--all", action="store_true", help="With --fix: also what needs a decision (stop Google's adb, "
+                       "make a new adb key if the old one is damaged).")
+    p_doc.add_argument("--no-phone", action="store_true", help="Do not look at the USB bus for a phone.")
+    from mitoolkit import doctor as _doctor
+    p_doc.add_argument("--run-fix", choices=sorted(_doctor.PRIVILEGED), help=argparse.SUPPRESS)      # internal
+    p_doc.add_argument("--result-file", help=argparse.SUPPRESS)                                      # internal
+    p_doc.set_defaults(func=_cmd_doctor)
 
     p_drv = sub.add_parser("driver-help", help="Windows: how to install Google's USB driver. --open opens Google's download page.")
     p_drv.add_argument("--open", action="store_true", help="Also open Google's download page in the browser.")

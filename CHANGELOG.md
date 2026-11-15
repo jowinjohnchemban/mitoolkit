@@ -1,11 +1,27 @@
 # Changelog
 
-All notable changes to this project are documented here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Highlights of the project's changes. Every merge to `main` is released automatically with a
+[Semantic Versioning](https://semver.org) number worked out from [Conventional Commits](https://www.conventionalcommits.org)
+pull request titles (see CONTRIBUTING.md); the full, generated notes of each release are on the
+[Releases page](https://github.com/jowinjohnchemban/mitoolkit/releases).
 
-## [Unreleased]
+## Since 1.0.0
+
+### Fixed
+- The list of programs that can hold a phone (and make MiToolkit say "another program is using it") named
+  `mitoolkit`, which is this program, instead of Xiaomi's `miunlock` tool, since the rename.
 
 ### Added
+- Closing MiToolkit lets go of the phone: its USB connections are closed, a Google fastboot it started is stopped,
+  and so is the Google adb server it started (one already running is left alone). The log file and crash.log are
+  closed too.
+- Automatic releases: every merge to `main` is released with a Semantic Versioning number worked out from the
+  Conventional Commits pull request titles; the doctor can ask for administrator rights (UAC, polkit, the macOS
+  prompt) for the few fixes that need them, and only after a person chooses.
+- The doctor: Help > Check and fix problems, and `mitoolkit doctor [--fix] [--all]`. It looks for what stops
+  MiToolkit working (USB access, the adb key, the saved session's permissions, settings, update leftovers, a phone
+  waiting to be allowed or held by another program) and says what is wrong in plain words. Safe fixes run by
+  themselves at start-up; fixes that need a decision run only when chosen. Agents get the diagnosis, not fixes.
 - Wireless adb pairing (Android 11 and newer, no cable): Phone > Wireless adb > Pair a new phone. Find phones on
   the Wi-Fi network, enter the pairing code, and the phone trusts this computer from then on. The window says
   plainly when a phone is waiting for you to allow it, and what to tick.

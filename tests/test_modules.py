@@ -118,15 +118,17 @@ class FastbootBackendTests(unittest.TestCase):
     def test_google_fastboot_output_is_parsed(self):
         exe = fastboot.ExeBackend("fastboot")
         done = mock.Mock(returncode=0, stdout="", stderr="product: gram\nFinished. Total time: 0.001s\n")
-        with mock.patch.object(fastboot.subprocess, "run", return_value=done):
+        with mock.patch.object(fastboot, "_run_tracked", return_value=done):
             self.assertEqual(exe.getvar("product"), "gram")
         done.stderr = "(bootloader) token:AAAA\n(bootloader) token:BBBB\nOKAY [  0.010s]\n"
-        with mock.patch.object(fastboot.subprocess, "run", return_value=done):
+        with mock.patch.object(fastboot, "_run_tracked", return_value=done):
             self.assertEqual(exe.token(), "AAAABBBB")
 
     def test_android_is_refused_with_a_clear_message(self):
         import mitoolkit.system
-        with mock.patch.object(usbio, "_backend", None), mock.patch.object(mitoolkit.system, "IS_ANDROID", True):
+        usbio.backend.cache_clear()                      # a backend found by an earlier test must not hide this
+        self.addCleanup(usbio.backend.cache_clear)
+        with mock.patch.object(mitoolkit.system, "IS_ANDROID", True):
             with self.assertRaises(usbio.UsbUnavailable) as ctx:
                 usbio.backend()
         self.assertIn("computer", str(ctx.exception))

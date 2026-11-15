@@ -1,44 +1,46 @@
 name: Release
 
-# A release is made automatically when the version in src/mitoolkit/__init__.py changes on main
-# (bump it, update CHANGELOG.md, push). Pushing a tag like v1.8.1 by hand, or running the
-# workflow from the Actions tab, does the same. A version that already has a release is skipped.
+# Every merge to main is released automatically, with the next version worked out from what was merged
+# (standard Conventional Commits + Semantic Versioning, see .github/scripts/release_version.py):
+#   "feat: ..." -> minor, "type!: ..." or BREAKING CHANGE -> major, anything else -> patch.
+# The git tag is the source of truth for the version: it is stamped into the build here and never committed,
+# so the protected main needs no bot push. Run it by hand to force a bump (major, minor or patch).
 on:
   push:
     branches: [main]
-    paths: ["src/mitoolkit/__init__.py"]
-    tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      bump:
+        description: "Force major, minor or patch. Leave empty to work it out from the merged pull request titles."
+        required: false
+        default: ""
 
 permissions:
   contents: read
+
+concurrency:
+  group: release              # one release at a time, so two quick merges cannot pick the same version
+  cancel-in-progress: false
 
 jobs:
   check:
     runs-on: ubuntu-24.04
     outputs:
-      tag: ${{ steps.version.outputs.tag }}
       release: ${{ steps.version.outputs.release }}
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      bump: ${{ steps.version.outputs.bump }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0          # the tags and the history since the last release
           persist-credentials: false
       - name: Work out the version
         id: version
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          V=$(python3 -c "import re;print(re.search(r'__version__ = \"(.+?)\"',open('src/mitoolkit/__init__.py').read()).group(1))")
-          TAG="v$V"
-          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$TAG" ]; then
-            echo "tag $GITHUB_REF_NAME != package version $TAG"; exit 1
-          fi
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "$TAG already has a release: nothing to do"; echo "release=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "release=true" >> "$GITHUB_OUTPUT"
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          FORCED_BUMP: ${{ inputs.bump }}
+        run: python3 .github/scripts/release_version.py ${FORCED_BUMP:+--bump "$FORCED_BUMP"} >> "$GITHUB_OUTPUT"
 
   dist:
     needs: check
@@ -48,12 +50,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Stamp the build (date and commit shown in the app)
-        shell: bash
-        run: printf 'DATE = "%s"\nCOMMIT = "%s"\n' "$(git log -1 --format=%cd --date=format:%d%m%Y)" "$(git rev-parse --short HEAD)" > src/mitoolkit/_build.py
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
+      - name: Stamp the release version (not committed)
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: python .github/scripts/stamp_version.py "$VERSION"
+      - name: Stamp the build (date and commit shown in the app)
+        shell: bash
+        run: printf 'DATE = "%s"\nCOMMIT = "%s"\n' "$(git log -1 --format=%cd --date=format:%d%m%Y)" "$(git rev-parse --short HEAD)" > src/mitoolkit/_build.py
       - run: python -m pip install build && python -m build
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -79,12 +85,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Stamp the build (date and commit shown in the app)
-        shell: bash
-        run: printf 'DATE = "%s"\nCOMMIT = "%s"\n' "$(git log -1 --format=%cd --date=format:%d%m%Y)" "$(git rev-parse --short HEAD)" > src/mitoolkit/_build.py
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
+      - name: Stamp the release version (not committed)
+        shell: bash
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: python .github/scripts/stamp_version.py "$VERSION"
+      - name: Stamp the build (date and commit shown in the app)
+        shell: bash
+        run: printf 'DATE = "%s"\nCOMMIT = "%s"\n' "$(git log -1 --format=%cd --date=format:%d%m%Y)" "$(git rev-parse --short HEAD)" > src/mitoolkit/_build.py
       - name: Install Tk (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y python3-tk
@@ -141,11 +152,12 @@ jobs:
           merge-multiple: true
       - name: Checksums (the in-app updater checks downloads against this file)
         run: cd artifacts && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
-      - name: Release notes from CHANGELOG
+      - name: Release notes (what was merged comes from GitHub; this adds how to download)
+        env:
+          BUMP: ${{ needs.check.outputs.bump }}
         run: |
-          V="${TAG#v}"
-          awk -v h="## [$V]" 'index($0, h) == 1 {f=1; next} f && index($0, "## [") == 1 {exit} f' CHANGELOG.md > notes.md
           {
+            echo "A ${BUMP} release, made automatically from the pull requests merged since the last one."
             echo
             echo "### Downloads"
             echo "- \`mitoolkit-*\` program for Windows, Linux and macOS: opens the GUI, or runs on the command line with \`--cli\`. The app updates itself from here (Help > Check for updates)."
@@ -160,4 +172,4 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$TAG" artifacts/* --title "$TAG" --notes-file notes.md --target "$GITHUB_SHA"
+        run: gh release create "$TAG" artifacts/* --title "$TAG" --notes-file notes.md --generate-notes --latest --target "$GITHUB_SHA"
