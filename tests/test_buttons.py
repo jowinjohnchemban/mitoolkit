@@ -76,5 +76,27 @@ class ButtonStateTests(unittest.TestCase):
             self.assertEqual(text, KINDS[kind][1])
 
 
+@unittest.skipUnless(HAVE_DISPLAY, "needs a display")
+class NativeButtonTests(unittest.TestCase):
+    """macOS uses the system's own buttons: the app still configures them with kind= and icon=."""
+
+    def test_native_buttons_accept_the_same_options(self):
+        from unittest import mock
+        from miunlock.ui.components import buttons
+        root = make_root()
+        try:
+            with mock.patch.object(buttons.sys, "platform", "darwin"):
+                button = buttons.Button(root, "Security check...")
+                radio = buttons.Button(root, "1 min", variable=tk.StringVar(), value="1")
+            button.configure(text="Security check... !", kind="warn", icon="shield")
+            radio.configure(text="1 hr", icon="clock")
+            self.assertEqual(button.cget("text"), "Security check... !")
+            self.assertEqual(button.kind, "warn")
+            self.assertEqual(radio.cget("text"), "1 hr")
+            self.assertTrue(button.configure())            # a query still works
+        finally:
+            root.destroy()
+
+
 if __name__ == "__main__":
     unittest.main()

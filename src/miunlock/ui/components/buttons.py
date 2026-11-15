@@ -297,15 +297,39 @@ class ModernButton(tk.Canvas):
             self.create_text(w / 2, cy, text=self._text, fill=text, font=self._font)
 
 
+class _Native:
+    """Mixin for macOS: the system draws its own buttons, but the app configures every button the same way
+    (configure(kind=..., icon=...)), so the options the system does not have are accepted and left out."""
+    kind = "normal"
+
+    def configure(self, cnf=None, **kw):  # type: ignore[override]
+        options = dict(cnf or {}, **kw)
+        if not options:
+            return super().configure()          # type: ignore[misc]
+        self.kind = options.pop("kind", self.kind)
+        options.pop("icon", None)
+        return super().configure(options) if options else None   # type: ignore[misc]
+
+    config = configure
+
+
+class _NativeButton(_Native, ttk.Button):
+    pass
+
+
+class _NativeRadio(_Native, ttk.Radiobutton):
+    pass
+
+
 def Button(parent, text: str = "", command: Optional[Callable[[], None]] = None, *, primary: bool = False,
            variable: Optional[tk.Variable] = None, value=None, font=None, icon: Optional[str] = None,
            kind: str = "normal"):
     """A button in the best look for this system (see the module notes)."""
     if sys.platform == "darwin":
         if variable is not None:
-            return ttk.Radiobutton(parent, text=text, variable=variable, value=value, style="Toolbutton",
-                                   command=command)
-        return ttk.Button(parent, text=text, command=command, style="Primary.TButton" if primary else "TButton")
+            return _NativeRadio(parent, text=text, variable=variable, value=value, style="Toolbutton",
+                                command=command)
+        return _NativeButton(parent, text=text, command=command, style="Primary.TButton" if primary else "TButton")
     return ModernButton(parent, text, command, primary=primary, variable=variable, value=value, font=font,
                         icon=icon, kind=kind)
 
