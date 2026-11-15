@@ -65,13 +65,82 @@ def available() -> bool:
         return False
 
 
-def no_access_advice() -> str:
-    if sys.platform == "win32":
-        return "Windows has no usable driver for it: use File > Install Google USB driver (or `miunlock install-driver`)."
-    if sys.platform.startswith("linux"):
+# Programs that open Android phones over USB. Only one program can use a phone at a time,
+# so while one of these runs, miunlock gets "access denied".
+_BLOCKERS = {
+    "adb": "Google's adb", "fastboot": "Google's fastboot", "scrcpy": "scrcpy",
+    "studio64": "Android Studio", "studio": "Android Studio",
+    "miflash": "Mi Flash", "xiaomiflash": "Mi Flash", "miflash_unlock": "Mi Unlock",
+    "miunlock": "Mi Unlock", "miphoneassistant": "Mi PC Suite",
+}
+
+
+def blocking_programs() -> List[str]:
+    """Process names (lower case, no .exe) of running programs that may hold the phone."""
+    import subprocess
+    try:
+        if sys.platform == "win32":
+            from miunlock.system import NO_WINDOW
+            out = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True,
+                                 timeout=10, creationflags=NO_WINDOW).stdout
+            names = {line.split('","')[0].strip('"').lower() for line in out.splitlines() if line.strip()}
+        else:
+            out = subprocess.run(["ps", "-A", "-o", "comm="], capture_output=True, text=True, timeout=10).stdout
+            names = {line.strip().rsplit("/", 1)[-1].lower() for line in out.splitlines()}
+    except (OSError, subprocess.SubprocessError):
+        return []
+    names = {n[:-4] if n.endswith(".exe") else n for n in names}
+    return sorted(n for n in names if n in _BLOCKERS)
+
+
+def stop_google_adb() -> bool:
+    """End Google's adb server so miunlock can use the phone. It starts again the next time
+    you use adb. Returns True if one was running."""
+    import subprocess
+    if "adb" not in blocking_programs():
+        return False
+    from miunlock.system import NO_WINDOW
+    cmd = ["taskkill", "/IM", "adb.exe", "/F"] if sys.platform == "win32" else ["pkill", "-x", "adb"]
+    subprocess.run(cmd, capture_output=True, timeout=15, creationflags=NO_WINDOW)
+    return True
+
+
+# Why a plugged-in phone cannot be opened (None means it can).
+BUSY = "busy"                    # another program has it open; the driver is fine
+NO_DRIVER = "no-driver"          # Windows has no usable (WinUSB) driver for it
+NO_PERMISSION = "no-permission"  # Linux/macOS: this user may not open it
+
+
+def reason_for(err: Exception) -> str:
+    """Classify a failure to open the phone. libusb says "not supported" when Windows has no
+    usable driver, and "access denied" when the driver is fine but another program has the
+    phone open (on Linux "access denied" means a permission problem instead)."""
+    errno = getattr(err, "errno", None)
+    text = str(err).lower()
+    if isinstance(err, NotImplementedError) or "not supported" in text:
+        return NO_DRIVER
+    if errno == 16 or "busy" in text:
+        return BUSY
+    if errno == 13 or "access" in text:
+        return BUSY if sys.platform == "win32" else NO_PERMISSION
+    return BUSY
+
+
+def no_access_advice(reason: str = BUSY) -> str:
+    """What to do about a phone that is plugged in but cannot be opened."""
+    if reason == NO_DRIVER:
+        return "Windows has no driver for it: see Help > USB driver help (or run `miunlock driver-help`)."
+    if reason == NO_PERMISSION:
         return ("Your user has no permission for it: add a udev rule for Android phones "
                 "(for example install the android-sdk-platform-tools-common package) and reconnect.")
-    return "Reconnect the phone and try again."
+    running = blocking_programs()
+    if running:
+        names = ", ".join(dict.fromkeys(_BLOCKERS[n] for n in running))
+        return (f"{names} has the phone open, and only one program can use it at a time. "
+                + ("Stop it to continue; it starts again by itself when you next use adb." if "adb" in running
+                   else "Close it, then click Rescan."))
+    return ("Another program is using it. Close programs that talk to Android phones (adb, Android "
+            "Studio, Mi Flash, phone managers), then unplug and reconnect the phone.")
 
 
 def explain(err: Exception) -> UsbError:
@@ -84,15 +153,11 @@ def explain(err: Exception) -> UsbError:
     text = str(err).lower()
     if errno == 110 or "timed out" in text or "timeout" in text:
         return UsbTimeout("The phone did not answer in time.")
-    if errno == 13 or "access" in text:
-        return UsbError("The phone was found but could not be opened. " + no_access_advice())
-    if errno == 16 or "busy" in text:
-        return UsbError("Another program is using the phone. Close Google's adb (`adb kill-server`), "
-                        "Android Studio, Mi Unlock or Mi Flash and try again.")
     if errno == 19 or "no such device" in text:
         return UsbError("The phone was disconnected.")
-    if isinstance(err, NotImplementedError) or "not supported" in text:
-        return UsbError("The phone was found but could not be opened. " + no_access_advice())
+    if errno in (13, 16) or isinstance(err, NotImplementedError) or any(
+            w in text for w in ("access", "busy", "not supported")):
+        return UsbError("The phone was found but could not be opened. " + no_access_advice(reason_for(err)))
     return UsbError(f"USB error: {err}")
 
 
@@ -111,18 +176,31 @@ def find(triple: Tuple[int, int, int]) -> List[Tuple[Any, Any]]:
     return result
 
 
-def identify(dev) -> Tuple[str, bool]:
-    """(serial, accessible). Reading the serial needs the device open, so failing to read it
-    means no driver or no permission; the bus position then stands in for the serial."""
+def identify(dev) -> Tuple[str, Optional[str]]:
+    """(serial, reason). reason is None when the phone can be opened, else BUSY, NO_DRIVER or
+    NO_PERMISSION. When it cannot be opened the serial is unreadable, so the USB bus position
+    stands in for it."""
+    import usb.core
     import usb.util
+    fallback = f"usb-{dev.bus}-{dev.address}"
     try:
-        if dev.iSerialNumber:
-            serial = usb.util.get_string(dev, dev.iSerialNumber)
-            if serial:
-                return serial, True
-        return f"usb-{dev.bus}-{dev.address}", True
+        dev.ctrl_transfer(0x80, 0x00, 0, 0, 2, timeout=1000)  # GET_STATUS: opens the device
+    except NotImplementedError as err:
+        return fallback, reason_for(err)
+    except usb.core.USBError as err:
+        if getattr(err, "errno", None) in (13, 16) or "access" in str(err).lower():
+            return fallback, reason_for(err)
+        # any other answer (such as a stall) still means the device opened
+    try:
+        serial = usb.util.get_string(dev, dev.iSerialNumber) if dev.iSerialNumber else None
     except Exception:
-        return f"usb-{dev.bus}-{dev.address}", False
+        serial = None
+    finally:
+        try:
+            usb.util.dispose_resources(dev)  # close the probe; a real connection reopens it
+        except Exception:
+            pass
+    return serial or fallback, None
 
 
 class Handle:
@@ -189,13 +267,13 @@ def open_first(triple: Tuple[int, int, int], serial: Optional[str] = None):
     Returns (handle, serial) or raises UsbError."""
     blocked = None
     for dev, intf in find(triple):
-        ser, accessible = identify(dev)
+        ser, reason = identify(dev)
         if serial and ser != serial:
             continue
-        if not accessible:
-            blocked = ser
+        if reason:
+            blocked = reason
             continue
         return Handle(dev, intf), ser
     if blocked:
-        raise UsbError("The phone was found but could not be opened. " + no_access_advice())
+        raise UsbError("The phone was found but could not be opened. " + no_access_advice(blocked))
     raise UsbError("No phone found.")

@@ -6,7 +6,7 @@ import unittest
 from contextlib import redirect_stdout
 from unittest import mock
 
-from miunlock import adb, api, cli, drivers, fastboot, usbio, xiaomi
+from miunlock import adb, api, cli, fastboot, usbio, xiaomi
 from miunlock.errors import MiunlockError, UnlockError
 
 SERVICE = {"servicedata": {"ssecurity": "s", "deviceId": "dev"}, "cookies": {"userId": "1"}}
@@ -15,7 +15,7 @@ SERVICE = {"servicedata": {"ssecurity": "s", "deviceId": "dev"}, "cookies": {"us
 class ErrorHierarchyTests(unittest.TestCase):
     def test_every_error_type_shares_the_base(self):
         for cls in (UnlockError, xiaomi.ServerError, adb.AdbError, fastboot.FastbootError,
-                    usbio.UsbError, drivers.DriverError, api.UnlockError):
+                    usbio.UsbError, api.UnlockError):
             self.assertTrue(issubclass(cls, MiunlockError), cls)
 
     def test_one_error_type_per_layer(self):
@@ -67,10 +67,62 @@ class UnlockServerTests(unittest.TestCase):
             xiaomi.UnlockServer(SERVICE, "Mars")
 
 
+class UsbReasonTests(unittest.TestCase):
+    def test_no_driver_versus_busy(self):
+        import usb.core
+        self.assertEqual(usbio.reason_for(NotImplementedError("Operation not supported")), usbio.NO_DRIVER)
+        denied = usb.core.USBError("Access denied (insufficient permissions)", 13, 13)
+        with mock.patch.object(usbio.sys, "platform", "win32"):
+            self.assertEqual(usbio.reason_for(denied), usbio.BUSY)
+        with mock.patch.object(usbio.sys, "platform", "linux"):
+            self.assertEqual(usbio.reason_for(denied), usbio.NO_PERMISSION)
+
+    def test_driver_help_only_when_driver_is_missing(self):
+        with mock.patch.object(usbio, "blocking_programs", return_value=["adb"]):
+            busy = usbio.no_access_advice(usbio.BUSY)
+        self.assertIn("Google's adb", busy)
+        self.assertNotIn("driver", busy.lower())
+        self.assertIn("driver", usbio.no_access_advice(usbio.NO_DRIVER).lower())
+
+
 class FastbootBackendTests(unittest.TestCase):
-    def test_default_backend_is_usb(self):
+    def test_default_backend_chooses_automatically(self):
         with mock.patch.object(fastboot, "_backend", None):
-            self.assertIsInstance(fastboot.backend(), fastboot.UsbBackend)
+            self.assertIsInstance(fastboot.backend(), fastboot.AutoBackend)
+
+    def auto(self, usb_devices, exe_devices):
+        auto = fastboot.AutoBackend()
+        auto.usb = mock.Mock(spec=fastboot.UsbBackend)
+        auto.usb.devices.return_value = usb_devices
+        if exe_devices is None:
+            auto._exe, auto._exe_checked = None, True
+        else:
+            auto._exe, auto._exe_checked = mock.Mock(spec=fastboot.ExeBackend), True
+            auto._exe.devices.return_value = exe_devices
+        return auto
+
+    def test_builtin_client_preferred_when_it_can_open_the_phone(self):
+        auto = self.auto([{"serial": "A", "accessible": True}], [{"serial": "A", "accessible": True}])
+        self.assertIs(auto.pick(), auto.usb)
+
+    def test_google_fastboot_used_when_builtin_cannot_open_the_phone(self):
+        auto = self.auto([{"serial": "usb-1-2", "accessible": False}], [{"serial": "A", "accessible": True}])
+        self.assertIs(auto.pick(), auto.exe)
+        self.assertEqual(auto.devices(), [{"serial": "A", "accessible": True}])
+
+    def test_without_google_fastboot_the_builtin_client_stays(self):
+        auto = self.auto([{"serial": "usb-1-2", "accessible": False}], None)
+        self.assertIs(auto.pick(), auto.usb)
+        self.assertFalse(auto.devices()[0]["accessible"])
+
+    def test_google_fastboot_output_is_parsed(self):
+        exe = fastboot.ExeBackend("fastboot")
+        done = mock.Mock(returncode=0, stdout="", stderr="product: gram\nFinished. Total time: 0.001s\n")
+        with mock.patch.object(fastboot.subprocess, "run", return_value=done):
+            self.assertEqual(exe.getvar("product"), "gram")
+        done.stderr = "(bootloader) token:AAAA\n(bootloader) token:BBBB\nOKAY [  0.010s]\n"
+        with mock.patch.object(fastboot.subprocess, "run", return_value=done):
+            self.assertEqual(exe.token(), "AAAABBBB")
 
     def test_android_is_refused_with_a_clear_message(self):
         import miunlock.system

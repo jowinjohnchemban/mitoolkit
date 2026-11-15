@@ -30,6 +30,17 @@ _PROPS = {
     "bootloader_locked": "ro.boot.flash.locked",
     "brand": "ro.product.brand",
     "security_patch": "ro.build.version.security_patch",
+    "manufacturer": "ro.product.manufacturer",
+    "build": "ro.build.display.id",
+    "sdk": "ro.build.version.sdk",
+    "chipset": "ro.soc.model",
+    "platform": "ro.board.platform",
+    "region": "ro.miui.region",
+    "variant": "ro.product.mod_device",
+    "baseband": "gsm.version.baseband",
+    "verified_boot": "ro.boot.verifiedbootstate",
+    "encryption": "ro.crypto.state",
+    "slot": "ro.boot.slot_suffix",
 }
 
 # What "Back up files" can copy. Each choice is a list of folders in the phone's shared
@@ -53,11 +64,14 @@ def _check() -> None:
         raise AdbError(str(err)) from None
 
 
-def _valid(package: str) -> str:
+def valid_package(package: str) -> str:
     """Package names go into a shell command, so only real package names are accepted."""
     if not _PACKAGE.match(package):
         raise AdbError(f"Not a valid package name: {package!r}")
     return package
+
+
+_valid = valid_package
 
 
 def devices() -> List[Dict[str, str]]:
@@ -92,8 +106,9 @@ class Phone:
             raise AdbError(str(err)) from None
 
     def info(self) -> Dict[str, object]:
-        """Non-sensitive details: model, codename, Android and MIUI/HyperOS version, security
-        patch, whether the bootloader is locked, battery level."""
+        """The basic details shown at once: model, versions, build, security patch, chipset,
+        memory, storage, screen, kernel, boot and encryption state, battery. Identifiers such
+        as the IMEI come only from details.phone_details (the "Show more" button)."""
         props: Dict[str, str] = {}
         for line in self.shell("getprop").splitlines():
             m = re.match(r"\[(.+?)\]: \[(.*)\]", line.strip())
@@ -102,8 +117,34 @@ class Phone:
         info: Dict[str, object] = {key: (props.get(prop) or None) for key, prop in _PROPS.items()}
         flag = info.pop("bootloader_locked")
         info["bootloader_locked"] = None if flag is None else flag == "1"
-        info["battery"] = self.battery()
+        info.update(self._hardware())
         return info
+
+    def _hardware(self) -> Dict[str, object]:
+        """Kernel, RAM, storage, screen and battery in one round trip."""
+        marker = "@@miunlock@@"
+        cmd = "; ".join(f"echo {marker}; {c}" for c in (
+            "uname -r", "grep MemTotal /proc/meminfo", "df -k /data | tail -n 1", "wm size",
+            "dumpsys battery"))
+        try:
+            parts = self.shell(cmd).split(marker)[1:]
+        except AdbError:
+            return {"battery": None}
+        parts += [""] * (5 - len(parts))
+        kernel, mem, df, screen, battery = (x.strip() for x in parts[:5])
+        out: Dict[str, object] = {"kernel": kernel.split()[0] if kernel else None}
+        m = re.search(r"(\d+)\s*kB", mem)
+        out["ram_gb"] = round(int(m.group(1)) / 1024 / 1024, 1) if m else None
+        cols = df.split()
+        if len(cols) >= 4 and cols[1].isdigit() and cols[2].isdigit():
+            out["storage_total_gb"] = round(int(cols[1]) / 1024 / 1024, 1)
+            out["storage_used_gb"] = round(int(cols[2]) / 1024 / 1024, 1)
+        m = re.search(r"(?:Override|Physical) size:\s*(\d+x\d+)", screen)
+        out["screen"] = m.group(1) if m else None
+        levels = dict(re.findall(r"^\s*(level|temperature|health|status):\s*(\d+)", battery, re.M))
+        out["battery"] = int(levels["level"]) if "level" in levels else None
+        out["battery_temp_c"] = int(levels["temperature"]) / 10 if "temperature" in levels else None
+        return out
 
     def battery(self) -> Optional[int]:
         try:
@@ -122,6 +163,37 @@ class Phone:
             raise AdbError(str(err)) from None
         finally:
             adb_usb.forget(self.serial)
+
+    def reboot(self, mode: str = "") -> None:
+        """Restart the phone: "" (normal), "recovery" or "bootloader". Nothing is erased."""
+        if mode not in ("", "recovery", "bootloader"):
+            raise AdbError(f"Unknown restart mode: {mode!r}")
+        try:
+            self._dev.reboot(mode)
+        except usbio.UsbError as err:
+            raise AdbError(str(err)) from None
+        finally:
+            adb_usb.forget(self.serial)
+
+    def power_off(self) -> None:
+        """Shut the phone down (it stays off until you press the power button)."""
+        try:
+            self.shell("reboot -p", 5000)
+        except AdbError:
+            pass  # the phone goes away before it can answer
+        finally:
+            adb_usb.forget(self.serial)
+
+    def logcat(self, lines: int = 1500) -> str:
+        """The phone's recent system log (logcat -d: it is dumped and not followed), newest last."""
+        count = max(50, min(int(lines), 20000))
+        return self.shell(f"logcat -d -v threadtime -t {count}", 60000)
+
+    @property
+    def via(self) -> str:
+        """How miunlock reaches the phone: "adb server" (Google's) or "usb" (built in)."""
+        from miunlock.adb_server import ServerDevice
+        return "adb server" if isinstance(self._dev, ServerDevice) else "usb"
 
     def sync(self) -> adb_usb.SyncSession:
         """adb's file-transfer session (stat, list, receive)."""
@@ -262,6 +334,24 @@ def device_info(serial: Optional[str] = None) -> Dict[str, object]:
 
 def reboot_to_bootloader(serial: Optional[str] = None) -> None:
     Phone(serial).reboot_to_bootloader()
+
+
+def reboot(mode: str = "", serial: Optional[str] = None) -> None:
+    Phone(serial).reboot(mode)
+
+
+def power_off(serial: Optional[str] = None) -> None:
+    Phone(serial).power_off()
+
+
+def logcat(serial: Optional[str] = None, lines: int = 1500) -> str:
+    return Phone(serial).logcat(lines)
+
+
+def more_details(serial: Optional[str] = None):
+    """All the extra details (identifiers, software, hardware, network, battery) in sections."""
+    from miunlock import details
+    return details.phone_details(Phone(serial))
 
 
 def list_user_apps(serial: Optional[str] = None) -> List[str]:

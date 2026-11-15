@@ -85,17 +85,20 @@ program talks to the phone over USB with [libusb](https://libusb.info), which `p
 installs with it (the `libusb-package` wheel) on Windows, macOS and 64-bit Linux. Elsewhere,
 install libusb from your system's packages.
 
-- **Windows** needs a USB driver for the phone. Run *File > Install Google USB driver* in
-  the GUI, or `miunlock install-driver`, which installs Google's official driver after an
-  administrator prompt. If the phone still has a yellow mark in Device Manager, right-click
-  it > *Update driver > Browse my computer > Let me pick > Android Device > Android
-  Bootloader Interface* (or *Android ADB Interface* while Android is running).
+- **Windows** needs a USB driver for the phone. *Help > USB driver help* in the GUI (or
+  `miunlock driver-help --open`) lists the steps and opens Google's download page; you install
+  the driver yourself with Device Manager: right-click the phone > *Update driver > Browse my
+  computer > Let me pick > Have Disk*, choose `android_winusb.inf`, then *Android Bootloader
+  Interface* (fastboot mode) or *Android ADB Interface* (Android running). miunlock does not
+  download or install drivers.
 - **Linux** needs permission for the phone: add a udev rule for Android devices, for
   example by installing `android-sdk-platform-tools-common` (Debian/Ubuntu), then reconnect.
 - **macOS** needs nothing extra.
 
-Only one program can use the phone at a time. Close Google's adb (`adb kill-server`),
-Android Studio, Mi Unlock or Mi Flash before using `miunlock`.
+Only one program can open the phone at a time. If Google's adb server is running,
+miunlock works through it, so you do not need to stop it. If Google's `fastboot` is
+already installed, miunlock uses it for a phone its own fastboot cannot open. Close Mi
+Unlock, Mi Flash or other phone tools while using miunlock.
 
 The first time adb connects, the phone asks *Allow USB debugging?*. `miunlock` uses the same
 key file as Google's adb (`~/.android/adbkey`), creating it if needed, so a computer you

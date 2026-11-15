@@ -34,6 +34,9 @@ If you only have the Python package, use `"command": "python", "args": ["-m", "m
 | `reboot_to_fastboot` | Reboots a phone running Android into fastboot with adb. Erases nothing |
 | `login` | Uses the saved session. With none, a person must sign in in the browser; the call waits |
 | `check_eligibility` | Asks Xiaomi whether the fastboot phone can be unlocked now. Read-only. Returns an error at once if no phone is in fastboot mode |
+| `security_check` | Read-only security check of a phone running Android (OSV bulletins, Play Protect, app access, known stalkerware) |
+| `device_details` | Everything a phone running Android reports over USB, in sections. Read-only. Serial number, IMEI, Android ID and addresses are left out |
+| `connections` | Read-only state of Wi-Fi, the mobile network (modem), SIM, Bluetooth and USB, with findings that say what looks wrong. Network and device names and addresses are hidden |
 | `read_log` | The last lines of `miunlock.log`, with tokens scrubbed |
 
 ## What an agent cannot do

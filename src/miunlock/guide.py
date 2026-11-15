@@ -72,7 +72,7 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
         ("p", "Click Check eligibility. This asks Xiaomi and changes nothing on the phone."),
         ("b", "Ready to unlock: Xiaomi will issue a token. It also says whether data is erased."),
         ("b", "Anything else: the app explains the error in plain words and gives the raw code. "
-              "Help > Error codes lists them all."),
+              "Help > Online documentation > Error codes lists them all."),
     ]),
     ("6. Unlock (step 3)", [
         ("p", "Only available once the check passes. Three deliberate acts are needed:"),
@@ -95,6 +95,38 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
         ("w", "Unlocking the bootloader resets the phone, which brings every removed app back. "
               "Debloat after unlocking, or if you are not unlocking."),
     ]),
+    ("Live status and details", [
+        ("p", "Show more (the bar under the device details) lists everything the phone gives over USB: serial "
+              "number, IMEI, software, hardware, modem, SIM, boot, servicing and debugging, partitions, sensors "
+              "and battery. It stays on your screen. Copy details (top of step 2) copies what is shown."),
+        ("p", "Live status... (step 2) draws live graphs of processor, memory, battery, temperature and network, "
+              "shows each processor core, the GPU and every temperature sensor, and lists processes like a "
+              "task manager. It only reads; close the window to stop. Use Ctrl+1 to Ctrl+4 for its tabs."),
+        ("p", "Log viewer... (Phone menu) shows the phone's recent system log with a level filter and search. "
+              "Logs can contain personal details: check them before sharing."),
+    ]),
+    ("Debug Wi-Fi and mobile data", [
+        ("p", "Connections... (step 2) reads Wi-Fi, the modem and mobile network, the SIM, Bluetooth, USB and power, "
+              "and tells you in plain words what looks wrong and what to try."),
+        ("b", "Summary: the findings, worst first, and two graphs of Wi-Fi and mobile signal. Tick Update every "
+              "5 s to watch them live while you move around."),
+        ("b", "Wi-Fi: the network you are on (signal in dBm, band and channel, speeds, router, DNS) and nearby "
+              "networks, to spot a crowded channel."),
+        ("b", "Mobile network: registration, operator, network type (4G or 5G), signal (RSRP, RSRQ, SINR), "
+              "the cell you are on, and whether Android confirmed internet through it."),
+        ("p", "Network test sends a few small pings from the phone (to the router, to 8.8.8.8, and a name lookup) "
+              "to tell a dead router from a DNS problem. It is the only button here that sends traffic."),
+        ("p", "Android's dump formats differ between phones. If a value is missing, the phone did not report it."),
+    ]),
+    ("Security check", [
+        ("p", "Security check... (step 2, while the phone is on) looks at the phone and changes nothing:"),
+        ("b", "Phone software: compares your security patch with Android's security bulletins (from OSV, "
+              "AOSP data) and says how many fixes are missing and whether your Android version still gets fixes."),
+        ("b", "Google Play: whether Play Protect is on, how old the Google Play system update is, and which "
+              "apps were not installed from a store or may install other apps."),
+        ("b", "Apps: apps with accessibility, notification or device-admin access, and known stalkerware."),
+        ("w", "It is not an antivirus. Keep Google Play Protect on."),
+    ]),
     ("Afterwards", [
         ("b", "Set the phone up again and restore your data."),
         ("b", "Use File > Sign out and delete saved session, then check the signed-in devices "
@@ -105,19 +137,18 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
     ("Troubleshooting", [
         ("b", "Phone not detected: use a data cable (not charge-only) and another USB port, and "
               "check the phone shows the fastboot screen."),
-        ("b", "Windows: File > Install Google USB driver downloads Google's official driver and "
-              "installs it (Windows asks for administrator permission). If the phone still has a "
-              "yellow mark in Device Manager, right-click it > Update driver > Browse my computer > "
-              "Let me pick > Android Device > Android Bootloader Interface."),
+        ("b", "Windows: if Device Manager shows the phone with a yellow mark, install Google's USB "
+              "driver. Help > USB driver help lists the steps and opens Google's download page; you "
+              "install it with Windows' Device Manager (Have Disk > android_winusb.inf)."),
         ("b", "Linux: if the phone is found but cannot be opened, add a udev rule for Android phones "
               "(for example the android-sdk-platform-tools-common package) and reconnect."),
         ("b", "\"Another program is using the phone\": close Google's adb (adb kill-server), Android "
               "Studio, Mi Unlock or Mi Flash. Only one program can use the phone at a time."),
         ("b", "Details button (bottom right): shows what the program is doing. Copy it when "
               "asking for help. It contains no tokens."),
-        ("b", "File > Show log file opens the saved log."),
+        ("b", "File > Show log file opens the saved log. File > Activity log shows what the program is doing."),
         ("b", "Error 20031: account not added in Mi Unlock status (section 1)."),
         ("b", "Error 20036: still in the waiting period (section 2)."),
-        ("p", "More: Help > FAQ and Help > Error codes."),
+        ("p", "More: Help > Online documentation (FAQ, Error codes, Safety model)."),
     ]),
 ]

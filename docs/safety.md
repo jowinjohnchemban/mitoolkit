@@ -109,7 +109,21 @@ In the code reviewed when this fork was made, requests go only to:
 |---|---|
 | `account.xiaomi.com`, `api.account.xiaomi.com` | Login and account lookups |
 | `unlock.update.miui.com`, `unlock.update.intl.miui.com`, `in-/ru-/eu-unlock.update.intl.miui.com` | Unlock service, chosen by account region |
-| `dl.google.com` | Google's USB driver for Windows, only when you choose *Install Google USB driver* |
+| `api.osv.dev` | Security check only: Android security bulletin entries. Sends the Android version and AOSP project names, nothing about your apps or account |
+| `raw.githubusercontent.com` | Security check only: the stalkerware indicator list (AssoEchap/stalkerware-indicators), downloaded at most weekly and cached in `~/.miunlock/cache` |
+| `127.0.0.1:5037` | Google's adb server on this computer, when it is running (never leaves the computer) |
+
+Two more things send traffic, and neither goes through this program:
+
+- **Connections > Network test** makes the *phone* ping its router, `8.8.8.8` and look up `google.com`
+  (a few small packets). It runs only when you press the button.
+- **Everything else is local.** Live status, Connections, Show more and the Log viewer only read from
+  the phone and show it on screen. Connections and the log can contain your Wi-Fi name, router address,
+  paired Bluetooth device names and app names, so check what you copy, save or share.
+
+Commands run on the phone are fixed strings, plus a few values that are validated first (a restart mode
+from a short list, a line count as a number, a router address as an IP). Nothing a phone reports is ever
+put into a shell command unchecked.
 
 No analytics or telemetry calls were found. The original code's Android (Termux) path,
 which downloaded and ran an install script from the third-party `nohajc/termux-adb`

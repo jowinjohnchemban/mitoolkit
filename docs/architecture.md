@@ -10,24 +10,50 @@ src/miunlock/
 ├── __main__.py        python -m miunlock
 ├── cli.py             entry point: GUI by default, --cli, JSON subcommands (@json_command), --mcp
 ├── gui.py             main window (App)
-├── ui/                the other windows, one class each
+├── ui/                the other windows, one class each, built from the components
 │   ├── base.py            Dialog base class
 │   ├── theme.py           colours, links, Fonts
+│   ├── menu.py            the menu bar
+│   ├── placement.py       keeps windows inside the free part of the screen
 │   ├── guide_window.py    GuideWindow
 │   ├── backup_dialog.py   BackupDialog
-│   └── apps_dialog.py     AppManagerDialog, AppRow
+│   ├── apps_dialog.py     AppManagerDialog, AppRow
+│   ├── security_dialog.py SecurityDialog
+│   ├── driver_dialog.py   DriverHelpDialog
+│   ├── live_dialog.py     LiveStatusDialog (gauges, graphs, cores, sensors, processes)
+│   ├── log_dialog.py      LogDialog (logcat viewer)
+│   ├── connect_dialog.py  ConnectionsDialog (Wi-Fi, modem, SIM, Bluetooth, USB; findings; network test)
+│   ├── activity_window.py ActivityLog, ActivityWindow
+│   └── components/        reusable widgets, independent of any one window
+│       ├── buttons.py         Button / ModernButton (icons, state colours), segmented()
+│       ├── button_row.py      a row of equal-width buttons that wraps
+│       ├── selector.py        SelectorBar (Windows 11 style tabs / range)
+│       ├── charts.py          LineChart, Gauge, Sparkline
+│       ├── skeleton.py        shimmering loading placeholders and their shared clock
+│       ├── scroll_page.py     a page that scrolls and keeps a readable width
+│       ├── shapes.py          rounded cards, colour mixing
+│       └── render.py          anti-aliased images with Pillow (rendered on worker threads)
+├── details.py         "Show more": every detail a phone reports, in sections (parsers + collection)
+├── monitor.py         live readings for Live status (CPU, cores, GPU, memory, battery, sensors, network, processes)
+├── diagnostics.py     Wi-Fi, modem, SIM, Bluetooth, USB readings, parsers, plain-language findings, network test
+├── workers.py         BackgroundPool: daemon worker threads, results delivered on the window's thread
+├── watchdog.py        call_with_timeout, UiWatchdog (records freezes), crash logging
+├── memory.py          Housekeeper: garbage collection, memory limit, closing frees windows
 ├── mcp.py             MCP server for AI agents (no unlock tool)
 ├── api.py             programmatic API used by the subcommands, GUI and MCP
 ├── xiaomi.py          UnlockServer: the requests to Xiaomi's unlock server, shared
 ├── errors.py          MiunlockError, the base of every expected error
 ├── adb.py             Phone: details, reboot, backup, app manager (+ short functions)
 ├── adb_usb.py         built-in adb client (USB protocol, auth, shell, sync)
+├── adb_server.py      adb through Google's adb server, when one is running
+├── platform_tools.py  finds Google's adb/fastboot if already installed (never downloads)
 ├── adbkey.py          adb RSA key (~/.android/adbkey), pure Python
-├── fastboot.py        Backend interface; UsbBackend
+├── fastboot.py        Backend interface; UsbBackend, ExeBackend, AutoBackend
 ├── fastboot_usb.py    built-in fastboot client (USB protocol)
 ├── usbio.py           USB access through pyusb + libusb
-├── drivers.py         Google USB driver installer (Windows)
+├── drivers.py         USB driver help for Windows (steps + Google's download page)
 ├── bloat.py           known Xiaomi bloat, with ratings, for the app manager
+├── security.py        read-only security check (OSV bulletins, Play Protect, app access, stalkerware)
 ├── guide.py           the in-app step-by-step guide
 ├── log.py             scrubbed miunlock.log next to the executable
 ├── hints.py           plain-English explanations of Xiaomi error codes
@@ -64,7 +90,7 @@ src/miunlock/
   kept for the CLI, API and MCP.
 - **One error base.** Every expected failure derives from `errors.MiunlockError` and has a
   readable message. Each layer has one type (`AdbError`, `FastbootError`, `UsbError`,
-  `UnlockError`, `DriverError`); `api.py` turns lower-layer errors into `UnlockError`.
+  `UnlockError`); `api.py` turns lower-layer errors into `UnlockError`.
 - **Windows as classes.** Each secondary window is a `ui.base.Dialog` subclass. They only
   use the App's small public interface: `root`, `fonts`, `run()`, `log()`, `call_soon()`.
 - **CLI commands are plain functions** wrapped by `@json_command`, which prints the result
@@ -97,6 +123,20 @@ download (stage) encryptData  ──►  oem unlock
 
 The fastboot steps are miunlock's own USB client (`fastboot_usb.py`); `encryptData` goes
 from memory straight to the phone and is never written to disk.
+
+## Choosing how to reach the phone
+
+Only one program can open a phone's USB interface, so miunlock picks the way that works:
+
+- **adb**: if Google's adb server is running (it owns every phone in adb mode), miunlock
+  asks it, over `127.0.0.1:5037`, exactly like the `adb` command does. Otherwise it uses its
+  own USB connection and keeps it open between scans (it never re-probes a phone it already
+  holds, which Windows would answer with "access denied").
+- **fastboot**: the built-in USB client first. If it finds a phone it cannot open and
+  Google's `fastboot` is already installed, that program is used for that phone.
+- A phone that still cannot be opened is reported with the reason: another program has it
+  (named, with **Stop Google's adb** when that is the one), no driver (Windows; driver help),
+  or no permission (Linux; udev rule).
 
 ## Built-in adb and fastboot
 

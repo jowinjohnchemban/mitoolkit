@@ -10,6 +10,66 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
 
 ### Added
 
+- `miunlock details` and `miunlock connections [--network-test]` commands, and MCP tools
+  `device_details` and `connections`, so scripts and agents can use the same readings. Agents are not
+  shown what identifies the phone or its owner (serial number, IMEI, addresses, network and device
+  names).
+- Connections and signal (step 2, or Phone menu): Wi-Fi (signal, band and channel, speeds, router, DNS,
+  nearby networks), mobile network and modem (registration, operator, 4G/5G, RSRP, RSRQ, SINR, cell and
+  band, whether Android confirmed internet), SIM, Bluetooth, USB and power, with plain-language
+  findings, live signal graphs and an optional network test. Read-only apart from the pings you ask for.
+- A smoke test opens every window, builds every menu and enlarges the text to 200% with everything open,
+  failing on any error Tk would otherwise swallow. It found (and fixed) a crash in the USB driver help
+  window. Text in every state of the new buttons, selector and charts is now checked for contrast.
+- Built to stay up: a watchdog records what froze if the window ever stops answering for 4 seconds
+  (every thread's stack goes to the log file), phone calls that never return are given up on after
+  15 to 40 seconds and retried, crashes and background-thread errors are logged, and the program
+  says what happened instead of vanishing. Fixed the Live status freeze: the loading placeholders'
+  shared timer doubled itself every frame.
+- Worker threads for drawing: chart images are rendered by a small pool of daemon threads (they never
+  keep the program from closing) and shown when ready, so the window never waits for Pillow.
+- Memory hygiene: a garbage collection after start-up (then `gc.freeze()`), a light one every 30 s and a
+  full one every 5 min, a full one whenever a window closes, a least-recently-used image cache, and a
+  500 MB limit that releases rebuildable caches. Closing a window now really frees it: variable
+  callbacks that kept it alive in Tk's command table, a worker thread's leftover job and the loading
+  clock's references were found and removed, with tests that check it.
+- Reusable widgets now live in `miunlock/ui/components/` (buttons, charts, selector, skeleton, ...).
+- More to service and debug a phone: Show more now has modem and telecom, SIM card, board and chip,
+  connectivity and state, servicing and debugging, and partition sections (only what the phone
+  reports); Phone > Log viewer (logcat with filters, copy, save); and Phone > Reboot to recovery mode,
+  Restart Android and Power off (each asks first; nothing is erased).
+- High resolution, anti-aliased graphs (Pillow): curves, gradients, gauge rings and card shadows are
+  drawn at 2 to 3 times the size and scaled down, so nothing looks pixelated. Chart.js / ECharts style:
+  smooth curves that don't overshoot, a gradient under the line, a time axis with quarter ticks, tick
+  marks on the gauges. Falls back to plain canvas drawing if Pillow is missing.
+- Skeleton loading placeholders (shimmering grey shapes, like React skeleton libraries and Tailwind's
+  animate-pulse) while the first readings, details or Xiaomi's answer arrive. They hold still when
+  MIUNLOCK_REDUCED_MOTION=1.
+- Windows 11 style controls: flat rounded buttons with icons (Segoe icons) and a selector bar with a
+  sliding accent indicator for the tabs and time range (the system's toggle buttons on macOS).
+- Smoother and safer live data: readings that arrive together are all graphed but drawn once; hidden
+  tabs and windows aren't redrawn; lists rebuild only while visible; a failing phone is retried with
+  back-off; one odd reading loses only that value; errors in a handler are logged, never fatal.
+- Windows open inside the free part of the screen: the taskbar, menu bar, Dock or panels are never
+  covered. The work area comes from the system (Windows, Linux window managers) or a safe margin, and
+  after opening the window's real frame is measured and pulled inside if needed.
+- Show more: every detail the phone gives over USB (serial number, IMEI where Android allows it,
+  Android ID, Wi-Fi/Bluetooth address, fingerprint, hardware, boot, SIM, battery), or every
+  bootloader variable in fastboot mode. The serial number is no longer masked.
+- Live status window (Phone > Live status) laid out like a Grafana dashboard: four tabs (Overview,
+  Processor, Sensors, Processes) so each list has its own page and one scrollbar, panels as cards with
+  a last/min/avg/max legend, threshold lines and green/yellow/red gauges with the state in words, a
+  Live/Paused marker and a time range from 1 minute to 1 hour. Ring gauges and ECharts-styled graphs (smooth lines, soft
+  fill, tooltip, peak marker) of processor, memory, battery, power, temperature and network, one reading
+  a second with 1, 5 and 15 minute views. Adds per-core trends, GPU load and speed where the phone
+  reports them, every thermal sensor, and a sortable, searchable task-manager style process list
+  (read-only).
+- Modern buttons: rounded, Windows 11 style buttons with a 3:1 border, hover and pressed states, a
+  strong keyboard focus ring and an accent-filled main action (the system's own buttons on macOS);
+  segmented buttons for choices such as the graph time range.
+- Show more adds what is specific to the phone when it reports it: Xiaomi / HyperOS details, hardware
+  features, display refresh rates, storage type, OpenGL ES, battery cycles and health, apps installed.
+- The tool buttons in step 2 line up in one equal-width row that wraps evenly.
 - GUI shows device details when a phone is connected: model, codename, Android and HyperOS/MIUI
   version, security patch, bootloader state, battery and a masked serial (fastboot mode shows
   codename, bootloader state and version, and active slot).
@@ -19,8 +79,36 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
 - App manager (debloat): **Manage apps...** in the GUI and `miunlock apps list|remove|restore`
   list every app with a rating from a curated Xiaomi bloat list, remove ticked apps for your
   user (`pm uninstall --user 0`) and restore them.
-- Windows: `miunlock install-driver` / *File > Install Google USB driver* installs Google's
-  USB driver with pnputil after a UAC prompt.
+- Windows USB driver help: *File > USB driver help* and `miunlock driver-help --open` list the
+  steps and open Google's download page. miunlock does not download or install drivers.
+- New look: each system uses its own native theme (Windows native on Windows, Aqua on macOS), and
+  a light flat style on Linux (Tk's "clam"). An image-based Windows 11 theme was tried and dropped:
+  it repainted 3x slower, so parts of the window painted late. One font family and type scale,
+  a single plain window of four sections with a "Next:" line and the standard menus (File, Unlock,
+  Phone, View, Help: Alt mnemonics, shortcuts, greyed-out entries, Command key on macOS), dialogs
+  centred on the screen,
+  the Activity log in its own window with the latest line in the status bar, device details in
+  two columns.
+- Accessibility (WCAG 2.2 AA): contrast checked by tests, visible focus on every control,
+  keyboard access to everything, text size up to 200% (Ctrl + / Ctrl - / Ctrl 0).
+- More device details: build, region, chipset, memory, storage, screen, kernel, verified boot,
+  encryption, battery temperature; in fastboot: secure boot, variant, hardware revision,
+  anti-rollback index, fastbootd vs bootloader.
+- Security check (GUI **Security check...**, `miunlock security-check`, MCP `security_check`),
+  read-only: missing Android security fixes and end of support from OSV's Android Security
+  Bulletin data; Google Play Protect and Play system update; apps not from a store, apps that
+  may install apps, apps with accessibility / notification / device-admin access; known
+  stalkerware from AssoEchap's indicators, confirmed by signing certificate when possible.
+- App manager redesigned: tabs with counts, plain-word ratings with a legend, a details panel
+  for the selected app, and one action button that says what it does.
+- Picks the best way to reach the phone: through Google's adb server when it is running
+  (no conflict, nothing to stop), else the built-in USB adb; built-in fastboot, with an
+  installed Google `fastboot` as a fallback for a phone the built-in client cannot open.
+  When a phone still cannot be opened, the GUI says why (another program, which is
+  named; missing driver; or permissions) and offers the fitting action.
+- Step 2 of the GUI shows the phone's state as a headline, an explanation and the buttons
+  that fit; windows size themselves to the screen; the guide's buttons and the app
+  manager's columns always fit.
 - Back up files before unlocking: a **Back up files...** dialog in the GUI and
   `miunlock backup --dest <folder> --only photos,documents` copy photos, documents, chat media,
   audio or all shared storage from a running phone over adb, plus a list of installed

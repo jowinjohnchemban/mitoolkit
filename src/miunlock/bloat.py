@@ -19,6 +19,15 @@ from typing import Dict, Tuple
 
 RATINGS = ("recommended", "optional", "advanced", "avoid", "unknown")
 
+# What each rating means, in the words the app manager shows.
+LABELS = {
+    "recommended": ("Safe to remove", "Ads, tracking or promotion. Removing it does not break anything else."),
+    "optional": ("Optional", "An ordinary app. Remove it if you do not use it."),
+    "advanced": ("Caution", "Other features may depend on it. Remove it only if you know you do not need them."),
+    "avoid": ("Keep", "Needed by the system or for unlocking. Do not remove it."),
+    "unknown": ("Unknown", "Not in miunlock's list. Look it up before removing it."),
+}
+
 KNOWN: Dict[str, Tuple[str, str, str]] = {
     # --- ads, analytics, promotions ------------------------------------------------
     "com.miui.msa.global": ("MIUI System Ads (MSA)", "recommended", "Shows ads in system apps."),

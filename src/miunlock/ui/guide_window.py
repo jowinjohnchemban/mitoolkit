@@ -1,4 +1,4 @@
-"""The offline step-by-step guide (Help > Step-by-step guide, F1)."""
+"""The offline step-by-step guide (Help > Step-by-step guide, or F1)."""
 from __future__ import annotations
 
 import tkinter as tk
@@ -6,18 +6,29 @@ import webbrowser
 from tkinter import ttk
 
 from miunlock import guide
+from miunlock.ui.components.buttons import Button
 from miunlock.ui.base import Dialog
 from miunlock.ui.theme import BORDER, DOCS, WARN_BG, WARN_FG
 
 
 class GuideWindow(Dialog):
     title = "miunlock guide"
-    size = "760x520"
-    min_size = (520, 340)
+    size = "820x560"
+    min_size = (560, 360)
     padding = 10
 
     def build(self) -> None:
-        self.side = tk.Listbox(self.body, width=30, exportselection=False, activestyle="none",
+        # Buttons first, at the bottom, so the text can never push them out of sight.
+        nav = ttk.Frame(self.win, padding=(10, 0, 10, 10))
+        nav.pack(side="bottom", fill="x", before=self.body)
+        Button(nav, text="Close", command=self.close).pack(side="right")
+        Button(nav, text="Next ▶", command=lambda: self.step(1)).pack(side="right", padx=6)
+        Button(nav, text="◀ Back", command=lambda: self.step(-1)).pack(side="right")
+        Button(nav, text="Open full guide in browser",
+                   command=lambda: webbrowser.open(DOCS + "unlock-guide.md")).pack(side="left")
+
+        widest = max(len(title) for title, _ in guide.TOPICS) + 4
+        self.side = tk.Listbox(self.body, width=widest, exportselection=False, activestyle="none",
                                borderwidth=0, highlightthickness=1, highlightbackground=BORDER)
         self.side.pack(side="left", fill="y")
         right = ttk.Frame(self.body)
@@ -36,14 +47,7 @@ class GuideWindow(Dialog):
         for title, _ in guide.TOPICS:
             self.side.insert("end", "  " + title)
         self.side.bind("<<ListboxSelect>>", self._on_pick)
-
-        nav = ttk.Frame(self.win, padding=(10, 0, 10, 10))
-        nav.pack(fill="x")
-        ttk.Button(nav, text="Close", command=self.close).pack(side="right")
-        ttk.Button(nav, text="Next ▶", command=lambda: self.step(1)).pack(side="right", padx=6)
-        ttk.Button(nav, text="◀ Back", command=lambda: self.step(-1)).pack(side="right")
-        ttk.Button(nav, text="Open full guide in browser",
-                   command=lambda: webbrowser.open(DOCS + "unlock-guide.md")).pack(side="left")
+        self.win.after(50, self.side.focus_set)  # keyboard users start here
         self.pick(0)
 
     def show(self, index: int) -> None:

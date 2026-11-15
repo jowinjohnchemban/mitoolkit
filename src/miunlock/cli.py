@@ -102,9 +102,37 @@ def _cmd_apps(args):
     return results
 
 
+@json_command()
+def _cmd_security_check(args):
+    from miunlock import security
+    return security.run(args.serial, _progress).to_dict()
+
+
+@json_command()
+def _cmd_details(args):
+    """Everything the phone reports over USB (what Show more shows), as JSON."""
+    return {"sections": [{"title": title, "rows": [{"label": k, "value": v} for k, v in rows]}
+                         for title, rows in adb.more_details(args.serial)]}
+
+
+@json_command()
+def _cmd_connections(args):
+    """Wi-Fi, mobile network, SIM, Bluetooth and USB readings with findings (the Connections window)."""
+    from miunlock import diagnostics
+    report = diagnostics.run(adb.Phone(args.serial))
+    if args.network_test:
+        gateway = next((v for _t, rows in report["sections"] for k, v, _l in rows if k == "Gateway (router)"), None)
+        report["network_test"] = [{"label": k, "value": v, "level": lvl}
+                                  for k, v, lvl in diagnostics.network_test(adb.Phone(args.serial), gateway)]
+    return report
+
+
 @json_command(installed=False)
-def _cmd_install_driver(args):
-    return {"installed": True, "message": drivers.install_usb_driver(_progress)}
+def _cmd_driver_help(args):
+    """Plain text, not JSON: it is for people."""
+    print(drivers.instructions())
+    if args.open and drivers.supported():
+        drivers.open_download_page()
 
 
 @json_command(logged_in=False)
@@ -248,8 +276,26 @@ def main():
     p_apps.add_argument("--serial", help="Device serial, if more than one phone is connected.")
     p_apps.set_defaults(func=_cmd_apps)
 
-    p_drv = sub.add_parser("install-driver", help="Windows only: download and install Google's official USB driver (asks for administrator permission).")
-    p_drv.set_defaults(func=_cmd_install_driver)
+    p_sec = sub.add_parser("security-check", help="Read-only security check of a phone running Android: patch level vs. "
+                                                  "Android security bulletins (OSV), Play Protect, app sources, known stalkerware.")
+    p_sec.add_argument("--serial", help="Device serial, if more than one phone is connected.")
+    p_sec.set_defaults(func=_cmd_security_check)
+
+    p_det = sub.add_parser("details", help="Everything a phone running Android reports over USB (identity, hardware, modem, "
+                                           "SIM, boot, servicing, partitions, sensors) as JSON. Read-only.")
+    p_det.add_argument("--serial", help="Device serial, if more than one phone is connected.")
+    p_det.set_defaults(func=_cmd_details)
+
+    p_con = sub.add_parser("connections", help="Wi-Fi, mobile network (modem), SIM, Bluetooth and USB readings with plain-language "
+                                               "findings, as JSON. Read-only, unless --network-test (a few pings from the phone).")
+    p_con.add_argument("--serial", help="Device serial, if more than one phone is connected.")
+    p_con.add_argument("--network-test", action="store_true",
+                       help="Also ping the router and 8.8.8.8 and look up a name, from the phone.")
+    p_con.set_defaults(func=_cmd_connections)
+
+    p_drv = sub.add_parser("driver-help", help="Windows: how to install Google's USB driver. --open opens Google's download page.")
+    p_drv.add_argument("--open", action="store_true", help="Also open Google's download page in the browser.")
+    p_drv.set_defaults(func=_cmd_driver_help)
 
     p_status = sub.add_parser("status", help="Print account + device status as JSON. Never touches fastboot oem unlock.")
     p_status.set_defaults(func=_cmd_status)

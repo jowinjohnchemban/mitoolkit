@@ -27,11 +27,12 @@ class Refused(FastbootError):
 
 
 def devices() -> List[Dict[str, object]]:
-    """Phones in fastboot mode: [{"serial", "accessible"}]. Only reads USB descriptors."""
+    """Phones in fastboot mode: [{"serial", "accessible", "reason"}]. reason says why a phone
+    cannot be opened (usbio.BUSY, NO_DRIVER, NO_PERMISSION) or is None."""
     out = []
     for dev, _intf in usbio.find(FASTBOOT):
-        serial, ok = usbio.identify(dev)
-        out.append({"serial": serial, "accessible": ok})
+        serial, reason = usbio.identify(dev)
+        out.append({"serial": serial, "accessible": reason is None, "reason": reason})
     return out
 
 
@@ -88,6 +89,15 @@ class FastbootDevice:
             return self.command(f"getvar:{name}", 5000).strip() or None
         except Refused:
             return None
+
+    def all_vars(self) -> List[str]:
+        """Every variable the bootloader reports (`getvar all`), as the raw INFO lines."""
+        lines: List[str] = []
+        try:
+            self.command("getvar:all", 20000, lines)
+        except Refused:
+            return []
+        return lines
 
     def oem(self, sub: str, timeout_ms: int = 60000) -> Tuple[str, List[str]]:
         info: List[str] = []

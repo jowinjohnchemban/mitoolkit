@@ -24,8 +24,18 @@ does **not** bypass the waiting period or any account requirement.
 - Works on Windows, macOS and Linux
 - One program, three ways to drive it: a GUI (default), a command line (`--cli`, JSON output)
   and an AI-agent interface (`--mcp`)
-- Built-in adb and fastboot (no platform-tools): see your phone, show its details, reboot it
-  into fastboot, back up its files and remove preinstalled apps
+- Built-in adb and fastboot (no platform-tools needed; uses Google's adb server when it is
+  running): see your phone, show its details, reboot it into fastboot, back up its files
+- Device details, and a **Show more** view of everything the phone gives over USB (identity,
+  hardware, modem and SIM, boot, servicing and debugging, partitions, sensors)
+- **Live status**: a dashboard with gauges and smooth graphs (processor and every core, GPU, memory,
+  battery, temperature, network), every thermal sensor, and a task-manager style process list
+- **Connections and signal**: Wi-Fi, mobile network (modem), SIM, Bluetooth and USB, with plain-language
+  findings and an optional network test, for debugging Wi-Fi and telecom problems
+- Log viewer (logcat), and restart to recovery / restart / power off for a running phone
+- App manager: remove preinstalled bloat for your user, with plain ratings, and restore it
+- Security check: missing Android security fixes (from OSV / Android Security Bulletins),
+  Google Play Protect, where apps came from, apps with powerful access, known stalkerware
 - Python API for your own scripts and automation
 - Login happens on Xiaomi's own page (browser or QR code); your password never
   passes through this program
@@ -39,7 +49,8 @@ does **not** bypass the waiting period or any account requirement.
   *Developer options → Mi Unlock status* (see the [unlock guide](docs/unlock-guide.md))
 
 adb and fastboot are built in: no Android platform-tools are needed. On Windows the phone
-needs a USB driver; the program can install Google's for you.
+needs a USB driver; the program shows the steps and opens Google's download page (Help >
+USB driver help), but it never downloads or installs a driver itself.
 
 ## Installation
 

@@ -117,16 +117,58 @@ can be restored; an app you installed yourself is uninstalled. Unlocking resets 
 which brings removed apps back. Ratings: `recommended`, `optional`, `advanced`, `avoid`,
 `unknown` (see `src/miunlock/bloat.py`).
 
-### install-driver
+### security-check
 
 ```sh
-miunlock install-driver    # Windows: Google's official USB driver, via pnputil (UAC prompt)
+miunlock security-check
 ```
 
-Logs the download's SHA-256 and installs with Windows' own `pnputil`. Google's driver does
-not list Xiaomi's USB IDs, so if Windows does not use it by itself, pick it in Device
-Manager: *Update driver > Browse my computer > Let me pick > Android Device > Android
-Bootloader Interface*. Also in the GUI's **File** menu.
+Read-only check of a phone running Android, printed as JSON:
+
+- **Phone software**: the security patch level compared with the Android Security Bulletin
+  entries in [OSV](https://osv.dev) for your Android version (AOSP data). Reports missing
+  fixes by severity and whether the Android version still receives fixes. Xiaomi and
+  chip-maker fixes are not in OSV.
+- **Google Play**: Play Protect on or off, the Google Play system update date, apps not
+  installed from a store, apps allowed to install other apps.
+- **Apps**: apps with accessibility, notification or device-admin access, and a comparison
+  with [known stalkerware](https://github.com/AssoEchap/stalkerware-indicators) (package name,
+  confirmed by signing certificate where the app has a v1 signature).
+
+It is not an antivirus; keep Google Play Protect on. The GUI has the same check under
+**Security check...** in step 2.
+
+### details
+
+```sh
+miunlock details [--serial S]
+```
+
+Everything a phone running Android reports over USB (what **Show more** shows), as JSON: identity
+(serial number, IMEI, Android ID, addresses), software, hardware and board, boot, modem and telecom,
+the SIM card, connectivity and state, servicing and debugging, partitions, sensors, battery. Read-only.
+Only what the phone reports is included.
+
+### connections
+
+```sh
+miunlock connections [--serial S] [--network-test]
+```
+
+Wi-Fi, mobile network (modem), SIM, Bluetooth, USB and power readings with plain-language `findings`
+(worst first, each with what to try), as JSON: the same as the **Connections** window. Read-only.
+`--network-test` also has the phone ping its router and `8.8.8.8` and look up a name; without it no
+traffic is sent.
+
+### driver-help
+
+```sh
+miunlock driver-help          # Windows: how to install Google's USB driver
+miunlock driver-help --open   # ... and open Google's download page
+```
+
+miunlock does not download or install drivers; you install Google's driver with Device
+Manager. The same help is in the GUI under *Help > USB driver help*.
 
 ## GUI
 
@@ -142,19 +184,83 @@ confirmation box and you type the phone's name exactly. There is no "don't ask a
 The GUI uses Tkinter, which ships with Python on Windows and macOS. On some Linux
 distributions install it separately, for example `sudo apt install python3-tk`.
 
+One plain window with the system's own look and the usual menus: **File**, **Unlock** (sign in, check eligibility), **Phone** (rescan, reboot, back up, apps,
+security check, copy details), **View** (text size) and **Help**. Entries that can't work yet (no phone,
+not signed in) are greyed out. The unlock itself is deliberately not in a menu: it erases the phone, so it
+is only reachable through the guarded button. Dialogs open in the centre of the screen.
+Four sections run top to bottom: **Mi Account**, **Phone**, **Eligibility**, **Unlock**. A line
+at the top (**Next: ...**) says what to do now. The status line at the bottom shows the latest
+activity; **File > Activity log** opens the full log.
+
+Keyboard: **Alt** + the underlined letter opens a menu, **F1** guide, **F5** rescan, **Ctrl L** activity log,
+**Ctrl +** / **Ctrl -** / **Ctrl 0** text size (up to 200%), **Ctrl Q** quit (**Command** instead of Ctrl on macOS), **Esc** closes a dialog, **Tab** moves between controls, **Space** ticks an
+app in the app manager.
+
+Accessibility: the interface follows WCAG 2.2 AA where Tk allows: text contrast of at least
+4.5:1 (checked by `tests/test_accessibility.py`), visible keyboard focus, every action
+reachable by keyboard, colour never the only signal, and text that scales to 200%.
+
 Handy features:
 
-- **Help > Step-by-step guide** (F1) opens the unlock guide inside the program, offline.
+- **Guide** (top right) (F1) opens the unlock guide inside the program, offline.
 - The page scrolls, with a scrollbar and mouse wheel, so nothing is cut off on small or
   scaled screens.
-- **Show details** reveals what the program is doing, with **Copy** and **Clear** buttons.
+- **File > Activity log** opens the log of what the program is doing, with **Copy** and **Clear**.
 - The numbered badges are grey (not yet), orange (do this next) and green (done).
-- Ctrl+Q quits.
 - Connected phones show their details (model, versions, bootloader state, battery). **Copy
   info** copies them, **Rescan** looks again, and a tip appears if no phone shows up for 20 s.
 - **Back up files...** copies photos, documents, chat media and more from a phone that is on.
-- **Manage apps...** lists the phone's apps with a rating for known bloat; tick and remove,
-  or restore removed ones.
+- **Manage apps...**: tabs for Suggested, All preinstalled, Installed by you and Removed;
+  ratings in plain words (Safe to remove, Optional, Caution, Keep, Unknown); a panel that
+  explains the selected app; one button that says what it will do ("Remove 3 apps").
+- **Security check...**: the read-only check described under `security-check`.
+- **Connections...** (step 2, or Phone > Connections and signal) is for debugging Wi-Fi, mobile data and
+  calls. It reads (nothing is changed) and shows, in tabs: a **Summary** of what looks wrong and what to
+  try (airplane mode, weak or crowded Wi-Fi, Wi-Fi with no internet or no DNS, no SIM or a locked SIM,
+  no mobile service, poor or noisy mobile signal, roaming, mobile data with no internet), with graphs of
+  Wi-Fi and mobile signal that update every 5 seconds if you tick **Update every 5 s**; **Wi-Fi** (the
+  network you are on: signal in dBm, band and channel, link speeds, standard, security, router, DNS, and
+  nearby networks); **Mobile network** (registration for calls and data, operator, 4G or 5G, signal as
+  RSRP, RSRQ and SINR, the cell and band, the modem version, and whether Android confirmed internet);
+  and **Bluetooth, USB, power** (paired devices, charger type and limit, USB mode, the networks Android is
+  using). **Network test** sends a few small pings from the phone (router, 8.8.8.8, a name lookup): the
+  one thing here that sends traffic, and only when pressed. Android's dump formats differ between
+  phones, so a value the phone does not report is simply left out.
+- **Phone > Log viewer...** shows the phone's recent system log (logcat), colouring errors and
+  warnings, with a level filter, a search box, Refresh, Copy and Save. Read-only. Logs can contain
+  personal details, so check them before sharing.
+- **Phone > Reboot to recovery mode / Restart Android / Power off** restart or shut down a running
+  phone after a confirmation. Nothing is erased. (**Reboot to fastboot mode** is the way to unlock.)
+- **Show more** (under the device details) reads everything the phone gives over USB, in sections:
+  identity (serial number, IMEI, Android ID, Wi-Fi and Bluetooth address), software, hardware and
+  board (chip maker and model, board ID, SKU), boot (last boot reason, boot mode, kernel line),
+  **modem and telecom** (baseband, radio firmware, RIL, network operator and codes, roaming, preferred
+  network mode, VoLTE and Wi-Fi calling), the **SIM card** (state, operator, codes), connectivity and
+  state (airplane mode, Wi-Fi, Bluetooth, mobile data link and signal bars, location, developer
+  options and USB debugging, uptime), **servicing and debugging** (debuggable and secure build, build
+  tags, OEM-unlock flags, wireless debugging port, encryption type, vendor patch level, full kernel
+  string), partition sizes (`/data`, `/system`, `/vendor`, ...), battery (with charge cycles, health
+  and heat throttling where the phone reports them), plus a
+  Xiaomi / HyperOS section and hardware features (NFC, IR blaster, refresh rates, ...), the GPU, and the
+  sensors on the phone (accelerometer, light, proximity, ... with chip and maker) when the phone has
+  them: only what the phone really reports is shown. In fastboot mode it lists every bootloader variable (`getvar all`).
+  The IMEI comes from the phone's own properties or its telephony service; if Android blocks it over
+  USB the row says so (dial *#06# on the phone). The serial number is shown in full. These values
+  stay on screen: nothing is sent anywhere, and **Copy details** copies them only if you press it.
+- **Live status...** (Phone menu) is a dashboard in the style of Grafana and Apache ECharts: one
+  reading a second, in four tabs (Ctrl+1 to Ctrl+4):
+  - **Overview**: ring gauges (processor, GPU where the phone reports it, memory, battery, storage)
+    coloured by threshold, with the state in words (Normal, High, Critical), then a card for each graph
+    with a legend table of last, min, average and max. Dashed lines mark thresholds (for example 80%
+    load, 45 and 60 °C). Point at a graph for a tooltip with the exact value. The time range (1 min up
+    to 1 hr) is at the top right, on this tab only.
+  - **Processor**: every core with its own trend, usage and speed, labelled Performance or Efficiency
+    where the phone has both.
+  - **Sensors**: every thermal sensor the phone lets us read, hottest first, with Normal, Warm or Hot.
+  - **Processes**: a task-manager style list (name, PID, CPU %, memory, state): sort by any column,
+    search, and filter to apps, apps and system, or everything. Read-only: nothing can be stopped here.
+  Each list has a page to itself, so the window never holds two scrollbars. A **Live** marker shows
+  whether readings are arriving; **Pause** freezes them and **Copy snapshot** copies the latest numbers.
 - When Xiaomi says to wait, the message includes the date and time to try again.
 
 ## Saved session and log

@@ -47,6 +47,26 @@ def _t_check(_args: dict) -> dict:
     return _public(api.check_unlock_eligibility(token))
 
 
+def _t_security(args: dict) -> dict:
+    from miunlock import security
+    return security.run(args.get("serial")).to_dict()
+
+
+def _t_details(args: dict) -> dict:
+    """Device details for an agent: everything except what identifies the phone or its owner
+    (serial number, IMEI, Android ID, Wi-Fi and Bluetooth addresses)."""
+    from miunlock import adb
+    return {"sections": [{"title": title, "rows": [{"label": k, "value": v} for k, v in rows]}
+                         for title, rows in adb.more_details(args.get("serial")) if title != "Identity"]}
+
+
+def _t_connections(args: dict) -> dict:
+    """Wi-Fi, mobile network, SIM, Bluetooth and USB state with findings. Network and device names and
+    addresses are hidden; the state, signal and findings are what an agent needs."""
+    from miunlock import adb, diagnostics
+    return diagnostics.redact(diagnostics.run(adb.Phone(args.get("serial"))))
+
+
 def _t_log(args: dict) -> dict:
     path = log.log_path()
     if path is None or not path.exists():
@@ -73,6 +93,16 @@ TOOLS: Dict[str, tuple] = {
                           "Read-only: returns eligible, product, zone, will_wipe_data, notice, or "
                           "Xiaomi's code and description (for example 20036 = wait 168 hours).",
                           _SCHEMA_NONE, _t_check),
+    "security_check": ("Read-only security check of a phone running Android: security patch vs. Android "
+                       "security bulletins (OSV), Play Protect, where apps came from, apps with powerful "
+                       "access, known stalkerware. Changes nothing.",
+                       {"type": "object", "properties": {"serial": {"type": "string"}}}, _t_security),
+    "device_details": ("Everything a phone running Android reports over USB, in sections (hardware, modem, SIM, "
+                       "boot, servicing, partitions, sensors). Read-only. Serial number, IMEI and addresses are "
+                       "left out.", {"type": "object", "properties": {"serial": {"type": "string"}}}, _t_details),
+    "connections": ("Read-only state of Wi-Fi, the mobile network (modem), SIM, Bluetooth and USB of a phone "
+                    "running Android, with findings that say what looks wrong. Network names and addresses are "
+                    "hidden.", {"type": "object", "properties": {"serial": {"type": "string"}}}, _t_connections),
     "read_log": ("Last lines of miunlock.log (tokens are scrubbed).",
                  {"type": "object", "properties": {"lines": {"type": "integer"}}}, _t_log),
 }

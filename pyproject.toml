@@ -26,6 +26,8 @@ dependencies = [
     "rich",
     "qrcode",
     "pyaes",
+    # Anti-aliased, high resolution charts and gauges in the GUI (the GUI still works without it).
+    "Pillow>=10",
     # Built-in adb and fastboot talk to the phone over USB through libusb.
     "pyusb>=1.2.1",
     # Ships the libusb library itself; elsewhere install libusb from the system's packages.

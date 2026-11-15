@@ -8,6 +8,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from miunlock import adb
+from miunlock.ui.components.buttons import Button
 from miunlock.ui.base import Dialog
 from miunlock.ui.theme import GREEN, MUTED, RED
 
@@ -24,7 +25,7 @@ class BackupDialog(Dialog):
 
     def build(self) -> None:
         body = self.body
-        ttk.Label(body, text="Copy files from the phone to this computer", font=self.fonts.bold).pack(anchor="w")
+        ttk.Label(body, text="Copy files from the phone to this computer", font=self.fonts.heading).pack(anchor="w")
         ttk.Label(body, foreground=MUTED, justify="left", text=(
             "Nothing on the phone is changed or deleted. Keep the screen unlocked and allow file\n"
             "access if the phone asks. App data, contacts, SMS and chats are not covered: use\n"
@@ -42,16 +43,17 @@ class BackupDialog(Dialog):
         row.pack(fill="x", pady=(12, 0))
         ttk.Label(row, text="Save to:").pack(side="left")
         ttk.Entry(row, textvariable=self.dest, width=48).pack(side="left", padx=6, fill="x", expand=True)
-        ttk.Button(row, text="Browse...", command=self._browse).pack(side="left")
+        Button(row, text="Browse...", command=self._browse).pack(side="left")
 
         self.status = ttk.Label(body, text="", foreground=MUTED, wraplength=520, justify="left")
         self.status.pack(anchor="w", pady=(10, 0))
         self.bar = ttk.Progressbar(body, mode="indeterminate")
         buttons = ttk.Frame(body)
         buttons.pack(fill="x", pady=(12, 0))
-        ttk.Button(buttons, text="Close", command=self.close).pack(side="right")
-        self.start_btn = ttk.Button(buttons, text="Start backup", style="Primary.TButton", command=self.start)
+        Button(buttons, text="Close", command=self.close).pack(side="right")
+        self.start_btn = Button(buttons, text="Start backup", primary=True, command=self.start)
         self.start_btn.pack(side="right", padx=6)
+        self.win.after(50, self.start_btn.focus_set)  # keyboard users start here
 
     def close(self) -> None:
         self.cancel.set()  # stops a running copy after the current file

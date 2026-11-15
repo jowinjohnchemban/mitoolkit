@@ -17,7 +17,7 @@ import struct
 import threading
 import time
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Callable, Dict, Iterator, List, Optional, Tuple
 
 from miunlock import adbkey, usbio
 from miunlock.errors import MiunlockError
@@ -48,6 +48,7 @@ class AdbDevice:
 
     def __init__(self, dev, intf, serial: str):
         self.serial = serial
+        self.port = (getattr(dev, "bus", None), getattr(dev, "address", None))  # recognise it without reopening
         self.state = "offline"
         self.max_data = 4096
         self._lock = threading.RLock()
@@ -185,9 +186,13 @@ class AdbDevice:
                 pass  # the phone may restart before it answers
             self.state = "offline"
 
+    def _open_stream(self, service: str) -> "_Stream":
+        local, remote = self._open(service)
+        return _Stream(self, local, remote)
+
     def sync(self) -> "SyncSession":
         self._require()
-        return SyncSession(self)
+        return SyncSession(lambda: self._open_stream("sync:"), self._lock)
 
 
 class _Stream:
@@ -241,19 +246,22 @@ class _Stream:
 
 
 class SyncSession:
-    """adb's file transfer service (``sync:``): stat, list and receive files."""
+    """adb's file transfer service (``sync:``): stat, list and receive files. Works over any
+    byte stream with read(n), write(data), close() and .closed: a USB stream here, or a
+    socket to Google's adb server (adb_server.py). ``opener`` makes a new one, because the
+    phone ends the session after a failed transfer."""
 
-    def __init__(self, dev: AdbDevice):
-        self.dev = dev
-        self._stream: Optional[_Stream] = None
+    def __init__(self, opener: Callable[[], object], lock):
+        self._opener = opener
+        self._lock = lock
+        self._stream = None
 
-    def _s(self) -> _Stream:
+    def _s(self):
         if self._stream is None or self._stream.closed:
-            local, remote = self.dev._open("sync:")
-            self._stream = _Stream(self.dev, local, remote)
+            self._stream = self._opener()
         return self._stream
 
-    def _request(self, ident: bytes, path: str) -> _Stream:
+    def _request(self, ident: bytes, path: str):
         raw = path.encode("utf-8")
         s = self._s()
         s.write(ident + struct.pack("<I", len(raw)) + raw)
@@ -261,7 +269,7 @@ class SyncSession:
 
     def stat(self, path: str) -> Tuple[int, int, int]:
         """(mode, size, mtime); mode 0 means it does not exist."""
-        with self.dev._lock:
+        with self._lock:
             s = self._request(b"STAT", path)
             reply = s.read(16)
             if reply[:4] != b"STAT":
@@ -270,7 +278,7 @@ class SyncSession:
 
     def listdir(self, path: str) -> List[Tuple[str, int, int, int]]:
         """[(name, mode, size, mtime)] without . and .."""
-        with self.dev._lock:
+        with self._lock:
             s = self._request(b"LIST", path)
             out = []
             while True:
@@ -286,7 +294,7 @@ class SyncSession:
 
     def recv(self, path: str, local: Path, cancel: Optional[threading.Event] = None) -> int:
         """Copy one file from the phone. Returns bytes written. Raises AdbError on failure."""
-        with self.dev._lock:
+        with self._lock:
             s = self._request(b"RECV", path)
             tmp = local.with_name(local.name + ".part")
             written = 0
@@ -342,49 +350,90 @@ class SyncSession:
 
 
 # --------------------------------------------------------------- registry
-_devices: Dict[str, AdbDevice] = {}
+# Phones miunlock is talking to, by serial: AdbDevice (own USB connection) or
+# adb_server.ServerDevice (through Google's adb server).
+_devices: Dict[str, object] = {}
 _reg_lock = threading.Lock()
 
 
-def scan() -> List[Dict[str, str]]:
-    """Phones with adb enabled: [{"serial", "state"}]. state is "device" (ready),
-    "unauthorized" (waiting for Allow on the phone), "offline" or "no-access" (found, but
-    no driver or permission). Connections are kept open between calls."""
-    found = usbio.find(ADB)
+def _scan_server() -> List[Dict[str, str]]:
+    from miunlock import adb_server
+    found = adb_server.devices()
+    for serial, dev in list(_devices.items()):  # our own USB connections would conflict
+        if not isinstance(dev, adb_server.ServerDevice):
+            dev.close()
+            _devices.pop(serial)
+    seen = set()
+    for d in found:
+        seen.add(d["serial"])
+        known = _devices.get(d["serial"])
+        if known is None:
+            _devices[d["serial"]] = adb_server.ServerDevice(d["serial"], d["state"])
+        else:
+            known.state = d["state"]
+    for serial in list(_devices):
+        if serial not in seen:
+            _devices.pop(serial)
+    return [{"serial": d["serial"], "state": d["state"], "via": "adb server"} for d in found]
+
+
+def _scan_usb() -> List[Dict[str, str]]:
     results, seen = [], set()
-    with _reg_lock:
-        for dev, intf in found:
-            serial, accessible = usbio.identify(dev)
-            seen.add(serial)
-            known = _devices.get(serial)
-            if known is not None and known.state == "offline":
-                known.close()
-                _devices.pop(serial, None)
-                known = None
-            if known is None:
-                if not accessible:
-                    results.append({"serial": serial, "state": "no-access"})
-                    continue
-                try:
-                    known = AdbDevice(dev, intf, serial)
-                    known.connect()
-                except AdbError as err:
-                    results.append({"serial": serial, "state": "offline", "error": str(err)})
-                    continue
-                _devices[serial] = known
-            elif known.state == "unauthorized":
+    held = {dev.port: dev for dev in _devices.values() if isinstance(dev, AdbDevice) and dev.state != "offline"}
+    for dev, intf in usbio.find(ADB):
+        known = held.get((dev.bus, dev.address))
+        if known is not None:
+            # Already connected: probing it again would fail with "access denied" because
+            # miunlock itself has it open, so just use the connection we have.
+            seen.add(known.serial)
+            if known.state == "unauthorized":
                 try:
                     known.poll_authorized()
                 except AdbError:
                     pass
-            results.append({"serial": serial, "state": known.state})
-        for serial in list(_devices):
-            if serial not in seen:
-                _devices.pop(serial).close()
+            results.append({"serial": known.serial, "state": known.state})
+            continue
+        serial, reason = usbio.identify(dev)
+        seen.add(serial)
+        stale = _devices.pop(serial, None)
+        if stale is not None:
+            stale.close()
+        if reason:
+            results.append({"serial": serial, "state": "no-access", "reason": reason})
+            continue
+        try:
+            fresh = AdbDevice(dev, intf, serial)
+            fresh.connect()
+        except AdbError as err:
+            results.append({"serial": serial, "state": "offline", "error": str(err)})
+            continue
+        _devices[serial] = fresh
+        results.append({"serial": serial, "state": fresh.state})
+    for serial in list(_devices):
+        if serial not in seen:
+            _devices.pop(serial).close()
     return results
 
 
-def get(serial: Optional[str] = None) -> AdbDevice:
+def scan() -> List[Dict[str, str]]:
+    """Phones with adb enabled: [{"serial", "state"}]. state is "device" (ready),
+    "unauthorized" (waiting for Allow on the phone), "offline" or "no-access" (found but
+    cannot be opened; "reason" says why: usbio.BUSY, NO_DRIVER or NO_PERMISSION).
+
+    If Google's adb server is running it owns the phones, so miunlock goes through it
+    (entries then have "via": "adb server"); otherwise miunlock uses its own USB connection,
+    kept open between calls."""
+    from miunlock import adb_server
+    with _reg_lock:
+        if adb_server.running():
+            try:
+                return _scan_server()
+            except AdbError:
+                pass  # the server stopped in between; fall back to USB
+        return _scan_usb()
+
+
+def get(serial: Optional[str] = None):
     """A ready phone (state "device"), connecting first if needed."""
     if serial is None or serial not in _devices:
         scan()
