@@ -13,13 +13,14 @@ over the phone's 20-byte token, treated as a SHA-1 digest, exactly as adb does.
 from __future__ import annotations
 
 import base64
+import functools
 import math
 import os
 import secrets
 import socket
 import struct
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 _SHA1_DIGESTINFO = bytes.fromhex("3021300906052b0e03021a05000414")
 _RSA_OID = bytes.fromhex("2a864886f70d010101")
@@ -174,22 +175,15 @@ def _write_private(path: Path, text: str) -> None:
         f.write(text)
 
 
-_cached: Optional[Key] = None
-
-
+@functools.lru_cache(maxsize=1)           # read or made once per run; load_or_create.cache_clear() forgets it
 def load_or_create() -> Key:
     """This computer's adb key, made on first use."""
-    global _cached
-    if _cached is not None:
-        return _cached
     folder = key_dir()
     path = folder / "adbkey"
     if path.exists():
-        _cached = from_pem(path.read_text(encoding="ascii"))
-        return _cached
+        return from_pem(path.read_text(encoding="ascii"))
     folder.mkdir(parents=True, exist_ok=True)
     key = generate()
     _write_private(path, key.to_pem())
     (folder / "adbkey.pub").write_bytes(key.adb_public_key().rstrip(b"\x00") + b"\n")
-    _cached = key
     return key

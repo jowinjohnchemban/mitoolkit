@@ -160,6 +160,27 @@ Wi-Fi, mobile network (modem), SIM, Bluetooth, USB and power readings with plain
 `--network-test` also has the phone ping its router and `8.8.8.8` and look up a name; without it no
 traffic is sent.
 
+### doctor
+
+```sh
+mitoolkit doctor                # what is wrong, as JSON; exit code 1 if something is broken
+mitoolkit doctor --fix          # also repair what is safe to repair
+mitoolkit doctor --fix --all    # and what needs a decision
+mitoolkit doctor --no-phone     # leave the USB bus alone
+```
+
+Checks Python and the window toolkit, USB access (libusb), the adb key, the saved Mi Account session's
+permissions, the settings file, files left by an update, the log file, Google's adb, and any connected phone
+(waiting for you to allow it, not answering, held by another program, missing driver). Each problem says what
+is wrong in plain words. In the window it is **Help > Check and fix problems...**.
+
+**Safe fixes** run by themselves at start-up (listed in the Activity log) and with `--fix`: making the adb key
+and the saved session private to you, resetting a damaged settings file (the old one is kept as `.damaged`),
+removing files an update left behind, and dropping a stuck phone connection. **Fixes that need a decision**
+(stopping Google's adb, making a new adb key because the old one is damaged: each phone then asks to allow it
+once) run only when you press their button or pass `--all`. It never touches the phone's data, Xiaomi's
+servers or the contents of the session, and makes no network request. AI agents get the diagnosis only.
+
 ### driver-help
 
 ```sh

@@ -165,6 +165,7 @@ class MenuBar:
         m.add_checkbutton(label="Debug logging", variable=self.debug_var, command=lambda: log.set_debug(
             self.debug_var.get()), **({} if MAC else {"underline": 0}))
         m.add_separator()
+        self._add(m, "Check and &fix problems...", app._doctor_dialog)
         self._add(m, "Check for &updates...", app._update_dialog)
         self.auto_var = tk.BooleanVar(value=updater.auto_enabled())
         m.add_checkbutton(label="Check for updates automatically", variable=self.auto_var, command=lambda: settings.set(

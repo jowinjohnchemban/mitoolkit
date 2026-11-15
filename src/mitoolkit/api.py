@@ -30,7 +30,15 @@ from mitoolkit import adb, fastboot, log
 from mitoolkit.auth import get_passtoken, get_service, get_region, get_dataCenterZone
 from mitoolkit.auth.redact import redact_response
 from mitoolkit.errors import MitoolkitError, UnlockError
-from mitoolkit.xiaomi import DOMAIN_BY_ZONE, REGION_TO_ZONE, UnlockServer, zone_for_region  # noqa: F401 re-exported
+from mitoolkit.xiaomi import DOMAIN_BY_ZONE, REGION_TO_ZONE, UnlockServer, zone_for_region
+
+# The public surface of this module: the functions below, and the Xiaomi helpers scripts have been able to
+# import from here (re-exported so that they keep working).
+__all__ = [
+    "login", "get_account_zone", "get_device_codename", "check_unlock_eligibility", "perform_unlock",
+    "list_devices", "reboot_to_fastboot",
+    "DOMAIN_BY_ZONE", "REGION_TO_ZONE", "UnlockServer", "zone_for_region",
+]
 
 _log = log.get("api")
 

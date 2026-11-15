@@ -127,6 +127,23 @@ def _cmd_connections(args):
     return report
 
 
+@json_command()
+def _cmd_doctor(args):
+    """Check the setup, and with --fix repair what is safe to repair (--all: what needs a decision too)."""
+    from mitoolkit import doctor
+    checks = doctor.run(phone=not args.no_phone)
+    fixed = []
+    if args.fix:
+        fixed = [{"id": c.id, "result": message} for c, message in doctor.apply(checks, include_decisions=args.all)]
+        if fixed:
+            checks = doctor.run(phone=not args.no_phone)           # look again: what is left
+    left = doctor.problems(checks)
+    result = {"ok": not left, "problems": len(left), "fixed": fixed, "checks": [c.to_dict() for c in checks]}
+    if any(c.status == doctor.FAIL for c in left):
+        raise _Failed(result)
+    return result
+
+
 @json_command(installed=False)
 def _cmd_driver_help(args):
     """Plain text, not JSON: it is for people."""
@@ -299,6 +316,15 @@ def main():
     p_con.add_argument("--network-test", action="store_true",
                        help="Also ping the router and 8.8.8.8 and look up a name, from the phone.")
     p_con.set_defaults(func=_cmd_connections)
+
+    p_doc = sub.add_parser("doctor", help="Check the setup (Python, USB access, adb key, saved session, settings, the "
+                                          "phone) and say what is wrong. --fix repairs what is safe to repair.")
+    p_doc.add_argument("--fix", action="store_true", help="Repair what is safe: permissions on private files, a damaged "
+                       "settings file, files left by an update, a stuck connection.")
+    p_doc.add_argument("--all", action="store_true", help="With --fix: also what needs a decision (stop Google's adb, "
+                       "make a new adb key if the old one is damaged).")
+    p_doc.add_argument("--no-phone", action="store_true", help="Do not look at the USB bus for a phone.")
+    p_doc.set_defaults(func=_cmd_doctor)
 
     p_drv = sub.add_parser("driver-help", help="Windows: how to install Google's USB driver. --open opens Google's download page.")
     p_drv.add_argument("--open", action="store_true", help="Also open Google's download page in the browser.")

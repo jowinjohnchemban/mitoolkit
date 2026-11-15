@@ -126,7 +126,9 @@ class FastbootBackendTests(unittest.TestCase):
 
     def test_android_is_refused_with_a_clear_message(self):
         import mitoolkit.system
-        with mock.patch.object(usbio, "_backend", None), mock.patch.object(mitoolkit.system, "IS_ANDROID", True):
+        usbio.backend.cache_clear()                      # a backend found by an earlier test must not hide this
+        self.addCleanup(usbio.backend.cache_clear)
+        with mock.patch.object(mitoolkit.system, "IS_ANDROID", True):
             with self.assertRaises(usbio.UsbUnavailable) as ctx:
                 usbio.backend()
         self.assertIn("computer", str(ctx.exception))

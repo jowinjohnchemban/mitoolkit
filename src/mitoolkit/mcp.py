@@ -67,6 +67,13 @@ def _t_connections(args: dict) -> dict:
     return diagnostics.redact(diagnostics.run(adb.Phone(args.get("serial"))))
 
 
+def _t_doctor(_args: dict) -> dict:
+    """What is wrong with the setup, read-only: agents get the diagnosis, a person decides about fixes."""
+    from mitoolkit import doctor
+    checks = doctor.run(phone=False)
+    return {"problems": len(doctor.problems(checks)), "checks": [c.to_dict() for c in checks]}
+
+
 def _t_log(args: dict) -> dict:
     path = log.log_path()
     if path is None or not path.exists():
@@ -103,6 +110,9 @@ TOOLS: Dict[str, tuple] = {
     "connections": ("Read-only state of Wi-Fi, the mobile network (modem), SIM, Bluetooth and USB of a phone "
                     "running Android, with findings that say what looks wrong. Network names and addresses are "
                     "hidden.", {"type": "object", "properties": {"serial": {"type": "string"}}}, _t_connections),
+    "doctor": ("Read-only check of the setup (Python, USB access, adb key, saved session, settings, log) with "
+               "what is wrong and how to fix it. Fixes are not offered to agents: a person runs `mitoolkit "
+               "doctor --fix`.", _SCHEMA_NONE, _t_doctor),
     "read_log": ("Last lines of mitoolkit.log (tokens are scrubbed).",
                  {"type": "object", "properties": {"lines": {"type": "integer"}}}, _t_log),
 }

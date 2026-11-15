@@ -1201,6 +1201,27 @@ class App:
         else:
             self._guide = GuideWindow(self)
 
+    def _doctor_dialog(self) -> None:
+        from mitoolkit.ui.doctor_dialog import DoctorDialog
+        if getattr(self, "_doctor", None) is not None and self._doctor.alive():
+            self._doctor.focus()
+        else:
+            self._doctor = DoctorDialog(self)
+
+    def start_self_check(self) -> None:
+        """At start-up, quietly: repair what is safe to repair (permissions on private files, a damaged settings
+        file, files left by an update) and say so in the Activity log. Nothing that needs a decision runs here."""
+        from mitoolkit import doctor
+
+        def work():
+            try:
+                for message in doctor.auto_fix():
+                    self._log(f"Fixed automatically: {message}")
+            except Exception as err:
+                log.get("gui").debug("Start-up self check failed: %s", err)
+
+        threading.Thread(target=work, daemon=True, name="self-check").start()
+
     def _update_dialog(self, release=None) -> None:
         from mitoolkit.ui.update_dialog import UpdateDialog
         if getattr(self, "_updates", None) is not None and self._updates.alive():
@@ -1255,6 +1276,7 @@ def main():
     root = tk.Tk()
     app = App(root)
     updater.cleanup()                          # remove the copy a previous update left behind
+    root.after(1500, app.start_self_check)     # repairs what is safe to repair, and says so in the Activity log
     root.after(4000, app.start_update_check)   # once a day, after the window is up
     guard = watchdog.UiWatchdog(root, on_stall=app.window_stalled)
     guard.start()                              # records what froze, if the window ever stops answering

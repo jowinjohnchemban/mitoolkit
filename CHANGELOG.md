@@ -5,7 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- The list of programs that can hold a phone (and make MiToolkit say "another program is using it") named
+  `mitoolkit`, which is this program, instead of Xiaomi's `miunlock` tool, since the rename.
+
 ### Added
+- The doctor: Help > Check and fix problems, and `mitoolkit doctor [--fix] [--all]`. It looks for what stops
+  MiToolkit working (USB access, the adb key, the saved session's permissions, settings, update leftovers, a phone
+  waiting to be allowed or held by another program) and says what is wrong in plain words. Safe fixes run by
+  themselves at start-up; fixes that need a decision run only when chosen. Agents get the diagnosis, not fixes.
 - Wireless adb pairing (Android 11 and newer, no cable): Phone > Wireless adb > Pair a new phone. Find phones on
   the Wi-Fi network, enter the pairing code, and the phone trusts this computer from then on. The window says
   plainly when a phone is waiting for you to allow it, and what to tick.

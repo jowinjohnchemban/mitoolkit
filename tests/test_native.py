@@ -99,8 +99,10 @@ class AdbKeyTests(unittest.TestCase):
 
     def test_key_file_is_created_private(self):
         key = shared_key()
+        adbkey.load_or_create.cache_clear()              # make the key in the temporary folder, and forget it after
+        self.addCleanup(adbkey.load_or_create.cache_clear)
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"ANDROID_USER_HOME": tmp}), \
-                mock.patch.object(adbkey, "_cached", None), mock.patch.object(adbkey, "generate", lambda: key):
+                mock.patch.object(adbkey, "generate", lambda: key):
             adbkey.load_or_create()
             self.assertTrue((Path(tmp) / "adbkey").exists())
             self.assertTrue((Path(tmp) / "adbkey.pub").exists())

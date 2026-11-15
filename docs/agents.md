@@ -37,6 +37,7 @@ If you only have the Python package, use `"command": "python", "args": ["-m", "m
 | `security_check` | Read-only security check of a phone running Android (OSV bulletins, Play Protect, app access, known stalkerware) |
 | `device_details` | Everything a phone running Android reports over USB, in sections. Read-only. Serial number, IMEI, Android ID and addresses are left out |
 | `connections` | Read-only state of Wi-Fi, the mobile network (modem), SIM, Bluetooth and USB, with findings that say what looks wrong. Network and device names and addresses are hidden |
+| `doctor` | Read-only check of the setup (Python, USB access, adb key, saved session, settings, log) with what is wrong and how to fix it. Agents get the diagnosis only; a person runs `mitoolkit doctor --fix` |
 | `read_log` | The last lines of `mitoolkit.log`, with tokens scrubbed |
 
 ## What an agent cannot do
