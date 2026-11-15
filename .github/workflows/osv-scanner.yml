@@ -35,7 +35,7 @@ jobs:
           python -m pip freeze --exclude mitoolkit > requirements-resolved.txt
           cat requirements-resolved.txt
       - name: Scan them with OSV-Scanner
-        uses: google/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: |-
             --lockfile=requirements.txt:requirements-resolved.txt
