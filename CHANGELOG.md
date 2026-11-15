@@ -10,11 +10,16 @@ pull request titles (see CONTRIBUTING.md); the full, generated notes of each rel
 ### Fixed
 - The list of programs that can hold a phone (and make MiToolkit say "another program is using it") named
   `mitoolkit`, which is this program, instead of Xiaomi's `miunlock` tool, since the rename.
+- The Wireless adb window fits its content (Close was cut off), keeps one size while you change pairing method, and
+  hides actions that do not apply.
+- After pairing, MiToolkit waits for the address the phone announces a few seconds later and connects by itself,
+  instead of asking to pair again. Phones that Google's adb lists by their network name now count as wireless.
 
 ### Added
-- A USB / Wireless switch in the Phone section (USB by default). Wireless mode finds phones with Wireless
-  debugging on the network, connects the ones that already trust this computer, and guides pairing for a new one:
-  with a QR code that the phone scans, or with the pairing code. Friendlier messages when a connection fails.
+- A USB | Wireless selector in the Phone section (USB by default; both choices always visible). Wireless mode finds
+  phones with Wireless debugging on the network, connects the ones that already trust this computer, and guides
+  pairing for a new one: with a QR code that the phone scans, or with the pairing code. Friendlier messages when
+  a connection fails.
 - Closing MiToolkit lets go of the phone: its USB connections are closed, a Google fastboot it started is stopped,
   and so is the Google adb server it started (one already running is left alone). The log file and crash.log are
   closed too.

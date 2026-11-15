@@ -17,7 +17,7 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 from mitoolkit import adbkey, usbio
-from mitoolkit.adb_core import AdbError, SyncSession  # re-exported: adb_usb.AdbError and adb_usb.SyncSession
+from mitoolkit.adb_core import AdbError, SyncSession, is_wireless  # re-exported: adb_usb.AdbError, adb_usb.SyncSession
 
 ADB = (0xFF, 0x42, 0x01)  # USB interface class, subclass, protocol
 
@@ -275,7 +275,7 @@ def _scan_server() -> List[Dict[str, str]]:
         if serial not in seen:
             _devices.pop(serial)
     # A phone plugged in AND on Wi-Fi shows up twice: keep the USB entry (fastboot needs the cable anyway)
-    wired = {s for s in _devices if ":" not in s}
+    wired = {s for s in _devices if not is_wireless(s)}
     out = []
     for d in found:
         dev = _devices[d["serial"]]

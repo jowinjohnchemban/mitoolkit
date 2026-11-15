@@ -310,27 +310,29 @@ Handy features:
 - **Debug logging** (Help menu, `--debug`, or `MITOOLKIT_DEBUG=1`) adds step-by-step lines to `mitoolkit.log`:
   each adb and fastboot request with its timing, scans, connections. Tokens stay hidden. Off by default.
 - **Wireless adb...** (Phone menu) uses the phone over Wi-Fi instead of a cable. With the phone plugged
-  in once, **Turn on Wi-Fi debugging** switches its adb to the network and connects; after that you can
+  in once, **Switch to Wi-Fi** switches its adb to the network and connects; after that you can
   unplug it. A phone already set up for wireless debugging can be connected by its address (for example
   `192.168.1.5`). It needs Google's `adb` (platform-tools) on this computer, because mitoolkit's own adb
   speaks USB only, and the phone returns to USB-only when it restarts. **Fastboot and unlocking work over
   a USB cable only**: the bootloader has no Wi-Fi, so mitoolkit asks you to plug the phone in before it
   reboots into fastboot. When a phone is both plugged in and on Wi-Fi, it is listed once, by USB.
-  **The USB / Wireless switch** in the Phone section chooses how phones are looked for. USB (the default) lists
-  phones on a cable. Switch to Wireless and MiToolkit searches the network for phones with Wireless debugging on,
-  connects to the ones that already trust this computer, and for a new one says it needs pairing and opens the
-  pairing window. Switching back to USB stops the adb server it started for Wi-Fi, and a phone that was just
-  connected over Wi-Fi switches the switch to Wireless by itself so it shows up. Wireless needs Google's adb.
+  **The USB | Wireless selector** in the Phone section chooses how phones are looked for; both choices are
+  always visible and you click the one you want (or use the arrow keys). USB (the default) lists phones on a
+  cable. Choose Wireless and MiToolkit searches the network for phones with Wireless debugging on, connects to
+  the ones that already trust this computer, and for a new one says it needs pairing and opens the pairing
+  window. Choosing USB again stops the adb server it started for Wi-Fi, and a phone that was just connected over
+  Wi-Fi moves the selector to Wireless by itself so it shows up. Wireless needs Google's adb.
   **Pairing by QR code (Android 11 or newer, no cable at all):** in the Wireless adb window choose *QR code*,
   press **Show QR code**, then on the phone open Settings > Developer options > Wireless debugging > *Pair device
   with QR code* and scan it. MiToolkit finds the phone on the network and pairs and connects by itself. The code
   is random, used once, and shown only while it waits (2 minutes, or until you press Cancel).
   **Pairing with a code:** choose *Pairing code* instead. On the phone open the same screen but
-  *Pair device with pairing code* and leave it open. Press **Find phones on
-  Wi-Fi** (or type the address with its port and the 6-digit code it shows) and **Pair**. Pairing makes the
-  phone trust this computer's adb key, so it does not ask to allow debugging again; the app then connects
-  using the address the phone announces, or you enter the *IP address & port* from the Wireless debugging
-  screen and press **Connect**. The code works once and is never logged or kept. If the phone shows an
+  *Pair device with pairing code* and leave it open. Press **Find phones**
+  (or type the address with its port and the 6-digit code it shows) and **Pair**. Pairing makes the
+  phone trust this computer's adb key, so it does not ask to allow debugging again. The phone announces
+  its connect address a few seconds after pairing and MiToolkit waits for it (up to 20 seconds), then
+  connects by itself and switches to Wireless; if it never shows up, enter the *IP address & port* from
+  the Wireless debugging screen and press **Connect**. The code works once and is never logged or kept. If the phone shows an
   "Allow debugging?" prompt instead (a cable or address connection), tap Allow and tick *Always allow from
   this computer*; until you do, the phone is listed as waiting for authorisation. Finding phones needs
   mDNS on the network (some routers and guest networks block it: then type the address).

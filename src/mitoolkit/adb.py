@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
-from mitoolkit import adb_usb, usbio
+from mitoolkit import adb_core, adb_usb, usbio
 from mitoolkit.adb_usb import AdbError  # noqa: F401 (the one adb error type, re-exported)
 
 _debug = logging.getLogger("mitoolkit.adb")     # written only in debug mode
@@ -212,7 +212,7 @@ class Phone:
     @property
     def wireless(self) -> bool:
         """True when the phone is reached over Wi-Fi (its serial is an address like 192.168.1.5:5555)."""
-        return ":" in self.serial
+        return adb_core.is_wireless(self.serial)
 
     def wifi_address(self) -> Optional[str]:
         """The phone's address on Wi-Fi (for example 192.168.1.5), or None when it is not on Wi-Fi."""

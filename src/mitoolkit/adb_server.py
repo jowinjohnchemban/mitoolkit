@@ -21,7 +21,7 @@ import socket
 import threading
 from typing import Dict, List, Optional
 
-from mitoolkit.adb_core import AdbError, SyncSession
+from mitoolkit.adb_core import AdbError, SyncSession, is_wireless
 
 HOST, PORT = "127.0.0.1", 5037
 
@@ -335,11 +335,12 @@ def discover_and_connect(min_gap: float = 20.0) -> List[Dict[str, str]]:
     accept is not tried again for ``min_gap`` seconds."""
     import time
     announced = [s for s in mdns_services() if s["kind"] == "connect"]
-    connected = {d["serial"] for d in devices()}
+    serials = [d["serial"] for d in devices() if d["state"] == "device"]
     out: List[Dict[str, str]] = []
     for service in announced:
         address, name = service["address"], service["name"]
-        if address in connected:
+        # connected already: listed by its address (192.168.1.5:39865) or by its network name (adb-6a81a217-xxxx._adb-tls-...)
+        if address in serials or any(s.startswith(name) for s in serials):
             out.append({"address": address, "name": name, "state": "connected"})
             continue
         if time.monotonic() - _tried.get(address, -1e9) < min_gap:
@@ -372,7 +373,7 @@ class ServerDevice:
 
     @property
     def wireless(self) -> bool:
-        return ":" in self.serial
+        return is_wireless(self.serial)
 
     def tcpip(self, port: int = 5555) -> None:
         """Make the phone listen for adb over Wi-Fi on this port (until it restarts)."""

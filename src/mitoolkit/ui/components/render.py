@@ -200,6 +200,49 @@ def toggle_image(width: int, height: int, pos: float, fill: str, border: str, th
     return img.resize((width + 2 * margin, height + 2 * margin), Image.LANCZOS)
 
 
+def segmented_image(width: int, height: int, seg_w: int, pad: int, pos: float, hover: int, fill: str, border: str,
+                    thumb: str, glyphs: Sequence[Tuple[str, float, str]], ring: str, margin: int, k: float):
+    """A two-choice segmented pill, anti-aliased on a transparent background: a grey track, a white thumb (with a soft
+    shadow) that slides between the two segments, a faint tint on the segment under the pointer, and a glyph in each
+    segment. ``glyphs`` is [(name, centre x, colour), ...] (device pixels, from the control's left edge); ``pos`` is 0
+    (thumb on the first segment) to 1 (the second); ``hover`` is the segment under the pointer (-1 for none)."""
+    s = 4
+    w, h, m = width * s, height * s, margin * s
+    img = Image.new("RGBA", ((width + 2 * margin) * s, (height + 2 * margin) * s), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    if ring:
+        gap = margin * s // 2
+        draw.rounded_rectangle((m - gap, m - gap, m + w + gap, m + h + gap), h // 2 + gap, outline=rgb(ring) + (255,),
+                               width=max(2, round(2 * k * s)))
+    draw.rounded_rectangle((m, m, m + w, m + h), h // 2, fill=rgb(border) + (255,))
+    inset = max(1, round(k)) * s
+    draw.rounded_rectangle((m + inset, m + inset, m + w - inset, m + h - inset), (h - 2 * inset) // 2, fill=rgb(fill) + (255,))
+    seg, p = seg_w * s, pad * s
+    top, bottom = m + p, m + h - p
+    if hover in (0, 1):                                              # a faint tint says "this is clickable"
+        left = m + p + seg * hover
+        draw.rounded_rectangle((left, top, left + seg, bottom), (bottom - top) // 2, fill=(255, 255, 255, 120))
+    left = m + p + seg * pos
+    shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle((left, top + 1.4 * k * s, left + seg, bottom + 1.4 * k * s),
+                                             (bottom - top) // 2, fill=(0, 0, 0, 80))
+    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(1.3 * k * s)))
+    draw = ImageDraw.Draw(img)
+    draw.rounded_rectangle((left, top, left + seg, bottom), (bottom - top) // 2, fill=rgb(thumb) + (255,),
+                           outline=(0, 0, 0, 24), width=max(1, round(k * s / 2)))
+    cy = (top + bottom) / 2
+    for name, cx, colour in glyphs:
+        (_plug if name == "usb" else _wifi)(draw, (cx + margin) * s, cy, 0.92 * k * s, rgb(colour) + (255,))
+    return img.resize((width + 2 * margin, height + 2 * margin), Image.LANCZOS)
+
+
+def segmented_photo(*spec):
+    """The segmented pill as a cached Tk image (position rounded to 1/24, so the animation reuses its frames)."""
+    spec = list(spec)
+    spec[4] = round(spec[4] * 24) / 24
+    return _cached(("segmented",) + tuple(spec), lambda: segmented_image(*spec))
+
+
 def toggle_photo(*spec):
     """The toggle switch as a cached Tk image (position rounded to 1/24, so the animation reuses its frames)."""
     spec = list(spec)
