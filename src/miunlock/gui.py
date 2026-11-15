@@ -24,7 +24,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, List, Optional
 
-from miunlock import __version__, adb, api, details, export, fastboot, log, memory, security, usbio, watchdog
+from miunlock import adb, api, build, details, export, fastboot, log, memory, security, updater, usbio, watchdog
 from miunlock.auth import store
 from miunlock.auth.redact import mask_id
 from miunlock.errors import MiunlockError
@@ -76,7 +76,7 @@ class App:
 
     def __init__(self, root: tk.Tk):
         self.root = root
-        root.title(f"miunlock {__version__}")
+        root.title(f"miunlock {build.full_version()}")
         root.minsize(640, 460)
         try:
             self._icon = tk.PhotoImage(file=str(Path(__file__).parent / "assets" / "logo.png"))
@@ -1197,6 +1197,36 @@ class App:
         else:
             self._guide = GuideWindow(self)
 
+    def _update_dialog(self, release=None) -> None:
+        from miunlock.ui.update_dialog import UpdateDialog
+        if getattr(self, "_updates", None) is not None and self._updates.alive():
+            self._updates.focus()
+        else:
+            self._updates = UpdateDialog(self, release or getattr(self, "_found_release", None))
+
+    def start_update_check(self) -> None:
+        """Once a day, quietly: look for a newer release. If there is one, say so in the status line (the
+        Check for updates window has the details). A failure says nothing. Turn it off in the Help menu."""
+        if not updater.check_due():
+            return
+
+        def work():
+            try:
+                release = updater.latest()
+            except Exception as err:
+                log.get("gui").debug("Update check failed: %s", err)
+                return
+            updater.mark_checked()
+            if updater.is_newer(release):
+                self.q.put(("call", self._update_available, (release,)))
+
+        threading.Thread(target=work, daemon=True, name="update-check").start()
+
+    def _update_available(self, release) -> None:
+        self._found_release = release
+        self._log(f"Update available: {release.tag} (Help > Check for updates).")
+        self._set_status(f"Update available: {release.tag}. Help > Check for updates.")
+
     def _about(self):
         from miunlock.ui.about_dialog import AboutDialog
         if getattr(self, "_about_win", None) is not None and self._about_win.alive():
@@ -1219,6 +1249,8 @@ def main():
     _enable_dpi_awareness()
     root = tk.Tk()
     app = App(root)
+    updater.cleanup()                          # remove the copy a previous update left behind
+    root.after(4000, app.start_update_check)   # once a day, after the window is up
     guard = watchdog.UiWatchdog(root, on_stall=app.window_stalled)
     guard.start()                              # records what froze, if the window ever stops answering
     tidy = memory.Housekeeper(root, release=[app.release_memory])

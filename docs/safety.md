@@ -107,6 +107,7 @@ In the code as reviewed, requests go only to:
 | `unlock.update.miui.com`, `unlock.update.intl.miui.com`, `in-/ru-/eu-unlock.update.intl.miui.com` | Unlock service, chosen by account region |
 | `api.osv.dev` | Security check only: Android security bulletin entries. Sends the Android version and AOSP project names, nothing about your apps or account |
 | `raw.githubusercontent.com` | Security check only: the stalkerware indicator list (AssoEchap/stalkerware-indicators), downloaded at most weekly and cached in `~/.miunlock/cache` |
+| `api.github.com`, `github.com` | Updates: once a day (Help > Check for updates automatically can be turned off) the app asks for the latest release of this project. Sends nothing about you or the phone. Downloading an update happens only when you press the button, only from this project's releases, and is checked against the release's `SHA256SUMS.txt` before it is installed. The programs are not code-signed, so that check catches damaged downloads, not a compromised release |
 | `127.0.0.1:5037` | Google's adb server on this computer, when it is running (never leaves the computer) |
 
 Two more things send traffic, and neither goes through this program:

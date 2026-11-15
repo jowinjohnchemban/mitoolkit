@@ -7,7 +7,7 @@ import webbrowser
 
 from tkinter import ttk
 
-from miunlock import __version__
+from miunlock import build
 from miunlock.ui.base import Dialog
 from miunlock.ui.components.buttons import Button
 from miunlock.ui.theme import MUTED, REPO
@@ -15,7 +15,7 @@ from miunlock.ui.theme import MUTED, REPO
 
 def version_text() -> str:
     """What a bug report needs: the program, Python and the system."""
-    return f"miunlock {__version__}\nPython {sys.version.split()[0]}\n{platform.platform()}"
+    return f"miunlock {build.full_version()}\nPython {sys.version.split()[0]}\n{platform.platform()}"
 
 
 class AboutDialog(Dialog):
@@ -26,7 +26,7 @@ class AboutDialog(Dialog):
     def build(self) -> None:
         body = self.body
         ttk.Label(body, text="miunlock", font=self.fonts.heading).pack(anchor="w")
-        ttk.Label(body, text=f"Version {__version__}", foreground=MUTED).pack(anchor="w")
+        ttk.Label(body, text=build.full_version(), foreground=MUTED).pack(anchor="w")
         ttk.Label(body, wraplength=360, justify="left", text=(
             "Unlock the bootloader of Xiaomi, Redmi and POCO phones with Xiaomi's own service, and look "
             "after the phone before and after: details, live status, connections, backup, apps and a "

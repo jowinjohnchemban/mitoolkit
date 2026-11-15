@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Updates over the air: Help > Check for updates downloads the latest release of the single-file program,
+  checks it against `SHA256SUMS.txt`, swaps it in and restarts; a daily quiet check (can be turned off) tells
+  you in the status line. Releases are automatic: changing `__version__` on main builds and publishes the
+  release (programs, packages, checksums, notes from this file).
+- The version reads `v1.8.0 (build: DDMMYYYY-commit)` in the title bar, About, `--version` and the log.
 - Export device details as text, CSV or Markdown (button and Phone menu), a Sign out button in the Mi
   Account section, and a Restart or power off dialog (Android, recovery, fastboot, off). In fastboot mode the
   dialog offers Cancel and start Android, or recovery.

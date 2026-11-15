@@ -34,6 +34,8 @@ does **not** bypass the waiting period or any account requirement.
   findings and an optional network test, for debugging Wi-Fi and telecom problems
 - Log viewer (logcat); one dialog to restart into Android, recovery or fastboot, or power off (and to leave
   fastboot without unlocking); export device details as text, CSV or Markdown
+- Updates over the air for the single-file program (checked against the release's SHA-256 list), and
+  automatic releases from GitHub
 - Wireless adb: use the phone over Wi-Fi for everything except fastboot and unlocking (those need a cable)
 - App manager: remove preinstalled bloat for your user, with plain ratings, and restore it
 - Security check: missing Android security fixes (from OSV / Android Security Bulletins),

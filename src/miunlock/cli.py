@@ -3,7 +3,7 @@ import functools
 import json
 import sys
 
-from miunlock import __version__, adb, api, bloat, drivers, log
+from miunlock import __version__, adb, api, bloat, build, drivers, log
 from miunlock.errors import MiunlockError
 from miunlock.unlock import InteractiveUnlock
 
@@ -249,7 +249,7 @@ def main():
     parser.add_argument("--cli", action="store_true", help="Command-line mode (the default when a command is given). With no command: the interactive prompt.")
     parser.add_argument("--gui", action="store_true", help="Open the graphical app (the default when run with no arguments).")
     parser.add_argument("--mcp", action="store_true", help="Let an AI agent control the program over MCP (stdin/stdout). Cannot unlock.")
-    parser.add_argument("--version", action="version", version=f"miunlock {__version__}")
+    parser.add_argument("--version", action="version", version=f"miunlock {build.full_version()}")
     parser.add_argument("--debug", action="store_true", help="Write step-by-step debug details to miunlock.log "
                         "(also: set MIUNLOCK_DEBUG=1, or Help > Debug logging in the app). Secrets stay hidden.")
     sub = parser.add_subparsers(dest="command", required=True)

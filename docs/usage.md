@@ -272,6 +272,13 @@ Handy features:
   skipped, every copy is written under a temporary name and checked against the size the phone reported, a
   failed file is retried, and anything that still fails is listed in `backup-problems.txt` in the backup folder.
 - **Sign out** (Mi Account section, or File menu) deletes the saved session on this computer.
+- **Help > Check for updates...** shows what is new in the latest release. For the single-file program from
+  the Releases page, **Install and restart** downloads the update, checks it against the release's
+  `SHA256SUMS.txt`, swaps it in and starts it again; a pip or source install is pointed to the release page
+  instead. Once a day the app also looks quietly and says in the status line when there is a newer version;
+  turn that off with **Help > Check for updates automatically**. Versions read `v1.8.0 (build: DDMMYYYY-commit)`:
+  the release number, then the date and short id of the commit it was built from (shown in the title bar,
+  About and `miunlock --version`).
 - **Debug logging** (Help menu, `--debug`, or `MIUNLOCK_DEBUG=1`) adds step-by-step lines to `miunlock.log`:
   each adb and fastboot request with its timing, scans, connections. Tokens stay hidden. Off by default.
 - **Wireless adb...** (Phone menu) uses the phone over Wi-Fi instead of a cable. With the phone plugged

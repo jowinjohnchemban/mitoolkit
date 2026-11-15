@@ -23,3 +23,6 @@ session.log
 bugreport*
 *.tsv
 screen*.png
+
+# Written by the release workflow (build date and commit)
+src/miunlock/_build.py

@@ -67,6 +67,19 @@ touches credentials, logging or the unlock confirmation.
 If a pull request is not merged, it is not a judgement of your work; it just may not
 fit the direction of the project.
 
+## Releasing
+
+Releases are automatic. To publish one:
+
+1. Change `__version__` in `src/miunlock/__init__.py` (major.minor.patch).
+2. Add a `## [x.y.z] - date` section to `CHANGELOG.md`: it becomes the release notes.
+3. Push to `main`.
+
+The Release workflow builds the programs for Windows, Linux and macOS and the Python packages, writes
+`SHA256SUMS.txt`, and publishes the release with the tag `vx.y.z`. A version that already has a release is
+skipped, so pushing again does nothing. The running app's updater (Help > Check for updates) installs from
+that release and verifies the download against `SHA256SUMS.txt`, so keep that file in every release.
+
 ## License
 
 By contributing you agree that your contributions are licensed under the

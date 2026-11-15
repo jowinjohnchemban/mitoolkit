@@ -86,8 +86,8 @@ def setup(verbose: Optional[bool] = None) -> Optional[Path]:
     _log.addHandler(handler)
     restrict_to_current_user(path)
     _path = path
-    from miunlock import __version__
-    _log.info("miunlock %s started (python %s, %s)", __version__, sys.version.split()[0], sys.platform)
+    from miunlock import build
+    _log.info("miunlock %s started (python %s, %s)", build.full_version(), sys.version.split()[0], sys.platform)
     return path
 
 

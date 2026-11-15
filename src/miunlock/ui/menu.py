@@ -14,7 +14,7 @@ import tkinter as tk
 import webbrowser
 from typing import Callable, List, Optional, Tuple
 
-from miunlock import drivers, log
+from miunlock import drivers, log, settings, updater
 from miunlock.ui.theme import DOCS, REPO
 
 MAC = sys.platform == "darwin"
@@ -164,5 +164,10 @@ class MenuBar:
         self.debug_var = tk.BooleanVar(value=log.debug_enabled())
         m.add_checkbutton(label="Debug logging", variable=self.debug_var, command=lambda: log.set_debug(
             self.debug_var.get()), **({} if MAC else {"underline": 0}))
+        m.add_separator()
+        self._add(m, "Check for &updates...", app._update_dialog)
+        self.auto_var = tk.BooleanVar(value=updater.auto_enabled())
+        m.add_checkbutton(label="Check for updates automatically", variable=self.auto_var, command=lambda: settings.set(
+            "auto_update_check", self.auto_var.get()))
         m.add_separator()
         self._add(m, "&About miunlock", app._about)
