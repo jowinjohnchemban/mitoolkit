@@ -33,10 +33,68 @@ class Check:
     fix: Optional[Callable[[], str]] = field(default=None, repr=False)   # returns a sentence saying what it did
     fix_label: str = ""
     safe: bool = False                                                   # may run without asking
+    needs_admin: bool = False                                            # may ask for administrator rights
 
     def to_dict(self) -> Dict[str, object]:
         return {"id": self.id, "title": self.title, "status": self.status, "detail": self.detail,
-                "fixable": self.fix is not None, "fix": self.fix_label, "safe": self.safe}
+                "fixable": self.fix is not None, "fix": self.fix_label, "safe": self.safe, "admin": self.needs_admin}
+
+
+# ------------------------------------------------------------------------------- fixes that may need admin
+UDEV_FILE = "/etc/udev/rules.d/51-mitoolkit.rules"
+UDEV_RULES = (
+    "# Lets the logged-in user talk to Xiaomi and Google Android phones over USB (adb and fastboot).\n"
+    'SUBSYSTEM=="usb", ATTR{idVendor}=="2717", MODE="0660", TAG+="uaccess"\n'
+    'SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", MODE="0660", TAG+="uaccess"\n'
+)
+
+
+def stop_adb_privileged() -> str:
+    """Stop Google's adb. Runs as the user first; as administrator only if the user's own try was not allowed."""
+    from mitoolkit import usbio
+    stopped = usbio.stop_google_adb()
+    if "adb" in usbio.blocking_programs():
+        raise PermissionError("Google's adb is still running (it was probably started with administrator rights).")
+    return ("Stopped Google's adb; it starts again the next time you use adb." if stopped
+            else "Google's adb was not running.")
+
+
+def install_udev_rules() -> str:
+    """Linux: let the logged-in user open Android phones. Needs root."""
+    import subprocess
+    if not sys.platform.startswith("linux"):
+        raise OSError("udev rules are for Linux.")
+    Path(UDEV_FILE).write_text(UDEV_RULES, encoding="utf-8")          # PermissionError without root
+    for command in (["udevadm", "control", "--reload-rules"], ["udevadm", "trigger", "--subsystem-match=usb"]):
+        subprocess.run(command, capture_output=True, timeout=30, check=False)
+    return f"Allowed USB access for Android phones ({UDEV_FILE}). Unplug the phone and plug it back in."
+
+
+# The only fixes that may run with administrator rights, by name. The elevated copy of this program accepts
+# nothing else (mitoolkit doctor --run-fix NAME), so no command is ever built from outside input.
+PRIVILEGED: Dict[str, Callable[[], str]] = {"stop-adb": stop_adb_privileged, "udev-rules": install_udev_rules}
+
+
+def run_privileged(name: str) -> str:
+    """Run one named fix in this process (the elevated copy calls this)."""
+    if name not in PRIVILEGED:
+        raise ValueError(f"Unknown fix: {name!r}")
+    return PRIVILEGED[name]()
+
+
+def with_admin(name: str) -> str:
+    """Run a named fix as the user; if that is not allowed, ask the system for administrator rights and run it
+    again as administrator. Raises if the person says no, or it still fails."""
+    from mitoolkit import elevate
+    try:
+        return run_privileged(name)
+    except PermissionError:
+        if elevate.is_admin():
+            raise
+    worked, message = elevate.run_self(["doctor", "--run-fix", name])
+    if not worked:
+        raise PermissionError(message or "The fix did not work, even as administrator.")
+    return message
 
 
 # ------------------------------------------------------------------------------------------ the program
@@ -209,14 +267,13 @@ def check_phone() -> List[Check]:
                              reset, "Reset the connection", safe=True))
         elif state == "no-access":
             reason = d.get("reason") or usbio.BUSY
-            fix = None
+            fix, label = None, ""
             if reason == usbio.BUSY and "adb" in usbio.blocking_programs():
-                def stop() -> str:
-                    return ("Stopped Google's adb; it starts again the next time you use adb."
-                            if usbio.stop_google_adb() else "Google's adb was not running.")
-                fix = stop
+                fix, label = (lambda: with_admin("stop-adb")), "Stop Google's adb"
+            elif reason == usbio.NO_PERMISSION and sys.platform.startswith("linux"):
+                fix, label = (lambda: with_admin("udev-rules")), "Allow USB access"
             out.append(Check(f"phone-{serial}", f"{name} cannot be opened", WARN, usbio.no_access_advice(reason),
-                             fix, "Stop Google's adb" if fix else "", safe=False))
+                             fix, label, safe=False, needs_admin=fix is not None))
         else:
             out.append(Check(f"phone-{serial}", f"{name}: {state}", INFO))
     return out

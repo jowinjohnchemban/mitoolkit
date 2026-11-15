@@ -75,16 +75,27 @@ fit the direction of the project.
 
 ## Releasing
 
-Releases are automatic. To publish one:
+**Every merge to `main` is released automatically**, with the next version worked out for you: nothing to edit
+by hand. The rules are the standard ones, [Conventional Commits](https://www.conventionalcommits.org) for the
+messages and [Semantic Versioning](https://semver.org) for the numbers. The pull request title is what counts
+(it becomes the commit message when the pull request is squash-merged), and a check makes sure it starts with a type:
 
-1. Change `__version__` in `src/mitoolkit/__init__.py` (major.minor.patch).
-2. Add a `## [x.y.z] - date` section to `CHANGELOG.md`: it becomes the release notes.
-3. Open a pull request. When it is merged to `main`, the release is built and published.
+| Title starts with | Release | Example |
+|---|---|---|
+| `feat:` | **minor** (1.2.3 to 1.3.0) | `feat: export device details` |
+| `fix:`, `docs:`, `ci:`, `test:`, `chore:`, `refactor:`, `perf:`, `build:`, `style:` | **patch** (1.2.3 to 1.2.4) | `fix: stop a crash on rescan` |
+| a `!` after the type, or `BREAKING CHANGE` in the message | **major** (1.2.3 to 2.0.0) | `feat!: rename the command` |
 
-The Release workflow builds the programs for Windows, Linux and macOS and the Python packages, writes
-`SHA256SUMS.txt`, and publishes the release with the tag `vx.y.z`. A version that already has a release is
-skipped, so pushing again does nothing. The running app's updater (Help > Check for updates) installs from
-that release and verifies the download against `SHA256SUMS.txt`, so keep that file in every release.
+A pull request label `major`, `minor` or `patch` overrides its title, and `[skip release]` in a title skips
+the release for that merge (the next one carries it). If several merges happen before the workflow runs, the
+biggest bump among them wins. You can also run the Release workflow by hand and force a bump.
+
+The git tag is the source of truth for the version: the workflow works out the next tag from the last one, stamps
+the version into the build (never committed, so the protected `main` needs no bot push), builds the programs for
+Windows, Linux and macOS and the Python packages, writes `SHA256SUMS.txt`, and publishes the release `vX.Y.Z` with
+notes generated from the merged pull requests. `__version__` in the repository is only a floor for source runs.
+The running app's updater (Help > Check for updates) installs from that release and verifies the download against
+`SHA256SUMS.txt`, so keep that file in every release.
 
 ### Signing (Windows SmartScreen)
 

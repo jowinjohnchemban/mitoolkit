@@ -153,7 +153,8 @@ class PhoneCheckTests(unittest.TestCase):
 
 class CommandTests(unittest.TestCase):
     def run_cli(self, **kw):
-        args = SimpleNamespace(fix=kw.get("fix", False), all=kw.get("all", False), no_phone=True)
+        args = SimpleNamespace(fix=kw.get("fix", False), all=kw.get("all", False), no_phone=True,
+                               run_fix=kw.get("run_fix"), result_file=kw.get("result_file"))
         out = io.StringIO()
         code = 0
         with redirect_stdout(out):
@@ -191,6 +192,168 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(data["problems"], 1)
         self.assertTrue(data["checks"][0]["fixable"])
         json.dumps(data)                                   # plain data: no callables leak into the answer
+
+
+class AdministratorTests(unittest.TestCase):
+    """Fixes that may need administrator rights: tried as the user first, then the system is asked."""
+
+    def test_only_named_fixes_can_run(self):
+        with self.assertRaises(ValueError):
+            doctor.run_privileged("rm -rf /")
+        self.assertEqual(sorted(doctor.PRIVILEGED), ["stop-adb", "udev-rules"])
+
+    def test_no_prompt_when_the_fix_works_as_the_user(self):
+        from mitoolkit import elevate
+        with mock.patch.dict(doctor.PRIVILEGED, {"stop-adb": lambda: "stopped"}), \
+                mock.patch.object(elevate, "run_self") as ask:
+            self.assertEqual(doctor.with_admin("stop-adb"), "stopped")
+        ask.assert_not_called()
+
+    def test_asks_for_administrator_only_after_permission_was_refused(self):
+        from mitoolkit import elevate
+
+        def refused():
+            raise PermissionError("access denied")
+        with mock.patch.dict(doctor.PRIVILEGED, {"stop-adb": refused}), mock.patch.object(elevate, "is_admin", return_value=False), \
+                mock.patch.object(elevate, "run_self", return_value=(True, "Stopped as administrator.")) as ask:
+            self.assertEqual(doctor.with_admin("stop-adb"), "Stopped as administrator.")
+        ask.assert_called_once_with(["doctor", "--run-fix", "stop-adb"])
+
+    def test_declining_the_prompt_changes_nothing_and_says_so(self):
+        from mitoolkit import elevate
+
+        def refused():
+            raise PermissionError("access denied")
+        with mock.patch.dict(doctor.PRIVILEGED, {"stop-adb": refused}), mock.patch.object(elevate, "is_admin", return_value=False), \
+                mock.patch.object(elevate, "run_self", return_value=(False, "Administrator permission was not given, so nothing was changed.")):
+            with self.assertRaisesRegex(PermissionError, "not given"):
+                doctor.with_admin("stop-adb")
+
+    def test_an_administrator_is_not_asked_again(self):
+        from mitoolkit import elevate
+
+        def refused():
+            raise PermissionError("still denied")
+        with mock.patch.dict(doctor.PRIVILEGED, {"stop-adb": refused}), mock.patch.object(elevate, "is_admin", return_value=True), \
+                mock.patch.object(elevate, "run_self") as ask:
+            with self.assertRaises(PermissionError):
+                doctor.with_admin("stop-adb")
+        ask.assert_not_called()
+
+    def test_apply_reports_a_refusal_instead_of_raising(self):
+        def refused():
+            raise PermissionError("Administrator permission was not given, so nothing was changed.")
+        check = Check("x", "Held by adb", WARN, fix=refused, fix_label="Stop it", needs_admin=True)
+        done = doctor.apply([check], include_decisions=True)
+        self.assertIn("not given", done[0][1])
+        self.assertTrue(check.to_dict()["admin"])
+
+    def test_linux_permission_problem_offers_the_udev_rule_as_an_administrator_fix(self):
+        with mock.patch("mitoolkit.adb.devices", return_value=[{"serial": "X", "state": "no-access", "reason": usbio.NO_PERMISSION}]), \
+                mock.patch.object(doctor.sys, "platform", "linux"):
+            check = doctor.check_phone()[0]
+        self.assertEqual((check.fix_label, check.needs_admin, check.safe), ("Allow USB access", True, False))
+
+    def test_udev_rules_are_written_and_reloaded(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(doctor.sys, "platform", "linux"), \
+                mock.patch.object(doctor, "UDEV_FILE", str(Path(tmp) / "51.rules")), mock.patch("subprocess.run") as run:
+            message = doctor.install_udev_rules()
+            text = (Path(tmp) / "51.rules").read_text()
+        self.assertIn('idVendor}=="2717"', text)
+        self.assertIn("uaccess", text)
+        self.assertEqual(run.call_count, 2)
+        self.assertIn("Unplug", message)
+        with mock.patch.object(doctor.sys, "platform", "win32"):
+            with self.assertRaises(OSError):
+                doctor.install_udev_rules()
+
+    def test_the_elevated_copy_runs_one_named_fix_and_reports_through_a_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = Path(tmp) / "r.json"
+            kw = dict(run_fix="stop-adb", result_file=str(result))
+            out = io.StringIO()
+            with mock.patch.dict(doctor.PRIVILEGED, {"stop-adb": lambda: "done"}), redirect_stdout(out):
+                cli._cmd_doctor(SimpleNamespace(fix=False, all=False, no_phone=True, **kw))
+            self.assertEqual(json.loads(result.read_text()), {"ok": True, "message": "done"})
+
+            def broken():
+                raise PermissionError("denied")
+            code = 0
+            with mock.patch.dict(doctor.PRIVILEGED, {"stop-adb": broken}), redirect_stdout(io.StringIO()):
+                try:
+                    cli._cmd_doctor(SimpleNamespace(fix=False, all=False, no_phone=True, **kw))
+                except SystemExit as exit_:
+                    code = exit_.code
+            self.assertEqual(code, 1)
+            self.assertFalse(json.loads(result.read_text())["ok"])
+
+
+class ElevateTests(unittest.TestCase):
+    def test_program_command(self):
+        from mitoolkit import elevate
+        self.assertEqual(elevate.program_command()[-2:], ["-m", "mitoolkit"])
+        with mock.patch.object(elevate.sys, "frozen", True, create=True), mock.patch.object(elevate.sys, "executable", "C:/x/mitoolkit.exe"):
+            self.assertEqual(elevate.program_command(), ["C:/x/mitoolkit.exe"])
+
+    def run_with(self, code, write=None):
+        from mitoolkit import elevate
+        seen = {}
+
+        def fake(command, timeout):
+            seen["command"] = command
+            if write is not None:
+                Path(command[-1]).write_text(json.dumps(write))
+            return code
+        with mock.patch.object(elevate, "_windows", fake), mock.patch.object(elevate, "_posix", fake), \
+                mock.patch.object(elevate, "_macos", fake):
+            return elevate.run_self(["doctor", "--run-fix", "stop-adb"]), seen
+
+    def test_the_result_file_carries_the_answer_and_the_command_is_fixed(self):
+        (worked, message), seen = self.run_with(0, {"ok": True, "message": "Stopped."})
+        self.assertEqual((worked, message), (True, "Stopped."))
+        self.assertEqual(seen["command"][-4:-1], ["--run-fix", "stop-adb", "--result-file"])
+        self.assertIn("--run-fix", seen["command"])
+        self.assertTrue(seen["command"][-1].endswith(".json"))
+
+    def test_declined_prompt(self):
+        (worked, message), _seen = self.run_with(None)
+        self.assertFalse(worked)
+        self.assertIn("not given", message)
+
+    def test_a_crash_without_a_result_file_is_reported(self):
+        (worked, message), _seen = self.run_with(1)
+        self.assertFalse(worked)
+        self.assertIn("did not finish", message)
+
+    @unittest.skipUnless(os.name == "nt", "Windows only")
+    def test_windows_launch_and_wait_returns_the_exit_code(self):
+        """The same ShellExecuteEx plumbing as the UAC path, with the plain "open" verb so no prompt appears."""
+        from mitoolkit import elevate
+        code = elevate._windows([sys.executable, "-c", "import sys; sys.exit(7)"], 30, verb="open")
+        self.assertEqual(code, 7)
+
+    def test_linux_uses_polkit_with_a_desktop_and_sudo_without(self):
+        from mitoolkit import elevate
+        calls = []
+        with mock.patch("subprocess.run", side_effect=lambda cmd, **kw: calls.append(cmd) or SimpleNamespace(returncode=0)), \
+                mock.patch.object(elevate.shutil, "which", side_effect=lambda n: f"/usr/bin/{n}"):
+            with mock.patch.dict(os.environ, {"DISPLAY": ":0"}):
+                self.assertEqual(elevate._posix(["prog", "doctor"], 5), 0)
+            with mock.patch.dict(os.environ, {}, clear=True):
+                self.assertEqual(elevate._posix(["prog", "doctor"], 5), 0)
+        self.assertEqual([c[0] for c in calls], ["pkexec", "sudo"])
+        with mock.patch.object(elevate.shutil, "which", return_value=None):
+            self.assertIsNone(elevate._posix(["prog"], 5))
+
+    def test_macos_prompt_is_quoted_and_cancel_is_a_no(self):
+        from mitoolkit import elevate
+        with mock.patch("subprocess.run", return_value=SimpleNamespace(returncode=0, stderr="")) as run:
+            elevate._macos(['/Apps/My "App"/mitoolkit', "doctor"], 5)
+        script = run.call_args[0][0][2]
+        self.assertIn("with administrator privileges", script)
+        self.assertIn('\\"App\\"', script)                    # quotes cannot break out of the AppleScript string
+        with mock.patch("subprocess.run", return_value=SimpleNamespace(returncode=1, stderr="User canceled. (-128)")):
+            self.assertIsNone(elevate._macos(["x"], 5))
 
 
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")

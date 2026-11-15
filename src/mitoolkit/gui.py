@@ -1115,15 +1115,17 @@ class App:
     def _stop_google_adb(self):
         if not messagebox.askyesno(
                 "Stop Google's adb", "Google's adb server is running and holding the phone, so MiToolkit can't "
-                "use it.\n\nStop it now? It starts again by itself the next time you use adb."):
+                "use it.\n\nStop it now? It starts again by itself the next time you use adb. If it was started "
+                "with administrator rights, the system asks for your permission first."):
             return
 
         def done(status, result):
-            self._log("Stopped Google's adb server." if status == "ok" and result else f"adb: {result}")
+            self._log(f"{result}" if status == "ok" else f"Could not stop Google's adb: {result}")
             self._info.clear()
             self._scan()
 
-        self._run(usbio.stop_google_adb, done, "Stopping Google's adb...")
+        from mitoolkit import doctor
+        self._run(lambda: doctor.with_admin("stop-adb"), done, "Stopping Google's adb...")
 
     def _driver_help(self):
         DriverHelpDialog(self)

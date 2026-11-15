@@ -1,9 +1,11 @@
 # Changelog
 
-All notable changes to this project are documented here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Highlights of the project's changes. Every merge to `main` is released automatically with a
+[Semantic Versioning](https://semver.org) number worked out from [Conventional Commits](https://www.conventionalcommits.org)
+pull request titles (see CONTRIBUTING.md); the full, generated notes of each release are on the
+[Releases page](https://github.com/jowinjohnchemban/mitoolkit/releases).
 
-## [Unreleased]
+## Since 1.0.0
 
 ### Fixed
 - The list of programs that can hold a phone (and make MiToolkit say "another program is using it") named

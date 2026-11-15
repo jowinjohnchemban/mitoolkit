@@ -22,6 +22,7 @@ class DoctorDialog(Dialog):
     def __init__(self, app, start: bool = True):
         self.checks: List[doctor.Check] = []
         self._busy = False
+        self._note = ""
         super().__init__(app)
         if start:
             self._look()
@@ -80,11 +81,12 @@ class DoctorDialog(Dialog):
         for check in sorted(result, key=lambda c: c.status in (doctor.OK, doctor.INFO)):    # problems first, same order otherwise
             self._row(check)
         safe = [c for c in bad if c.fix is not None and c.safe]
+        note, self._note = self._note, ""
         if not bad:
-            self.summary.configure(text="No problems found.", foreground=GREEN)
+            self.summary.configure(text=("No problems found. " + note).strip(), foreground=GREEN)
         else:
-            self.summary.configure(text=f"{len(bad)} thing(s) need a look." + (f" {len(safe)} can be fixed safely." if safe else ""),
-                                   foreground=AMBER)
+            text = f"{len(bad)} thing(s) need a look." + (f" {len(safe)} can be fixed safely." if safe else "")
+            self.summary.configure(text=(text + " " + note).strip(), foreground=AMBER)
         self.fix_all.configure(state="normal" if safe else "disabled")
 
     def _row(self, check: doctor.Check) -> None:
@@ -96,18 +98,26 @@ class DoctorDialog(Dialog):
         ttk.Label(row, text=check.title, font=self.fonts.bold if bad else None).grid(row=0, column=1, sticky="w")
         if check.detail:
             ttk.Label(row, text=check.detail, foreground=MUTED, wraplength=430, justify="left").grid(row=1, column=1, sticky="w")
+        if check.needs_admin and bad:
+            ttk.Label(row, text="Asks for administrator permission first.", foreground=MUTED,
+                      font=self.fonts.small).grid(row=2, column=1, sticky="w")
         if check.fix is not None and bad:
             Button(row, text=check.fix_label or "Fix", command=lambda c=check: self._fix_one(c)).grid(
                 row=0, column=2, rowspan=2, sticky="e", padx=(8, 0))
 
     # ------------------------------------------------------------------------------------------ fixing
     def _after_fix(self, done) -> None:
+        notes = []
         for check, message in (done if isinstance(done, list) else []):
-            self.app._log(f"Fixed: {check.title}. {message}")
+            self.app._log(message if message.startswith("Could not") else f"Fixed: {check.title}. {message}")
+            notes.append(message)
         self._busy = False
+        self._note = " ".join(notes)                 # shown under the heading after the list is read again
         self._look()
 
     def _fix_one(self, check: doctor.Check) -> None:
+        if check.needs_admin:
+            self.summary.configure(text="Waiting for your answer to the administrator prompt...", foreground=MUTED)
         self._work(lambda: doctor.apply([check], include_decisions=True), self._after_fix)
 
     def _fix_safe(self) -> None:

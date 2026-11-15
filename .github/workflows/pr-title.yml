@@ -1,0 +1,27 @@
+name: PR title
+
+# The title of a pull request becomes the commit message on main (squash merge), and the release workflow reads it
+# to decide the version bump: "feat: ..." -> minor, "type!: ..." -> major, anything else -> patch.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: PR title
+    runs-on: ubuntu-24.04
+    steps:
+      - name: The title follows Conventional Commits
+        env:
+          TITLE: ${{ github.event.pull_request.title }}       # in an env var, never pasted into the script
+        run: |
+          if printf '%s' "$TITLE" | grep -Eq '^(feat|fix|docs|ci|test|chore|refactor|perf|build|style|revert)(\([a-z0-9._/-]+\))?!?: .+'; then
+            echo "OK: $TITLE"
+          else
+            echo "::error::Start the title with a type: 'feat: ...' (minor release), 'fix: ...', 'docs: ...', 'ci: ...', 'test: ...', 'chore: ...', 'refactor: ...', 'perf: ...', 'build: ...' (patch release), or add '!' ('feat!: ...') for a breaking change (major release)."
+            echo "Your title: $TITLE"
+            exit 1
+          fi
