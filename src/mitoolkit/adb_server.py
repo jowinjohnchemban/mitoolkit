@@ -21,7 +21,7 @@ import socket
 import threading
 from typing import Dict, List, Optional
 
-from mitoolkit.adb_usb import AdbError, SyncSession
+from mitoolkit.adb_core import AdbError, SyncSession
 
 HOST, PORT = "127.0.0.1", 5037
 
