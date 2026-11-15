@@ -84,11 +84,17 @@ Python 3.9 or newer.
 - On Android (Termux), make sure the phone supports OTG and that it is enabled.
 - On Windows, the device should appear in Device Manager without a warning icon.
   Install the drivers if it does not:
+  - Easiest: in the GUI choose *File > Install Google USB driver*, or run
+    `miunlock install-driver`. It downloads Google's official driver and installs it after
+    a Windows administrator prompt. Google's driver does not list Xiaomi's USB IDs, so if
+    the warning stays, right-click the phone in Device Manager > *Update driver > Browse my
+    computer > Let me pick > Android Device > Android Bootloader Interface*.
   - [Xiaomi USB driver](http://bigota.d.miui.com/tools/xiaomi_usb_driver.rar)
     ([guide](https://web.vip.miui.com/page/info/mio/mio/detail?postId=18464849&app_version=dev.20051))
   - [Google ADB driver](https://dl.google.com/android/repository/latest_usb_driver_windows.zip)
     ([guide](https://developer.android.com/studio/run/oem-usb#InstallingDriver))
 - Make sure the device is in **fastboot** mode, not *fastbootd*.
+- If adb or fastboot is old, run `miunlock install-tools` (or *File > Update adb and fastboot*).
 - Try a different USB data cable. A bad or charge-only cable is the most common
   cause; prefer the original.
 - Unplug and replug the cable and check it is seated properly.

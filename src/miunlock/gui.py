@@ -27,10 +27,10 @@ from tkinter import font as tkfont
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, Optional
 
-from miunlock import __version__, adb, api, guide, log
+from miunlock import __version__, adb, api, drivers, guide, log
 from miunlock.auth import store
 from miunlock.auth.redact import mask_id
-from miunlock.fastboot import get_fastboot
+from miunlock.fastboot import get_fastboot, update_platform_tools
 from miunlock.hints import explain
 from miunlock.system import NO_WINDOW
 
@@ -131,6 +131,10 @@ class App:
         file_menu = tk.Menu(bar, tearoff=0)
         file_menu.add_command(label="Sign out and delete saved session...", command=self._sign_out)
         file_menu.add_command(label="Show log file", command=self._show_log)
+        file_menu.add_separator()
+        file_menu.add_command(label="Update adb and fastboot (from Google)...", command=self._update_tools)
+        if drivers.supported():
+            file_menu.add_command(label="Install Google USB driver...", command=self._install_driver)
         file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self.root.destroy)
         bar.add_cascade(label="File", menu=file_menu)
@@ -501,7 +505,7 @@ class App:
             tip = ("Still no phone. Use a data cable (not charge-only) in another USB port, and check the "
                    "phone shows the fastboot screen.")
             if sys.platform == "win32":
-                tip += " On Windows you may need Xiaomi or Google USB drivers."
+                tip += " On Windows try File > Install Google USB driver."
             self.dev_tip.configure(text=tip)
             self.dev_tip.pack(anchor="w", pady=(6, 0), after=self.dev_text.master)
         elif not waiting and self.dev_tip.winfo_ismapped():
@@ -805,6 +809,57 @@ class App:
         self._show_check("", "", "", MUTED)
         self._log("Saved session deleted.")
         self._refresh()
+
+    def _update_tools(self):
+        if self.busy:
+            return
+        if not messagebox.askyesno(
+            "Update adb and fastboot",
+            "This downloads the latest adb and fastboot (Android platform-tools) from Google\n"
+            "(dl.google.com) into your home folder's platform-tools folder, replacing the old copy.\n\nContinue?",
+        ):
+            return
+
+        def work():
+            return update_platform_tools()
+
+        def done(status, result):
+            if status == "error":
+                self._log(f"Could not update adb and fastboot: {result}")
+                messagebox.showerror("Update adb and fastboot", str(result))
+                return
+            self.fastboot = None  # pick the new copy up on the next scan
+            self._adb = None
+            self._prepare_fastboot()
+            self._log(f"adb and fastboot updated in {result}")
+            messagebox.showinfo("Update adb and fastboot", f"Updated.\n\n{result}")
+
+        self._run(work, done, "Downloading adb and fastboot from Google...")
+
+    def _install_driver(self):
+        if self.busy:
+            return
+        if not messagebox.askyesno(
+            "Install Google USB driver",
+            "This downloads Google's official Android USB driver (dl.google.com) and installs it\n"
+            "with Windows' own installer. Windows will ask for administrator permission.\n\n"
+            "Do this only if your phone is not detected. Continue?",
+        ):
+            return
+
+        def done(status, result):
+            if status == "error":
+                self._log(f"USB driver: {result}")
+                messagebox.showerror("Install Google USB driver", str(result))
+            else:
+                self._log(str(result))
+                if messagebox.askyesno("Install Google USB driver", f"{result}\n\nOpen Device Manager now?"):
+                    try:
+                        subprocess.Popen(["mmc", "devmgmt.msc"], creationflags=NO_WINDOW)
+                    except OSError as err:
+                        self._log(f"Could not open Device Manager: {err}")
+
+        self._run(lambda: drivers.install_usb_driver(self._log), done, "Installing the USB driver...")
 
     def _show_log(self):
         path = log.log_path()

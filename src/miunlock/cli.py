@@ -119,6 +119,24 @@ def _cmd_backup(args):
         sys.exit(1)
 
 
+def _cmd_install_tools(args):
+    from miunlock import fastboot
+    try:
+        _print_json({"installed": True, "folder": fastboot.update_platform_tools()})
+    except (SystemExit, Exception) as e:
+        _print_json({"installed": False, "error": str(e) or type(e).__name__})
+        sys.exit(1)
+
+
+def _cmd_install_driver(args):
+    from miunlock import drivers
+    try:
+        _print_json({"installed": True, "message": drivers.install_usb_driver(lambda t: print(t, file=sys.stderr))})
+    except drivers.DriverError as e:
+        _print_json({"installed": False, "error": str(e)})
+        sys.exit(1)
+
+
 def _cmd_status(args):
     try:
         token = api.login(silent_if_cached=True)
@@ -264,6 +282,12 @@ def main():
                       help="Comma-separated: photos, documents, chats, audio, everything (default: photos,documents).")
     p_bk.add_argument("--serial", help="Device serial, if more than one phone is connected.")
     p_bk.set_defaults(func=_cmd_backup)
+
+    p_tools = sub.add_parser("install-tools", help="Download the latest adb and fastboot from Google (platform-tools).")
+    p_tools.set_defaults(func=_cmd_install_tools)
+
+    p_drv = sub.add_parser("install-driver", help="Windows only: download and install Google's official USB driver (asks for administrator permission).")
+    p_drv.set_defaults(func=_cmd_install_driver)
 
     p_status = sub.add_parser("status", help="Print account + device status as JSON. Never touches fastboot oem unlock.")
     p_status.set_defaults(func=_cmd_status)

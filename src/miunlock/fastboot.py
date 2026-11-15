@@ -1,4 +1,5 @@
 import shutil
+import subprocess
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -29,6 +30,21 @@ def download_platform_tools():
     fastboot_path = tools_dir / ("fastboot.exe" if SYSTEM == "Windows" else "fastboot")
     make_executable(str(fastboot_path))
     return str(fastboot_path)
+
+
+def update_platform_tools():
+    """Download the latest adb and fastboot from Google again (platform-tools), replacing the
+    copy in ~/platform-tools. Returns the folder. A system-wide install is left alone."""
+    tools_dir = Path.home() / "platform-tools"
+    adb = tools_dir / ("adb.exe" if SYSTEM == "Windows" else "adb")
+    if adb.exists():  # a running adb server would keep its file locked on Windows
+        try:
+            subprocess.run([str(adb), "kill-server"], capture_output=True, timeout=10,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except (subprocess.SubprocessError, OSError):
+            pass
+    download_platform_tools()
+    return str(tools_dir)
 
 
 def get_fastboot():

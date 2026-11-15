@@ -13,6 +13,9 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
 - GUI shows device details when a phone is connected: model, codename, Android and HyperOS/MIUI
   version, security patch, bootloader state, battery and a masked serial (fastboot mode shows
   codename, bootloader state and version, and active slot).
+- Official Google downloads: `miunlock install-tools` / *File > Update adb and fastboot*
+  fetches the latest platform-tools, and on Windows `miunlock install-driver` / *File > Install
+  Google USB driver* installs Google's USB driver with pnputil after a UAC prompt.
 - Back up files before unlocking: a **Back up files...** dialog in the GUI and
   `miunlock backup --dest <folder> --only photos,documents` copy photos, documents, chat media,
   audio or all shared storage from a running phone with `adb pull`, plus a list of installed

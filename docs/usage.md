@@ -103,6 +103,19 @@ Copies folders from a phone running Android to your computer with `adb pull`, an
 `installed-apps.txt`. Choices for `--only`: `photos`, `documents`, `chats`, `audio`,
 `everything`. Read-only for the phone; progress goes to stderr and the result is JSON.
 
+### install-tools and install-driver
+
+```sh
+miunlock install-tools     # latest adb and fastboot (Android platform-tools) from dl.google.com
+miunlock install-driver    # Windows: Google's official USB driver, via pnputil (UAC prompt)
+```
+
+`install-tools` replaces the copy in `~/platform-tools`; a system-wide adb/fastboot is left
+alone. `install-driver` logs the download's SHA-256 and installs with Windows' own
+`pnputil`. Google's driver does not list Xiaomi's USB IDs, so if Windows does not use it by
+itself, pick it in Device Manager: *Update driver > Browse my computer > Let me pick >
+Android Device > Android Bootloader Interface*. Both are also in the GUI's **File** menu.
+
 ## GUI
 
 ```sh

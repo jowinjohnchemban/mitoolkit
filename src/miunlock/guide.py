@@ -92,8 +92,12 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
     ]),
     ("Troubleshooting", [
         ("b", "Phone not detected: use a data cable (not charge-only) and another USB port, and "
-              "check the phone shows the fastboot screen. On Windows, install Xiaomi or Google "
-              "USB drivers if it still does not appear."),
+              "check the phone shows the fastboot screen."),
+        ("b", "Windows: File > Install Google USB driver downloads Google's official driver and "
+              "installs it (Windows asks for administrator permission). If the phone still has a "
+              "yellow mark in Device Manager, right-click it > Update driver > Browse my computer > "
+              "Let me pick > Android Device > Android Bootloader Interface."),
+        ("b", "Old or broken adb/fastboot: File > Update adb and fastboot downloads the latest from Google."),
         ("b", "Details button (bottom right): shows what the program is doing. Copy it when "
               "asking for help. It contains no tokens."),
         ("b", "File > Show log file opens the saved log."),
