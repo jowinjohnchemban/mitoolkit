@@ -235,7 +235,7 @@ class Phone:
         if not hasattr(self._dev, "tcpip"):
             raise AdbError("This connection cannot switch the phone to Wi-Fi.")
         if not adb_server.start():
-            raise AdbError("Wi-Fi needs Google's adb (platform-tools), which was not found on this computer.")
+            raise AdbError(adb_server.NEEDS_GOOGLE_ADB)
         try:
             self._dev.tcpip(port)
         except usbio.UsbError as err:

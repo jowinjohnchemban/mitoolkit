@@ -16,6 +16,7 @@ adb/SERVICES.TXT. Nothing leaves this computer.
 from __future__ import annotations
 
 import logging
+import re
 import socket
 import threading
 from typing import Dict, List, Optional
@@ -164,8 +165,9 @@ def _host_command(text: str, timeout: float = 15.0) -> str:
         conn.close()
 
 
-def valid_address(text: str) -> Optional[str]:
-    """"192.168.1.5" or "192.168.1.5:5555" as "host:port", or None when it is not an address."""
+def valid_address(text: str, require_port: bool = False) -> Optional[str]:
+    """"192.168.1.5" or "192.168.1.5:5555" as "host:port", or None when it is not an address.
+    With ``require_port`` the port must be given (pairing ports are different every time)."""
     text = text.strip()
     host, _, port = text.partition(":")
     parts = host.split(".")
@@ -173,7 +175,54 @@ def valid_address(text: str) -> Optional[str]:
         return None
     if port and not (port.isdigit() and 1 <= int(port) <= 65535):
         return None
+    if require_port and not port:
+        return None
     return f"{host}:{port or 5555}"
+
+
+NEEDS_GOOGLE_ADB = "Wi-Fi needs Google's adb (platform-tools), which was not found on this computer."
+
+
+def pair(address: str, code: str) -> str:
+    """Pair with a phone over Wi-Fi (Android 11 or newer, no cable). On the phone: Settings > Developer options >
+    Wireless debugging > Pair device with pairing code. It shows an address with a port and a 6-digit code, both
+    valid only while that screen is open. Pairing makes the phone trust this computer's adb key, so the phone
+    does not ask "Allow debugging?" again. Returns the pairing address. The code is never logged."""
+    target = valid_address(address, require_port=True)
+    if target is None:
+        raise AdbError("Use the pairing address shown on the phone, with its port, like 192.168.1.5:41234.")
+    code = code.strip()
+    if not re.fullmatch(r"\d{6}", code):
+        raise AdbError("The pairing code is the 6 digits shown on the phone.")
+    if not start():
+        raise AdbError(NEEDS_GOOGLE_ADB)
+    try:
+        answer = _host_command(f"host:pair:{code}:{target}", timeout=30.0)
+    except AdbError as err:
+        raise AdbError(f"The phone did not accept the pairing: {err} Open Pair device with pairing code on the "
+                       "phone again and use the new code.") from None
+    logging.getLogger("miunlock.adb").debug("adb pair %s: %s", target, answer)
+    if "successfully paired" not in answer.lower():
+        raise AdbError(answer or "The phone did not accept the pairing code.")
+    return target
+
+
+def mdns_services(timeout: float = 8.0) -> List[Dict[str, str]]:
+    """Phones that announce themselves on the Wi-Fi network: [{"name", "kind", "address"}] with kind "pairing"
+    (the Pair device with pairing code screen is open) or "connect" (Wireless debugging is on). Needs Google's
+    adb server with mDNS; on a network that blocks it nothing is found and the address is typed instead."""
+    if not start():
+        raise AdbError(NEEDS_GOOGLE_ADB)
+    if "unavailable" in _host_command("host:mdns:check", timeout=timeout).lower():
+        raise AdbError("Google's adb cannot look for phones on this network. Type the address shown on the phone.")
+    found = []
+    for line in _host_command("host:mdns:services", timeout=timeout).splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 3 and valid_address(parts[2], require_port=True):
+            kind = "pairing" if "pairing" in parts[1] else "connect" if "connect" in parts[1] else ""
+            if kind:
+                found.append({"name": parts[0], "kind": kind, "address": parts[2].strip()})
+    return found
 
 
 def connect(address: str) -> str:
@@ -183,7 +232,7 @@ def connect(address: str) -> str:
     if target is None:
         raise AdbError("That is not an address. Use the phone's Wi-Fi address, like 192.168.1.5.")
     if not start():
-        raise AdbError("Wi-Fi needs Google's adb (platform-tools), which was not found on this computer.")
+        raise AdbError(NEEDS_GOOGLE_ADB)
     answer = _host_command(f"host:connect:{target}")
     logging.getLogger("mitoolkit.adb").debug("adb server connect %s: %s", target, answer)
     low = answer.lower()

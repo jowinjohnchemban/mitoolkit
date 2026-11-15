@@ -658,8 +658,12 @@ class App:
             return (AMBER, "Another program is using the phone", android.get("advice", ""),
                     self.stop_adb_btn if android.get("adb_running") else None)
         if state == "unauthorized":
+            if ":" in str(android.get("serial", "")):                      # connected over Wi-Fi
+                return (ORANGE_DOT, "Allow debugging on the phone",
+                        "Unlock the phone, tap Allow and tick \"Always allow from this computer\". To skip this "
+                        "prompt for good, pair it once in Phone > Wireless adb.", None)
             return (ORANGE_DOT, "Allow USB debugging on the phone",
-                    "Unlock the phone and tap Allow on the prompt.", None)
+                    "Unlock the phone, tap Allow and tick \"Always allow from this computer\".", None)
         if state == "offline":
             return (ORANGE_DOT, "The phone isn't answering",
                     "Turn USB debugging off and on again, then reconnect it.", None)
