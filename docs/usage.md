@@ -189,7 +189,7 @@ security check, copy details), **View** (text size) and **Help**. Entries that c
 not signed in) are greyed out. The unlock itself is deliberately not in a menu: it erases the phone, so it
 is only reachable through the guarded button. Dialogs open in the centre of the screen.
 Four sections run top to bottom: **Mi Account**, **Phone**, **Eligibility**, **Unlock**. A line
-at the top (**Next: ...**) says what to do now. The status line at the bottom shows the latest
+at the top (**Step 2: ...**, with the number of the step to do now) says what to do next. The status line at the bottom shows the latest
 activity; **File > Activity log** opens the full log.
 
 Keyboard: **Alt** + the underlined letter opens a menu, **F1** guide, **F5** rescan, **Ctrl L** activity log,

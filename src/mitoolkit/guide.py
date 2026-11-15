@@ -33,7 +33,7 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
         ("w", "App data, SMS, contacts and settings are not copied by the file backup."),
     ]),
     ("1. Add your account to the phone", [
-        ("p", "Do this on the phone, before using mitoolkit."),
+        ("p", "Do this on the phone, before using MiToolkit."),
         ("b", "Settings > About phone: tap Build number (or MIUI/OS version) seven times to "
               "turn on Developer options."),
         ("b", "Sign in to the Mi Account you want to use under Settings > Mi Account."),
@@ -46,14 +46,14 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
     ("2. Wait out the waiting period", [
         ("p", "Xiaomi makes you wait before it issues an unlock token. 168 hours (7 days) is "
               "common. While it runs, the check reports error 20036 \"Please unlock N hours "
-              "later\". That is normal, and mitoolkit cannot shorten it."),
+              "later\". That is normal, and MiToolkit cannot shorten it."),
         ("p", "Some HyperOS devices also need permission through the Xiaomi Community app, "
               "which is not offered in every region."),
     ]),
     ("3. Sign in (step 1 in the app)", [
         ("p", "Click Sign in with browser. Xiaomi's own login page opens in your browser. "
               "Sign in there with the same Mi Account you added on the phone."),
-        ("b", "Your password is never typed into mitoolkit."),
+        ("b", "Your password is never typed into MiToolkit."),
         ("b", "The session is saved encrypted and expires after 24 hours. "
               "File > Sign out and delete saved session removes it."),
     ]),

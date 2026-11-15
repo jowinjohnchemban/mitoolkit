@@ -121,7 +121,7 @@ class MenuBar:
 
     def _phone(self, bar: tk.Menu) -> None:
         app, m = self.app, self._menu(bar, "&Phone")
-        self._add(m, "&Rescan", app._rescan, "F5", "F5", enabled=lambda: self._idle())
+        self._add(m, "&Rescan", app._rescan, "F5", "F5", enabled=self._idle)
         m.add_separator()
         self._add(m, "Re&start or power off...", app._restart_dialog,
                   enabled=lambda: self._on_android() or self._in_fastboot())
@@ -170,4 +170,4 @@ class MenuBar:
         m.add_checkbutton(label="Check for updates automatically", variable=self.auto_var, command=lambda: settings.set(
             "auto_update_check", self.auto_var.get()))
         m.add_separator()
-        self._add(m, "&About mitoolkit", app._about)
+        self._add(m, "&About MiToolkit", app._about)

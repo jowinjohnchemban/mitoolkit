@@ -2,7 +2,7 @@
 Nothing touches the network or a real phone."""
 import datetime
 import unittest
-from unittest import mock
+import unittest.mock as mock
 
 from mitoolkit import security
 

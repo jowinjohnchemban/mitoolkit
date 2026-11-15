@@ -140,6 +140,7 @@ class SearchBox(tk.Canvas):
             if self.focus_get() is self._list:
                 return
         except KeyError:
+            # Tk reports a focus widget it has no Python name for (a menu, a popup): treat it as lost focus
             pass
         self._set_focus(False)
         self._close_popup()
@@ -201,6 +202,7 @@ class SearchBox(tk.Canvas):
             try:
                 self._popup.destroy()
             except tk.TclError:
+                # already destroyed with its window
                 pass
             self._popup, self._list, self._shown = None, None, []
 
@@ -257,4 +259,5 @@ class SearchBox(tk.Canvas):
         try:                                                   # the variable outlives this widget
             self.variable.trace_remove("write", self._trace)
         except (tk.TclError, ValueError):
+            # the trace is already off the variable
             pass

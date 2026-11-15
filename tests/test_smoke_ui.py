@@ -9,7 +9,7 @@ import sys
 import time
 import tkinter as tk
 import unittest
-from unittest import mock
+import unittest.mock as mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))

@@ -33,7 +33,7 @@ class UpdateDialog(Dialog):
 
     def build(self) -> None:
         body = self.body
-        ttk.Label(body, text="mitoolkit updates", font=self.fonts.heading).pack(anchor="w")
+        ttk.Label(body, text="MiToolkit updates", font=self.fonts.heading).pack(anchor="w")
         ttk.Label(body, text=f"You have {build.full_version()}", foreground=MUTED).pack(anchor="w")
         self.line = ttk.Label(body, text="Looking for updates...", wraplength=440, justify="left")
         self.line.pack(anchor="w", pady=(12, 0))
@@ -73,7 +73,7 @@ class UpdateDialog(Dialog):
 
     def _show(self, release: updater.Release) -> None:
         if not updater.is_newer(release):
-            self._say(f"mitoolkit is up to date ({release.tag} is the latest).", GREEN)
+            self._say(f"MiToolkit is up to date ({release.tag} is the latest).", GREEN)
             return
         self._say(f"{release.tag} is available.", "")
         if release.notes:
@@ -148,7 +148,7 @@ class UpdateDialog(Dialog):
         try:
             updater.restart(program)
         except OSError as err:
-            self._say(f"Updated, but could not start the new version ({err}). Open mitoolkit again.", RED)
+            self._say(f"Updated, but could not start the new version ({err}). Open MiToolkit again.", RED)
             return
         self.app.root.after(100, self.app.root.destroy)
 

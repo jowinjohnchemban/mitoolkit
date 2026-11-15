@@ -3,8 +3,6 @@ import platform
 import stat
 import subprocess
 
-from mitoolkit.auth.config import console, ORANGE, WHITE, DIM, RED, GREEN
-
 SYSTEM = platform.system()
 # Stops a console window flashing up for every fastboot call when running the
 # windowed GUI on Windows. It is 0 (a no-op) everywhere else.

@@ -531,6 +531,7 @@ class Gauge(tk.Canvas):
         try:
             self.draw()
         except tk.TclError:
+            # the chart was destroyed while this redraw was waiting: there is nothing to draw on
             pass
 
     def draw(self) -> None:

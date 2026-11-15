@@ -1,6 +1,6 @@
 import json
 from mitoolkit.auth.config import CONFIG_URL, console, RED
-from mitoolkit.auth.requester import session, get
+from mitoolkit.auth.requester import get
 from mitoolkit.auth.redact import redact_response
 
 def get_uRegion():

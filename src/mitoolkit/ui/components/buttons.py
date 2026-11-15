@@ -197,6 +197,7 @@ class ModernButton(tk.Canvas):
             try:
                 self.winfo_toplevel().focus_set()
             except tk.TclError:
+                # the window is closing: there is nothing to give the focus to
                 pass
             self.invoke()
 
@@ -215,12 +216,14 @@ class ModernButton(tk.Canvas):
             try:
                 self.after_cancel(self._anim)
             except tk.TclError:
+                # the timer already fired or the window is gone
                 pass
             self._anim = None
         if self._variable is not None:  # take our callback off the variable so it can't keep the window alive
             try:
                 self._variable.trace_remove("write", self._trace)
             except (tk.TclError, ValueError, AttributeError):
+                # the variable or the trace is already gone: nothing left to take off it
                 pass
         self._command = None
 

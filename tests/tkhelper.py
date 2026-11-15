@@ -12,3 +12,4 @@ def make_root(tries: int = 5) -> tk.Tk:
             if "init.tcl" not in str(err) or attempt == tries - 1:
                 raise
             time.sleep(0.2)
+    raise tk.TclError("could not create a Tk root")        # (only reached with tries <= 0)

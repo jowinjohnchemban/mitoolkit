@@ -1,4 +1,5 @@
 """Resource hygiene: background pool, bounded image cache, housekeeping, and nothing left behind."""
+import gc
 import os
 import sys
 import threading

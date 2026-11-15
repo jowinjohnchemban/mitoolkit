@@ -5,7 +5,7 @@ import os
 import sys
 import unittest
 from datetime import date
-from unittest import mock
+import unittest.mock as mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))

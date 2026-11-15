@@ -7,7 +7,7 @@ import struct
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
+import unittest.mock as mock
 
 from mitoolkit import adb_usb, adbkey, bloat, fastboot_usb, usbio
 
@@ -88,7 +88,7 @@ class AdbKeyTests(unittest.TestCase):
             from cryptography.hazmat.primitives import hashes, serialization
             from cryptography.hazmat.primitives.asymmetric import padding, utils
         except ImportError:
-            self.skipTest("cryptography not installed")
+            raise unittest.SkipTest("cryptography not installed")
         key = shared_key()
         loaded = serialization.load_pem_private_key(key.to_pem().encode(), password=None)
         token = os.urandom(20)

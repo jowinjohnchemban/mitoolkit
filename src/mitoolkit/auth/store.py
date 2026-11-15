@@ -102,7 +102,7 @@ def _keyring():
 # --------------------------------------------------------------------- DPAPI
 def _dpapi(data: bytes, protect: bool) -> bytes:
     import ctypes
-    from ctypes import wintypes
+    import ctypes.wintypes as wintypes
 
     class Blob(ctypes.Structure):
         _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
@@ -138,6 +138,7 @@ def save(sid: str, data: dict) -> str:
             (_dir(sid) / "session.json").unlink(missing_ok=True)
             return DPAPI  # encrypted even if the extra ACL step failed
         except Exception:
+            # DPAPI is not available: fall through to the next way of keeping the session safe
             pass
     ok = _write_private(_dir(sid) / "session.json", raw)
     return FILE if ok else FILE_OPEN
@@ -167,6 +168,7 @@ def _load_raw(sid: str) -> Optional[dict]:
             if value:
                 return json.loads(value)
         except Exception:
+            # no credential store, or nothing readable in it: the caller then looks at the session file
             pass
     enc = _dir(sid) / "session.dpapi"
     if os.name == "nt" and enc.exists():
@@ -190,6 +192,7 @@ def delete_files(sid: str) -> None:
         try:
             (_dir(sid) / name).unlink(missing_ok=True)
         except OSError:
+            # deleting is best effort: a file that cannot be removed is left, and the rest are still tried
             pass
 
 
@@ -200,6 +203,7 @@ def delete(sid: str) -> None:
         try:
             kr.delete_password(SERVICE, sid)
         except Exception:
+            # nothing stored there, or no credential store: either way there is nothing left to delete
             pass
     delete_files(sid)
 

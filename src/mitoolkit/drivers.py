@@ -21,12 +21,12 @@ STEPS = [
      "list > Have Disk..., and choose android_winusb.inf in the unzipped folder."),
     ("Pick Android Bootloader Interface when the phone is in fastboot mode, or Android ADB "
      "Interface when it is running Android, and accept the warning."),
-    "Unplug the phone, plug it back in, and click Rescan in mitoolkit.",
+    "Unplug the phone, plug it back in, and click Rescan in MiToolkit.",
 ]
 
 NOTE = ("Google's driver does not list Xiaomi's USB IDs, which is why Windows does not pick it "
         "by itself and you choose it with Have Disk. The steps are Windows' own; nothing is "
-        "installed by mitoolkit.")
+        "installed by MiToolkit.")
 
 
 def supported() -> bool:

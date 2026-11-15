@@ -3,7 +3,7 @@ import functools
 import json
 import sys
 
-from mitoolkit import __version__, adb, api, bloat, build, drivers, log
+from mitoolkit import adb, api, bloat, build, drivers, log
 from mitoolkit.errors import MitoolkitError
 from mitoolkit.unlock import InteractiveUnlock
 
@@ -213,6 +213,7 @@ def _attach_console():
         if sys.stdin is None:
             sys.stdin = stream(-10, "CONIN$", "r", os.O_RDONLY)
     except Exception:
+        # no console to attach to (started from a shortcut, say): carry on without one
         pass
 
 

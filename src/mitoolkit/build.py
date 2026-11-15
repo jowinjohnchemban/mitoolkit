@@ -25,6 +25,7 @@ def info() -> Optional[Tuple[str, str]]:
         from mitoolkit import _build  # written by the release workflow
         return str(_build.DATE), str(_build.COMMIT)
     except (ImportError, AttributeError):
+        # not a release build: the date and commit then come from git, below
         pass
     if getattr(sys, "frozen", False):
         return None

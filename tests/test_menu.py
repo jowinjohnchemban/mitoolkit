@@ -43,7 +43,7 @@ class MenuTests(unittest.TestCase):
                 m = self.root.nametowidget(self.bar.entrycget(i, "menu"))
                 self.app.menubar.refresh()
                 return m
-        self.fail(f"no {name} menu")
+        raise AssertionError(f"no {name} menu")
 
     def test_top_level_menus(self):
         names = [self.bar.entrycget(i, "label") for i in range(self.bar.index("end") + 1)]

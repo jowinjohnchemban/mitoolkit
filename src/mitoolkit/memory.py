@@ -30,7 +30,7 @@ def rss_mb() -> Optional[float]:
     try:
         if sys.platform == "win32":
             import ctypes
-            from ctypes import wintypes
+            import ctypes.wintypes as wintypes
 
             class Counters(ctypes.Structure):
                 _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
@@ -91,6 +91,7 @@ class Housekeeper:
             try:
                 self.root.after_cancel(self._job)
             except Exception:
+                # the window (and its timers) may already be destroyed
                 pass
             self._job = None
 

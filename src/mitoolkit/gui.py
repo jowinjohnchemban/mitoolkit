@@ -187,8 +187,8 @@ class App:
     def _build(self, page) -> None:
         self.next_line = self._wrap(page, "", font=self.fonts.heading)
         self.next_line.pack(anchor="w", pady=(0, 2))
-        self._wrap(page, "Unlocking erases all data on the phone and can't be undone. Back up first "
-                         "(step 2 has a Back up files button).", foreground=MUTED).pack(anchor="w", pady=(0, 10))
+        self._wrap(page, "Unlocking erases all data on the phone and can't be undone. Step 2 has a Back up files "
+                         "button: use it first.", foreground=MUTED).pack(anchor="w", pady=(0, 10))
 
         # 1. Mi Account
         self.f1 = self._section(page, "1. Mi Account")
@@ -418,15 +418,15 @@ class App:
         if self.unlocked:
             return "Done. The bootloader is unlocked."
         if self.token is None:
-            return "Next: sign in to your Mi Account (step 1)."
+            return "Step 1: sign in to your Mi Account."
         state = self._state()
         if self.eligibility and self.eligibility.get("eligible"):
-            return "Next: confirm, then unlock (step 4)."
+            return "Step 4: confirm, then unlock."
         if state == "fastboot":
-            return "Next: check eligibility (step 3)."
+            return "Step 3: check eligibility."
         if state == "device":
-            return "Next: restart the phone into fastboot mode (step 2)."
-        return "Next: connect your phone (step 2)."
+            return "Step 2: restart the phone into fastboot mode."
+        return "Step 2: connect your phone."
 
     def _refresh(self):
         logged = self.token is not None
@@ -1114,7 +1114,7 @@ class App:
 
     def _stop_google_adb(self):
         if not messagebox.askyesno(
-                "Stop Google's adb", "Google's adb server is running and holding the phone, so mitoolkit can't "
+                "Stop Google's adb", "Google's adb server is running and holding the phone, so MiToolkit can't "
                 "use it.\n\nStop it now? It starts again by itself the next time you use adb."):
             return
 
@@ -1244,6 +1244,7 @@ def _enable_dpi_awareness():
         try:
             ctypes.windll.shcore.SetProcessDpiAwareness(1)
         except Exception:
+            # an older Windows without this call: the window is then scaled by the system, which is fine
             pass
 
 
@@ -1270,9 +1271,10 @@ def main():
         log.get("gui").exception("The window stopped with an unexpected error")
         sys.stdout, sys.stderr = saved
         try:
-            messagebox.showerror("mitoolkit", f"mitoolkit hit an unexpected problem and has to close.\n\n{err}\n\n"
-                                             f"Details were saved to {log.log_path()}.")
+            messagebox.showerror("MiToolkit", f"MiToolkit hit an unexpected problem and has to close.\n\n{err}\n\n"
+                                              f"Details were saved to {log.log_path()}.")
         except tk.TclError:
+            # the window system itself is gone: the error is already in the log file
             pass
     finally:
         guard.stop()

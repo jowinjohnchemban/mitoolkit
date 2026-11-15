@@ -199,6 +199,7 @@ class ExeBackend(Backend):
         try:
             self._run("reboot", *([mode] if mode else []), serial=serial, timeout=15)
         except FastbootError:
+            # the phone leaves fastboot before the program can answer
             pass
 
 

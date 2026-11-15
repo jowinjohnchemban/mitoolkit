@@ -53,7 +53,7 @@ class ThemeChoiceTests(unittest.TestCase):
     ALL = ("alt", "aqua", "clam", "classic", "default", "vista", "winnative")
 
     def pick(self, platform, names=ALL):
-        from unittest import mock
+        import unittest.mock as mock
         with mock.patch.object(t.sys, "platform", platform):
             return t.native_theme_name(names)
 
@@ -73,10 +73,9 @@ class TextSizeTests(unittest.TestCase):
             import tkinter as tk
             root = tk.Tk()
         except Exception:
-            self.skipTest("no display")
+            raise unittest.SkipTest("no display")
         try:
             root.withdraw()
-            from tkinter import font as tkfont
             t.apply_theme(root)
             fonts = t.Fonts(root)
             body = t.named_font("TkDefaultFont", root)
