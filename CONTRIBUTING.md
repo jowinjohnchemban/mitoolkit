@@ -80,6 +80,15 @@ The Release workflow builds the programs for Windows, Linux and macOS and the Py
 skipped, so pushing again does nothing. The running app's updater (Help > Check for updates) installs from
 that release and verifies the download against `SHA256SUMS.txt`, so keep that file in every release.
 
+### Signing (Windows SmartScreen)
+
+An unsigned Windows program makes SmartScreen show "Windows protected your PC". Signing it with a code-signing
+certificate (an OV or EV certificate from a certificate authority) is the only way to avoid that. To turn
+signing on, add two repository secrets (Settings > Secrets and variables > Actions): `WINDOWS_CERT_PFX_BASE64`
+(the `.pfx` file, base64-encoded) and `WINDOWS_CERT_PASSWORD`. The Release workflow then signs and verifies
+`miunlock.exe` before it is checksummed and published; without the secrets it builds unsigned. A new OV
+certificate still needs some downloads to build reputation; an EV certificate is trusted at once.
+
 ## License
 
 By contributing you agree that your contributions are licensed under the

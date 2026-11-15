@@ -136,9 +136,14 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 Get-FileHash .\miunlock-windows-x64.exe -Algorithm SHA256
 ```
 
-The programs are **not code-signed**, so Windows SmartScreen or macOS Gatekeeper may
-warn, and some antivirus tools flag programs made with PyInstaller. If that worries
-you, install from source instead. On Linux the GUI also needs Tk on the system
+**Windows SmartScreen.** SmartScreen warns about any program it has not seen many times, and trusts one
+only when it is code-signed with a certificate it knows or has built up a reputation. The Windows program
+has proper file properties (product, version, publisher name) but is **not code-signed until a signing
+certificate is added to the repository** (see CONTRIBUTING.md > Signing), so you may see "Windows protected
+your PC". Check the download against `SHA256SUMS.txt` as above, then choose **More info > Run anyway**.
+Updating from inside miunlock (Help > Check for updates) downloads the new program without the web-download
+mark, so it does not trigger the warning again. macOS Gatekeeper may warn in the same way, and some antivirus
+tools flag programs made with PyInstaller. If that worries you, install from source instead. On Linux the GUI also needs Tk on the system
 (for example `sudo apt install python3-tk`). The macOS build is for Apple silicon.
 
 ## Install from a local clone

@@ -62,7 +62,10 @@ class SkeletonTests(unittest.TestCase):
         bar.pack(fill="x")
         run(self.root, 0.2)
         bar.stop()
-        run(self.root, 0.3)
+        for _ in range(30):                                   # a slow machine needs more than a fixed wait
+            run(self.root, 0.1)
+            if not self.skeleton.clock._watching and self.skeleton.clock._job is None:
+                break
         self.assertEqual(len(self.skeleton.clock._watching), 0)
         self.assertIsNone(self.skeleton.clock._job)
 

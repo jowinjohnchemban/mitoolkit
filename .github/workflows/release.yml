@@ -67,10 +67,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: windows-latest, tag: windows-x64, ext: .exe, mode: --windowed}
+          - {os: windows-latest, tag: windows-x64, ext: .exe, mode: --windowed, extra: --version-file packaging/version_info.txt}
           - {os: ubuntu-24.04,  tag: linux-x64,   ext: "", mode: --console}
           - {os: macos-latest,   tag: macos-arm64, ext: "", mode: --console}
     runs-on: ${{ matrix.os }}
+    env:
+      # Optional code-signing certificate (a .pfx, base64) in the repository secrets. Without it the
+      # Windows program is built unsigned and Windows SmartScreen will warn about it.
+      CERT: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -86,8 +90,25 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y python3-tk
       - name: Install
         run: python -m pip install . pyinstaller
+      - name: Windows version information (shown in the file's properties)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: python packaging/make_version_file.py > packaging/version_info.txt
       - name: Build
-        run: pyinstaller --onefile ${{ matrix.mode }} --name miunlock --icon assets/icon.ico --collect-data miunlock --collect-all libusb_package --hidden-import usb.backend.libusb1 --hidden-import PIL._tkinter_finder packaging/app.py
+        run: pyinstaller --onefile ${{ matrix.mode }} ${{ matrix.extra }} --name miunlock --icon assets/icon.ico --collect-data miunlock --collect-all libusb_package --hidden-import usb.backend.libusb1 --hidden-import PIL._tkinter_finder packaging/app.py
+      - name: Sign the Windows program (when a certificate is configured)
+        if: runner.os == 'Windows' && env.CERT != ''
+        shell: pwsh
+        env:
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          [IO.File]::WriteAllBytes("cert.pfx", [Convert]::FromBase64String($env:CERT))
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1).FullName
+          & $signtool sign /f cert.pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /d "miunlock" dist\miunlock.exe
+          if ($LASTEXITCODE -ne 0) { throw "signing failed" }
+          & $signtool verify /pa dist\miunlock.exe
+          if ($LASTEXITCODE -ne 0) { throw "signature check failed" }
+          Remove-Item cert.pfx
       - name: Smoke test
         shell: bash
         run: |
@@ -131,7 +152,7 @@ jobs:
             echo "- \`.whl\` / \`.tar.gz\`: Python packages (\`pip install <file>\`)"
             echo "- \`SHA256SUMS.txt\`: verify downloads with \`sha256sum -c SHA256SUMS.txt\`"
             echo
-            echo "The executables are unsigned, so Windows SmartScreen and macOS Gatekeeper may warn."
+            echo "Windows SmartScreen and macOS Gatekeeper may warn about a program they have not seen before (more so if it is not code-signed). Check the download against SHA256SUMS.txt, then choose More info > Run anyway on Windows. Updating from inside the app does not trigger the warning."
             echo "Antivirus tools sometimes flag PyInstaller programs. If you prefer, install from source."
             echo "Unlocking erases the device: read docs/safety.md first."
           } >> notes.md
