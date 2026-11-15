@@ -52,6 +52,15 @@ from mitoolkit.ui.theme import (AMBER, GREEN, MUTED, ORANGE_DOT, RED, Fonts, app
 POLL_MS = 1000           # how often the window looks for the phone: an unplugged phone shows within a second
 WIFI_PROBE_S = 12       # in Wireless mode: how often the network is searched for phones
 AGENT_CONNECTED_S = 120  # the status bar says an AI agent is connected for this long after it last used a tool
+AGENT_DOING = {"list_devices": "looking for phones", "reboot_to_fastboot": "restarting the phone into fastboot mode",
+               "login": "signing in", "check_eligibility": "checking eligibility with Xiaomi",
+               "security_check": "running the security check", "device_details": "reading the phone's details",
+               "connections": "reading the phone's connections", "doctor": "checking the setup",
+               "read_log": "reading the log", "version": "reading the version"}
+AGENT_DONE = {"list_devices": "looking for phones", "reboot_to_fastboot": "restarting the phone",
+              "login": "signing in", "check_eligibility": "checking eligibility", "security_check": "the security check",
+              "device_details": "reading the details", "connections": "reading the connections",
+              "doctor": "checking the setup", "read_log": "reading the log", "version": "reading the version"}
 INFO_REFRESH_S = 15     # how often the basic phone details (battery, storage, ...) are read again
 MORE_REFRESH_S = 20      # and the extra details (Wi-Fi, uptime, ...) while Show more is open
 
@@ -110,6 +119,7 @@ class App:
         self._agent_calls: deque = deque(maxlen=20)       # (time, tool) of what agents used, newest last
         self._agent_last = -1e9                           # when an agent last connected or used a tool (monotonic seconds)
         self._agent_asking = False                        # an agent is waiting for the person to answer a question
+        self._agent_active = 0                            # tools an agent is running now
         self._shown_layout = None               # what the Phone section holds now (see _render_status)
         self._info_names: tuple = ()            # the labels of the details grid, and its value cells
         self._info_cells: list = []
@@ -1058,7 +1068,7 @@ class App:
         from mitoolkit import mcp_http                       # not loaded until an agent is allowed in
         if self._agent is None:
             self._agent = mcp_http.McpHttpServer(approve=self._agent_approve, on_call=self._agent_called,
-                                                 on_client=self._agent_met).start()
+                                                 on_client=self._agent_met, on_done=self._agent_done).start()
             self._log("AI agent connection is on. Agents can read and check; unlocking is not offered to them.")
             self._agent_tick()
         return self._agent
@@ -1075,7 +1085,41 @@ class App:
         self._agent_calls.append((time.strftime("%H:%M:%S"), tool))
         self._agent_last = time.monotonic()
         self._log(f"{self._agent_name()} used {tool}.")
-        self.call_soon(self._agent_status)
+        self.call_soon(self._agent_working, tool, True)
+
+    def _agent_working(self, tool: str, start: bool, data=None, failed: bool = False) -> None:
+        """The window follows what an agent does (UI thread). When it starts a tool the status bar says what it is
+        doing, with the progress bar; when it finishes the window shows the result the way it would for the person:
+        a new look at the phone, the Security Check colour, the eligibility answer."""
+        self._agent_status()
+        who = self._agent_name()
+        if start:
+            self._agent_active += 1
+            if not self.busy:
+                self.progress.pack(side="right", padx=10)
+                self.progress.start(12)
+                self._set_status(f"{who} is {AGENT_DOING.get(tool, 'using ' + tool)}")
+            return
+        self._agent_active = max(0, self._agent_active - 1)
+        if not self._agent_active and not self.busy:
+            self.progress.stop()
+            self.progress.pack_forget()
+            self._set_status(f"{who} finished {AGENT_DONE.get(tool, tool)}." if not failed
+                             else f"{who}'s request did not go through.")
+        if failed or not isinstance(data, dict):
+            return
+        if tool in ("list_devices", "reboot_to_fastboot"):
+            self._info.clear()                               # look at the phone again at once, as Rescan does
+            if not self.busy and not self._polling:
+                self._scan()
+        elif tool == "security_check" and data.get("verdict") and self._android_serial():
+            self.security_result(self._android_serial(), str(data["verdict"]))
+        # Eligibility is deliberately not copied into step 3: the unlock step uses Xiaomi's answer with fields an agent never
+        # receives, and unlocking is a person's decision. The person presses Check Eligibility to see it themselves.
+
+    def _agent_done(self, tool: str, data, failed: bool) -> None:
+        """An agent's tool finished (called on the server's thread)."""
+        self.call_soon(self._agent_working, tool, False, data, failed)
 
     def _agent_met(self, name: str) -> None:
         """An agent said who it is when it connected (called on the server's thread)."""

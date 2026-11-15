@@ -81,6 +81,32 @@ class ServerTests(unittest.TestCase):
         client.post({"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {}})
         self.assertEqual(server.client, "Claude Code")                      # one that gives no name keeps the last one
 
+    def test_the_app_hears_what_each_tool_returned_and_whether_it_failed(self):
+        done = []
+        _, client = self.start(on_done=lambda tool, data, failed: done.append((tool, data, failed)))
+        client.call("version")
+        fake = {"list_devices": ("x", mcp._SCHEMA_NONE, lambda a: (_ for _ in ()).throw(RuntimeError("boom")))}
+        with mock.patch.dict(mcp.TOOLS, fake):
+            client.call("list_devices")
+        client.post({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "nope"}})   # an unknown tool
+        self.assertEqual([(t, f) for t, _d, f in done], [("version", False), ("list_devices", True), ("nope", True)])
+        self.assertFalse(done[0][1]["can_unlock"])
+        self.assertEqual(done[1][1], {"error": "RuntimeError"})                    # never a traceback
+
+    def test_a_window_that_fails_to_update_does_not_fail_the_agents_call(self):
+        def broken(*_args):
+            raise ValueError("window gone")
+        _, client = self.start(on_done=broken)
+        status, body, _ = client.call("version")
+        self.assertEqual(status, 200)
+        self.assertNotIn("error", body)
+
+    def test_a_declined_call_is_not_reported_as_done(self):
+        done = []
+        _, client = self.start(approve=lambda t, a: False, on_done=lambda *a: done.append(a))
+        client.call("reboot_to_fastboot")
+        self.assertEqual(done, [])
+
     def test_a_request_needs_the_token(self):
         _, client = self.start()
         ping = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
@@ -348,6 +374,61 @@ class AppTests(unittest.TestCase):
         self.assertIsNone(self.app._agent)
         self.assertEqual((d.address.get(), d.token.get()), ("", ""))
         d.close()
+
+    def test_the_window_says_what_an_agent_is_doing_and_when_it_is_done(self):
+        app = self.app
+        app.agent_start()
+        app._agent.client = "Claude Code"
+        app._agent_working("security_check", True)
+        self.assertEqual(app.status.cget("text"), "Claude Code is running the security check")
+        self.assertTrue(app.progress.winfo_manager())                              # the progress bar runs meanwhile
+        app._agent_working("security_check", False, {"verdict": "Needs attention"})
+        self.assertEqual(app.status.cget("text"), "Claude Code finished the security check.")
+        self.assertFalse(app.progress.winfo_manager())
+        app._agent_working("device_details", True)
+        app._agent_working("device_details", False, None, True)                    # a failed call says so
+        self.assertEqual(app.status.cget("text"), "Claude Code's request did not go through.")
+
+    def test_the_window_does_not_overwrite_what_it_is_busy_with(self):
+        app = self.app
+        app.agent_start()
+        app._set_busy(True, "Backing up files")
+        app._agent_working("version", True)
+        self.assertEqual(app.status.cget("text"), "Backing up files")
+        app._agent_working("version", False, {})
+        self.assertEqual(app.status.cget("text"), "Backing up files")
+        app._set_busy(False)
+
+    def test_a_security_check_by_an_agent_colours_the_security_button(self):
+        app = self.app
+        app.agent_start()
+        app.android = {"serial": "X", "state": "device", "model": "POCO M2 Pro"}
+        app._agent_working("security_check", False, {"verdict": "Needs attention"})
+        self.assertEqual(app._security["X"], "Needs attention")
+        self.assertEqual(app.security_btn.kind, "danger")
+
+    def test_devices_and_a_reboot_by_an_agent_make_the_window_look_at_the_phone_again(self):
+        app = self.app
+        app.agent_start()
+        app._info["X"] = {"model": "old"}
+        app._polling = False
+        with mock.patch.object(app, "_scan") as scan:
+            app._agent_working("list_devices", False, {"android": []})
+            app._agent_working("reboot_to_fastboot", False, {"ok": True})
+        self.assertEqual(scan.call_count, 2)
+        self.assertEqual(app._info, {})                                           # read afresh, as Rescan does
+
+    def test_an_agents_eligibility_answer_is_never_copied_into_step_3(self):
+        """Unlocking is a person's decision and uses Xiaomi's answer with fields an agent never receives."""
+        app = self.app
+        app.agent_start()
+        app.token = {"userId": "1"}
+        before = app.eligibility
+        with mock.patch.object(app, "_check_done") as shown:
+            app._agent_working("check_eligibility", False, {"eligible": True, "product": "gram"})
+        shown.assert_not_called()
+        self.assertIs(app.eligibility, before)
+        self.assertEqual(str(app.unlock_btn.cget("state")), "disabled")
 
     def test_what_agents_used_is_listed_in_the_window(self):
         from mitoolkit.ui.agent_dialog import AgentDialog
