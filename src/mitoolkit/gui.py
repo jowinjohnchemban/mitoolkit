@@ -1059,7 +1059,7 @@ class App:
         if self._agent is None:
             self._agent = mcp_http.McpHttpServer(approve=self._agent_approve, on_call=self._agent_called,
                                                  on_client=self._agent_met).start()
-            self._log("AI agent connection is on. Agents can read and check; they cannot unlock.")
+            self._log("AI agent connection is on. Agents can read and check; unlocking is not offered to them.")
             self._agent_tick()
         return self._agent
 

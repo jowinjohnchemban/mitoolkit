@@ -283,6 +283,22 @@ class AppTests(unittest.TestCase):
         self.assertLess(app.agent_box.winfo_rootx(), app.link_info.winfo_rootx())   # left of how the phone is connected
         self.assertIn("AI agent connected", app.agent_info.cget("text"))             # no name given: a plain one
 
+    def test_the_activity_lines_about_agents_are_not_shown_as_errors(self):
+        """"They cannot unlock" turned the line red: the Activity log colours any line with "cannot" as a problem."""
+        from mitoolkit.ui.activity_window import kind_of
+        self.app.agent_start()
+        queued = []
+        while not self.app.q.empty():
+            queued.append(self.app.q.get_nowait())
+        self.app._agent.client = "Claude Code"
+        self.app._agent_called("list_devices")
+        self.app._agent_met("Claude Code")
+        while not self.app.q.empty():
+            queued.append(self.app.q.get_nowait())
+        lines = [rest[0] for kind, *rest in queued if kind == "log"]
+        self.assertTrue(len(lines) >= 3, lines)
+        self.assertEqual([kind_of(line) for line in lines], [""] * len(lines), lines)
+
     def test_a_second_start_gives_the_same_server_and_stop_is_safe_twice(self):
         first = self.app.agent_start()
         self.assertIs(self.app.agent_start(), first)
