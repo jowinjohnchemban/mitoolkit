@@ -5,14 +5,15 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from mitoolkit import mcp_http
 from mitoolkit.ui.base import Dialog
 from mitoolkit.ui.components.buttons import Button
 from mitoolkit.ui.theme import GREEN, MUTED
 
 WRAP = 460
-NOTE = ("Let an AI agent, such as Claude, use this MiToolkit: it can read what the phone reports and run the checks "
-        "on the phone that is connected here. It cannot unlock the phone. Anything that changes the phone, or uses "
-        "your saved sign-in, asks you first in this window.")
+NOTE = ("Let an AI agent, or any program that speaks MCP, use this MiToolkit: it can read what the phone reports and "
+        "run the checks on the phone that is connected here. It cannot unlock the phone. Anything that changes the "
+        "phone, or uses your saved sign-in, asks you first in this window.")
 WARNING = ("The token changes every time you turn this on. Anyone who has it can use these tools while this is on, "
            "so keep it to yourself. It works on this computer only.")
 
@@ -53,13 +54,17 @@ class AgentDialog(Dialog):
             button = Button(form, text="Copy", command=lambda v=var, w=what: self._copy(v.get(), w))
             button.grid(row=i, column=2, padx=(8, 0), pady=3)
             self.copy_buttons.append(button)
+        # one choice and one button: the settings text for the client you use (any MCP client reads the first)
         more = ttk.Frame(body)
         more.pack(fill="x", pady=(8, 0))
-        self.claude_btn = Button(more, text="Copy Claude Code Command", command=self._copy_command)
-        self.claude_btn.pack(side="left")
-        self.json_btn = Button(more, text="Copy JSON Settings", command=self._copy_json)
-        self.json_btn.pack(side="left", padx=8)
-        self.copy_buttons += [self.claude_btn, self.json_btn]
+        ttk.Label(more, text="Settings For").pack(side="left", padx=(0, 10))
+        self.format = tk.StringVar(value=mcp_http.FORMATS[0][1])
+        self.format_box = ttk.Combobox(more, textvariable=self.format, state="readonly", width=26,
+                                       values=[name for _key, name in mcp_http.FORMATS])
+        self.format_box.pack(side="left")
+        self.settings_btn = Button(more, text="Copy Settings", command=self._copy_settings)
+        self.settings_btn.pack(side="left", padx=8)
+        self.copy_buttons.append(self.settings_btn)
         ttk.Label(body, text=WARNING, foreground=MUTED, wraplength=WRAP, justify="left").pack(anchor="w", pady=(10, 0))
 
         ttk.Label(body, text="Recent Use", font=self.fonts.bold).pack(anchor="w", pady=(12, 2))
@@ -118,12 +123,13 @@ class AgentDialog(Dialog):
         self.win.clipboard_append(text)
         self.copied.configure(text=f"Copied {what}.")
 
-    def _copy_command(self) -> None:
+    def _copy_settings(self) -> None:
+        """Copy the settings text for the chosen client."""
         server = self._server()
-        if server is not None:
-            self._copy(server.claude_code_command(), "the Claude Code command")
-
-    def _copy_json(self) -> None:
-        server = self._server()
-        if server is not None:
-            self._copy(server.json_settings(), "the JSON settings")
+        if server is None:
+            return
+        name = self.format.get()
+        key = next((k for k, label in mcp_http.FORMATS if label == name), mcp_http.FORMATS[0][0])
+        self._copy(server.settings(key), f"the settings for {name}")
+        if key in mcp_http.FORMAT_NOTES:
+            self.copied.configure(text=mcp_http.FORMAT_NOTES[key])

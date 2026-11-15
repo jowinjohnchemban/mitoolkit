@@ -29,18 +29,29 @@ If you only have the Python package, use `"command": "python", "args": ["-m", "m
 
 `mitoolkit --mcp` starts a separate program. To use the MiToolkit window that is already open, with its phone,
 saved session and settings, a person turns on **Help > AI Agent Connection > Turn On**. The app then listens on
-`127.0.0.1` (this computer only) at an address and with a secret token it shows, with **Copy Claude Code Command** and
-**Copy JSON Settings** buttons:
+`127.0.0.1` (this computer only) at an address and with a secret token it shows. Any program that speaks MCP over
+HTTP can use it. Choose the client under **Settings For** and press **Copy Settings**:
 
-```sh
-claude mcp add --transport http mitoolkit http://127.0.0.1:PORT/mcp --header "Authorization: Bearer TOKEN"
-```
+| Settings for | What you get |
+|---|---|
+| Any MCP Client (JSON) | The standard `mcpServers` entry (`type`, `url`, `headers`): most clients, including Cursor and Claude Desktop's custom connectors |
+| Claude Code (Command) | `claude mcp add --transport http mitoolkit URL --header "Authorization: Bearer TOKEN"` |
+| VS Code (JSON) | The same entry for `mcp.json`, where the list is called `servers` |
+| Clients That Start a Program (Command) | `npx -y mcp-remote URL --header ...`, for clients that can only run a command (they talk over stdin and stdout) and not call an address |
+| ChatGPT and OpenAI API (JSON) | The `mcp` tool entry for the Responses API, with `require_approval` set to `always` |
+| Test with curl (Command) | A `curl` line that asks for the tool list, to try it with no client |
+
+**ChatGPT and the OpenAI API** make the call from OpenAI's servers, so they can only reach an address that is public on
+the internet; a `127.0.0.1` address works for clients that run on this computer. To use ChatGPT you would have to put
+this address behind a tunnel or a proxy you trust. Anyone who can reach it and has the token can use the tools while it
+is on, so do that only with care. Clients that run on this computer (Claude Code, Codex, Cursor, VS Code and the like)
+need nothing more.
 
 - It is off until switched on and stops when switched off or when the app closes. The token changes every time.
 - The tools are the same as below. Those that change something (`reboot_to_fastboot`) or use the saved session
   (`login`) show a question in the app, with the agent's name, and run only if the person answers Allow. No answer is a no.
-- The window follows what an agent does. While a tool runs the status bar says what it is doing ("Claude Code is
-  running the security check") with the progress bar, and says when it is done. A device or reboot call makes the window
+- The window follows what an agent does. While a tool runs the status bar says what it is doing (for example "Cursor is
+  running the security check", with the agent's own name) with the progress bar, and says when it is done. A device or reboot call makes the window
   look at the phone again at once, and a security check colours the Security Check button, as if you had run it.
   Xiaomi's eligibility answer is deliberately not copied into step 3: unlocking is a person's decision, so you press
   Check Eligibility yourself.

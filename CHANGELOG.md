@@ -48,6 +48,11 @@ pull request titles (see CONTRIBUTING.md); the full, generated notes of each rel
   either kind of name. Apps from v1.5.0 and earlier look for the old names, so they cannot self-update to a release with
   versioned names: download it once from the release page (or Check for Updates > Download).
 
+- AI Agent Connection is not tied to one product: choose the client under Settings For (any MCP client, Claude Code,
+  VS Code, a program-starting bridge, ChatGPT and the OpenAI API, or a curl test) and copy its settings. ChatGPT and
+  OpenAI call from the internet, so they need a public address (the agents guide says how it works).
+- A live status test no longer fails now and then on a busy runner.
+
 ### Added
 - MCP in the app: Help > AI Agent Connection lets an AI agent use the running MiToolkit (local address and secret token,
   off until turned on). Changing things asks the person first, unlocking is never offered, and the status bar shows the
