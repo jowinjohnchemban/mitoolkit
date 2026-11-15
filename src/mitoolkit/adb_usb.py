@@ -257,6 +257,27 @@ _reg_lock = threading.Lock()
 _real_serials: Dict[str, str] = {}      # Wi-Fi address -> the phone's own serial
 
 
+_placed: Dict[str, str] = {}            # serial -> USB port, found once (the phone does not move while it is plugged in)
+
+
+def _lone_location(wired: List[str]) -> Dict[str, str]:
+    """The USB port of the one cable phone, when adb's device list does not say. libusb lists the adb interfaces and
+    where each is plugged in; with exactly one cable phone and exactly one interface that is that phone. With
+    several phones it is not known which is which, so nothing is guessed."""
+    if len(wired) != 1:
+        return {}
+    serial = wired[0]
+    if serial not in _placed:
+        try:
+            spots = [spot for spot in (usbio.location(dev) for dev, _intf in usbio.find(ADB)) if spot]
+        except usbio.UsbError:
+            return {}                                  # no USB access (libusb missing): the footer just says USB
+        if len(spots) != 1:
+            return {}
+        _placed[serial] = spots[0]
+    return {serial: _placed[serial]}
+
+
 def _scan_server() -> List[Dict[str, str]]:
     from mitoolkit import adb_server
     found = adb_server.devices()
@@ -278,7 +299,10 @@ def _scan_server() -> List[Dict[str, str]]:
     # A phone plugged in AND on Wi-Fi shows up twice: keep the USB entry (fastboot needs the cable anyway)
     wired = {s for s in _devices if not is_wireless(s)}
     out = []
-    places = adb_server.usb_locations() if any(not is_wireless(d["serial"]) for d in found) else {}
+    cable = [d["serial"] for d in found if not is_wireless(d["serial"])]
+    places = adb_server.usb_locations() if cable else {}
+    if cable and not any(serial in places for serial in cable):
+        places.update(_lone_location(cable))          # adb's list does not always say which port a phone is on
     for d in found:
         dev = _devices[d["serial"]]
         if dev.wireless and d["state"] == "device" and wired:

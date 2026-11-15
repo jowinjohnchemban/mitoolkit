@@ -14,7 +14,7 @@ COLOUR = {doctor.OK: GREEN, doctor.INFO: MUTED, doctor.WARN: AMBER, doctor.FAIL:
 
 
 class DoctorDialog(Dialog):
-    title = "Check and fix problems"
+    title = "Check and Fix Problems"
     size = "600x560"
     min_size = (480, 360)
     padding = 16
@@ -29,17 +29,17 @@ class DoctorDialog(Dialog):
 
     def build(self) -> None:
         body = self.body
-        ttk.Label(body, text="Check and fix problems", font=self.fonts.heading).pack(anchor="w")
-        self.summary = ttk.Label(body, text="Looking...", foreground=MUTED, wraplength=540, justify="left")
+        ttk.Label(body, text="Check and Fix Problems", font=self.fonts.heading).pack(anchor="w")
+        self.summary = ttk.Label(body, text="Looking", foreground=MUTED, wraplength=540, justify="left")
         self.summary.pack(anchor="w", pady=(2, 10))
         self.rows = ttk.Frame(body)
         self.rows.pack(fill="both", expand=True)
         buttons = ttk.Frame(body)
         buttons.pack(fill="x", pady=(12, 0))
         Button(buttons, text="Close", command=self.close).pack(side="right")
-        self.fix_all = Button(buttons, text="Fix what is safe", primary=True, command=self._fix_safe)
+        self.fix_all = Button(buttons, text="Fix What Is Safe", primary=True, command=self._fix_safe)
         self.fix_all.pack(side="right", padx=6)
-        Button(buttons, text="Check again", command=self._look).pack(side="right")
+        Button(buttons, text="Check Again", command=self._look).pack(side="right")
 
     # ----------------------------------------------------------------------------------------- looking
     def _work(self, job, then) -> None:
@@ -67,7 +67,7 @@ class DoctorDialog(Dialog):
         self.win.after(120, poll)
 
     def _look(self) -> None:
-        self.summary.configure(text="Looking...", foreground=MUTED)
+        self.summary.configure(text="Looking", foreground=MUTED)
         self._work(doctor.run, self._show)
 
     def _show(self, result) -> None:
@@ -117,7 +117,7 @@ class DoctorDialog(Dialog):
 
     def _fix_one(self, check: doctor.Check) -> None:
         if check.needs_admin:
-            self.summary.configure(text="Waiting for your answer to the administrator prompt...", foreground=MUTED)
+            self.summary.configure(text="Waiting for your answer to the administrator prompt", foreground=MUTED)
         self._work(lambda: doctor.apply([check], include_decisions=True), self._after_fix)
 
     def _fix_safe(self) -> None:

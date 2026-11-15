@@ -143,7 +143,7 @@ class SmokeTests(unittest.TestCase):
         self.assertFalse(self.app.more_box.winfo_ismapped())
         self.app._toggle_more()                                   # expand again: same widgets, no rebuild
         self.assertEqual(self.app.more_box.winfo_children(), first)
-        self.assertEqual(self.app.more_btn.cget("text"), "Show less")
+        self.assertEqual(self.app.more_btn.cget("text"), "Show Less")
         self.assertClean()
 
     def test_rescan_gives_feedback_and_recovers_from_a_stuck_scan(self):
@@ -152,7 +152,7 @@ class SmokeTests(unittest.TestCase):
         self.app._polling = True
         self.app._scan_started = time.monotonic()                  # a scan is running now
         self.app._rescan()
-        self.assertEqual(self.app.status.cget("text"), "Already looking for the phone...")
+        self.assertEqual(self.app.status.cget("text"), "Already looking for the phone.")
         self.app._scan_started = time.monotonic() - 60             # ...but it has been stuck for a minute
         with mock.patch.object(self.app, "_scan") as scan:
             self.app._rescan()

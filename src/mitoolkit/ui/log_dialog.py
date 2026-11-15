@@ -44,7 +44,7 @@ def keep(row: Tuple[str, str, str, str], level: str, needle: str) -> bool:
 
 
 class LogDialog(Dialog):
-    title = "Log viewer"
+    title = "Log Viewer"
     size = "980x680"
     min_size = (640, 420)
 
@@ -61,7 +61,7 @@ class LogDialog(Dialog):
         head.pack(fill="x")
         ttk.Label(head, text=f"{self.name or 'Phone'}: system log", font=self.fonts.heading).pack(side="left")
         Button(head, text="Copy", icon="copy", command=self.copy).pack(side="right")
-        Button(head, text="Save...", icon="save", command=self.save).pack(side="right", padx=(0, 8))
+        Button(head, text="Save", icon="save", command=self.save).pack(side="right", padx=(0, 8))
         self.refresh_btn = Button(head, text="Refresh", icon="refresh", command=self.reload)
         self.refresh_btn.pack(side="right", padx=(0, 8))
         ttk.Label(body, text="The phone's recent log, newest last. Reading only. Logs can contain personal "
@@ -105,7 +105,7 @@ class LogDialog(Dialog):
                                  label="Reading the log")
         self.text.pack_forget()
         self._loading.pack(fill="x", pady=(4, 0))
-        self.note.configure(text="Reading the log from the phone...")
+        self.note.configure(text="Reading the log from the phone")
 
         def work():
             return adb.logcat(self.serial, 3000)
@@ -127,7 +127,7 @@ class LogDialog(Dialog):
             self.rows = parse_log(str(result))
             self.show()
 
-        self.app.run(work, done, "Reading the phone's log...")
+        self.app.run(work, done, "Reading the phone's log")
 
     def _tags(self) -> List[str]:
         """The tags in the log, most frequent first (what is most likely worth searching for)."""

@@ -29,11 +29,11 @@ QR_STEPS = ("1.  On the phone open Settings > Developer options > Wireless debug
             "2.  Tap Pair device with QR code.\n"
             "3.  Scan the code shown here.")
 CODE_STEPS = ("On the phone open Settings > Developer options > Wireless debugging > Pair device with pairing code, "
-              "and keep that screen open. Then press Find phones, or type the address and the 6-digit code it shows.")
+              "and keep that screen open. Then press Find Phones, or type the address and the 6-digit code it shows.")
 
 
 class WirelessDialog(Dialog):
-    title = "Wi-Fi connection"
+    title = "Wi-Fi Connection"
     resizable = False
     padding = 16
 
@@ -53,7 +53,7 @@ class WirelessDialog(Dialog):
         self.result.pack(side="left", fill="x", expand=True)
         ttk.Separator(body).pack(side="bottom", fill="x")
 
-        ttk.Label(body, text="Wi-Fi connection", font=self.fonts.heading).pack(anchor="w")
+        ttk.Label(body, text="Wi-Fi Connection", font=self.fonts.heading).pack(anchor="w")
         ttk.Label(body, text=NOTE, foreground=MUTED, wraplength=WRAP, justify="left").pack(anchor="w", pady=(2, 10))
 
         # what is connected now, with the one action that fits it (hidden when there is none)
@@ -66,9 +66,9 @@ class WirelessDialog(Dialog):
         ttk.Separator(body).pack(fill="x", pady=12)
         head = ttk.Frame(body)
         head.pack(fill="x")
-        ttk.Label(head, text="Pair a new phone", font=self.fonts.bold).pack(side="left")
+        ttk.Label(head, text="Pair a New Phone", font=self.fonts.bold).pack(side="left")
         self.method = tk.StringVar(value="qr")
-        self.method_bar = segmented(head, [("qr", "QR code"), ("code", "Pairing code")], self.method, self._show_method)
+        self.method_bar = segmented(head, [("qr", "QR Code"), ("code", "Pairing Code")], self.method, self._show_method)
         self.method_bar.pack(side="right")
         ttk.Label(body, foreground=MUTED, wraplength=WRAP, justify="left",
                   text="Needs Android 11 or newer. Pairing is needed once: after it the phone trusts this computer and "
@@ -83,7 +83,7 @@ class WirelessDialog(Dialog):
         self.panels.pack_propagate(False)
 
         ttk.Separator(body).pack(fill="x", pady=12)
-        ttk.Label(body, text="Connect by address", font=self.fonts.bold).pack(anchor="w")
+        ttk.Label(body, text="Connect by Address", font=self.fonts.bold).pack(anchor="w")
         line = ttk.Frame(body)
         line.pack(fill="x", pady=(6, 0))
         self.address = tk.StringVar()
@@ -93,7 +93,7 @@ class WirelessDialog(Dialog):
         placeholder(entry, self.address, "192.168.1.xx")
         self.connect_btn = Button(line, text="Connect", command=self._connect)
         self.connect_btn.pack(side="left", padx=8)
-        ttk.Label(line, text="the phone's address; it must be paired already", foreground=MUTED).pack(side="left")
+        ttk.Label(line, text="The phone's address. It must be paired already.", foreground=MUTED).pack(side="left")
         self._refresh()
         self._show_method()
         self.win.after(60, self._focus_first)
@@ -109,7 +109,7 @@ class WirelessDialog(Dialog):
         ttk.Label(side, text=QR_STEPS, wraplength=WRAP - self._qr_px - 24, justify="left").pack(anchor="w")
         buttons = ttk.Frame(side)
         buttons.pack(anchor="w", pady=(14, 0))
-        self.qr_show = Button(buttons, text="Show QR code", primary=True, command=self._pair_qr)
+        self.qr_show = Button(buttons, text="Show QR Code", primary=True, command=self._pair_qr)
         self.qr_show.pack(side="left")
         self.qr_cancel = Button(buttons, text="Cancel", command=self._qr_stop)
         self.qr_note = ttk.Label(side, foreground=MUTED, wraplength=WRAP - self._qr_px - 24, justify="left")
@@ -121,15 +121,15 @@ class WirelessDialog(Dialog):
         ttk.Label(self.code_panel, foreground=MUTED, wraplength=WRAP, justify="left", text=CODE_STEPS).pack(anchor="w")
         find = ttk.Frame(self.code_panel)
         find.pack(fill="x", pady=(10, 0))
-        self.find_btn = Button(find, text="Find phones", command=self._find)
+        self.find_btn = Button(find, text="Find Phones", command=self._find)
         self.find_btn.pack(side="left")
         pair = ttk.Frame(self.code_panel)
         pair.pack(fill="x", pady=(10, 0))
         self.pair_address = tk.StringVar()
         self.pair_code = tk.StringVar()
         only_digits = (self.win.register(lambda value: value == "" or (value.isdigit() and len(value) <= 6)), "%P")
-        ttk.Label(pair, text="Pairing address").grid(row=0, column=0, sticky="w")
-        ttk.Label(pair, text="Pairing code").grid(row=0, column=1, sticky="w", padx=(12, 0))
+        ttk.Label(pair, text="Pairing Address").grid(row=0, column=0, sticky="w")
+        ttk.Label(pair, text="Pairing Code").grid(row=0, column=1, sticky="w", padx=(12, 0))
         pair_entry = ttk.Entry(pair, textvariable=self.pair_address, width=24)
         pair_entry.grid(row=1, column=0, sticky="w")
         self.code_entry = ttk.Entry(pair, textvariable=self.pair_code, width=9, validate="key", validatecommand=only_digits)
@@ -238,14 +238,14 @@ class WirelessDialog(Dialog):
                 def enabled(target) -> str:
                     self.app.use_wireless()
                     return f"Connected over Wi-Fi at {target}. You can unplug the USB cable now (not for fastboot)."
-                self._work("Switching the phone to Wi-Fi...", phone.enable_wireless, enabled)
+                self._work("Switching the phone to Wi-Fi", phone.enable_wireless, enabled)
         elif self._mode == "disconnect":
             serial = self.app._android_serial()
 
             def drop() -> str:
                 adb_server.disconnect(serial)
                 return serial
-            self._work("Disconnecting...", drop, lambda s: f"Disconnected {s}.")
+            self._work("Disconnecting", drop, lambda s: f"Disconnected {s}.")
 
     def _find(self) -> None:
         """Look for phones that announce Wireless debugging or the pairing screen, and fill the addresses in."""
@@ -264,7 +264,7 @@ class WirelessDialog(Dialog):
             return ("No phone found. Open Pair device with pairing code on the phone and keep it open, or type "
                     "the address shown there. Some networks hide phones from this computer (a PC on a cable and a "
                     "phone on Wi-Fi often cannot see each other): typing the address always works.")
-        self._work("Looking for phones on this Wi-Fi network...", adb_server.mdns_services, found, rescan=False)
+        self._work("Looking for phones on this Wi-Fi network", adb_server.mdns_services, found, rescan=False)
 
     def _pair(self) -> None:
         address, code = self.pair_address.get(), self.pair_code.get()
@@ -278,7 +278,7 @@ class WirelessDialog(Dialog):
         def paired(result) -> str:
             self.pair_code.set("")                         # the code works once; do not leave it on screen
             return self._paired_message(result)
-        self._work("Pairing...", lambda: self._connect_announced(adb_server.pair(address, code)), paired)
+        self._work("Pairing", lambda: self._connect_announced(adb_server.pair(address, code)), paired)
 
     @staticmethod
     def _connect_announced(target: str, wait: float = 30.0, poll: float = 1.5):
@@ -343,7 +343,7 @@ class WirelessDialog(Dialog):
         def done(result) -> str:
             self._qr_reset()
             return self._paired_message(result)
-        self._work("Waiting for the phone to scan the code...", pair_by_scan, done, on_error=self._qr_reset)
+        self._work("Waiting for the phone to scan the code", pair_by_scan, done, on_error=self._qr_reset)
 
     def _qr_stop(self) -> None:
         if self._qr_stop_event is not None:
@@ -364,7 +364,7 @@ class WirelessDialog(Dialog):
         c, n = self.qr_canvas, self._qr_px
         c.delete("all")
         c.create_rectangle(8, 8, n - 8, n - 8, outline="#c3c8d0", dash=(5, 4), width=2)
-        c.create_text(n / 2, n / 2, text="The QR code\nappears here", fill="#6b7280", justify="center",
+        c.create_text(n / 2, n / 2, text="The QR Code\nAppears Here", fill="#6b7280", justify="center",
                       font=self.fonts.base)
 
     def draw_qr(self, text: str) -> None:
@@ -400,5 +400,5 @@ class WirelessDialog(Dialog):
         def connected(target) -> str:
             self.app.use_wireless()
             return f"Connected over Wi-Fi at {target}."
-        label = "Connecting..." if ":" in text else "Looking for the phone's port, a few seconds..."
+        label = "Connecting" if ":" in text else "Looking for the phone's port, which takes a few seconds"
         self._work(label, lambda: adb_server.connect(text), connected)

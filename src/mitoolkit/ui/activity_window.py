@@ -51,7 +51,7 @@ class ActivityLog:
 
 
 class ActivityWindow(Dialog):
-    title = "MiToolkit activity"
+    title = "MiToolkit Activity"
     size = "820x380"
     min_size = (480, 220)
     padding = 0

@@ -143,7 +143,7 @@ Read-only check of a phone running Android, printed as JSON:
   (keyboards and plug-ins have no icon).
 
 It is not an antivirus; keep Google Play Protect on. The GUI has the same check under
-**Security check...** in step 2.
+**Security Check** in step 2.
 
 ### details
 
@@ -179,7 +179,7 @@ mitoolkit doctor --no-phone     # leave the USB bus alone
 Checks Python and the window toolkit, USB access (libusb), the adb key, the saved Mi Account session's
 permissions, the settings file, files left by an update, the log file, Google's adb, and any connected phone
 (waiting for you to allow it, not answering, held by another program, missing driver). Each problem says what
-is wrong in plain words. In the window it is **Help > Check and fix problems...**.
+is wrong in plain words. In the window it is **Help > Check and Fix Problems**.
 
 **Safe fixes** run by themselves at start-up (listed in the Activity log) and with `--fix`: making the adb key
 and the saved session private to you, resetting a damaged settings file (the old one is kept as `.damaged`),
@@ -217,8 +217,8 @@ security check, copy details), **View** (text size) and **Help**. Entries that c
 not signed in) are greyed out. The unlock itself is deliberately not in a menu: it erases the phone, so it
 is only reachable through the guarded button. Dialogs open in the centre of the screen.
 Four sections run top to bottom: **Mi Account**, **Phone**, **Eligibility**, **Unlock**. A line
-at the top (**Step 2: ...**, with the number of the step to do now) says what to do next. The status line at the bottom shows the latest
-activity; **File > Activity log** opens the full log.
+at the top (for example **Step 2: Connect your phone.**, with the number of the step to do now) says what to do next. The status line at the bottom shows the latest
+activity; **File > Activity Log** opens the full log.
 
 Keyboard: **Alt** + the underlined letter opens a menu, **F1** guide, **F5** rescan, **Ctrl L** activity log,
 **Ctrl +** / **Ctrl -** / **Ctrl 0** text size (up to 200%), **Ctrl Q** quit (**Command** instead of Ctrl on macOS), **Esc** closes a dialog, **Tab** moves between controls, **Space** ticks an
@@ -237,12 +237,12 @@ Handy features:
 - The numbered badges are grey (not yet), orange (do this next) and green (done).
 - Connected phones show their details (model, versions, bootloader state, battery). **Copy
   info** copies them, **Rescan** looks again, and a tip appears if no phone shows up for 20 s.
-- **Back up files...** copies photos, documents, chat media and more from a phone that is on.
-- **Manage apps...**: tabs for Suggested, All preinstalled, Installed by you and Removed;
+- **Back Up Files** copies photos, documents, chat media and more from a phone that is on.
+- **Manage Apps**: tabs for Suggested, All preinstalled, Installed by you and Removed;
   ratings in plain words (Safe to remove, Optional, Caution, Keep, Unknown); a panel that
   explains the selected app; one button that says what it will do ("Remove 3 apps").
-- **Security check...**: the read-only check described under `security-check`.
-- **Connections...** (step 2, or Phone > Connections and signal) is for debugging Wi-Fi, mobile data and
+- **Security Check**: the read-only check described under `security-check`.
+- **Connections** (step 2, or Phone > Connections and signal) is for debugging Wi-Fi, mobile data and
   calls. It reads (nothing is changed) and shows, in tabs: a **Summary** of what looks wrong and what to
   try (airplane mode, weak or crowded Wi-Fi, Wi-Fi with no internet or no DNS, no SIM or a locked SIM,
   no mobile service, poor or noisy mobile signal, roaming, mobile data with no internet), with graphs of
@@ -254,7 +254,7 @@ Handy features:
   using). **Network test** sends a few small pings from the phone (router, 8.8.8.8, a name lookup): the
   one thing here that sends traffic, and only when pressed. Android's dump formats differ between
   phones, so a value the phone does not report is simply left out.
-- **Phone > Log viewer...** shows the phone's recent system log (logcat), colouring errors and
+- **Phone > Log Viewer** shows the phone's recent system log (logcat), colouring errors and
   warnings, with a level filter, a search box, Refresh, Copy and Save. Read-only. Logs can contain
   personal details, so check them before sharing.
 - **Show more** (under the device details) reads everything the phone gives over USB, in sections:
@@ -273,7 +273,7 @@ Handy features:
   The IMEI comes from the phone's own properties or its telephony service; if Android blocks it over
   USB the row says so (dial *#06# on the phone). The serial number is shown in full. These values
   stay on screen: nothing is sent anywhere, and **Copy details** copies them only if you press it.
-- **Live status...** (Phone menu) is a dashboard in the style of Grafana and Apache ECharts: one
+- **Live Status** (Phone menu) is a dashboard in the style of Grafana and Apache ECharts: one
   reading a second, in four tabs (Ctrl+1 to Ctrl+4):
   - **Overview**: ring gauges (processor, GPU where the phone reports it, memory, battery, storage)
     coloured by threshold, with the state in words (Normal, High, Critical), then a card for each graph
@@ -281,7 +281,8 @@ Handy features:
     load, 45 and 60 °C). Point at a graph for a tooltip with the exact value. The time range (1 min up
     to 1 hr) is at the top right, on this tab only.
   - **SoC** (the chip that runs the phone): the processor, the graphics chip (GPU) and the memory (RAM),
-    each with its load, speed and temperature (the hottest sensor of that part, with Normal, Warm or Hot), then
+    each with its load, speed and temperature (the highest reading among that part's sensors, with Normal, Warm
+    or Hot), then
     every processor core with its own trend, usage and speed, labelled Performance or Efficiency where the
     phone has both.
   - **Sensors**: every thermal sensor the phone lets us read, hottest first, with Normal, Warm or Hot.
@@ -289,17 +290,17 @@ Handy features:
     search, and filter to apps, apps and system, or everything. Read-only: nothing can be stopped here.
   Each list has a page to itself, so the window never holds two scrollbars. A **Live** marker shows
   whether readings are arriving; **Pause** freezes them and **Copy snapshot** copies the latest numbers.
-- **Copy details** and **Export details...** (the two small icons at the top of the Phone section, next to the
+- **Copy details** and **Export Details** (the two small icons at the top of the Phone section, next to the
   USB | Wi-Fi selector and **Rescan**: point at an icon to see its name) copy or save the device details, plus the
   extra details once they are read, as text, CSV (for a spreadsheet) or Markdown (for a bug report). The files
   contain the serial number and, in the extra details, the IMEI: you choose where they go.
-- **Restart or power off...** (Phone menu, and **Restart phone...** in fastboot mode) is one place to pick
+- **Restart or Power Off** (Phone menu, and **Restart Phone** in fastboot mode) is one place to pick
   Android, recovery mode, fastboot mode or power off. In fastboot mode it offers **Cancel and start Android**
   and recovery mode, so you can leave without unlocking. Nothing is erased by any of them.
-- **Security check...** takes a colour as soon as a phone is connected, from a quick check that stays on the
+- **Security Check** takes a colour as soon as a phone is connected, from a quick check that stays on the
   phone and the computer (patch age, verified boot, encryption, Play Protect). The full check, which asks OSV
   and looks at apps, replaces it and goes deeper. Green means nothing found, amber review, red needs attention.
-- **Back up files...** can be run again on the same folder: files already there (same size and time) are
+- **Back Up Files** can be run again on the same folder: files already there (same size and time) are
   skipped, every copy is written under a temporary name and checked against the size the phone reported, a
   failed file is retried, and anything that still fails is listed in `backup-problems.txt` in the backup folder.
 - **Sign out** (Mi Account section, or File menu) deletes the saved session on this computer.
@@ -310,16 +311,19 @@ Handy features:
   Android Studio or a terminal may be using it. In `~/.mitoolkit/settings.json`, `"stop_any_adb_on_exit": true`
   stops that one too, and `"stop_adb_on_exit": false` stops none. A phone connected over Wi-Fi is disconnected
   when the adb server stops, so reconnect it the next time.
-- **Help > Check for updates...** shows what is new in the latest release. For the single-file program from
-  the Releases page, **Install and restart** downloads the update, checks it against the release's
-  `SHA256SUMS.txt`, swaps it in and starts it again; a pip or source install is pointed to the release page
-  instead. Once a day the app also looks quietly and says in the status line when there is a newer version;
+- **Help > Check for Updates** shows what is new in the latest release, and when there is a newer one offers
+  three things. For the single-file program from the Releases page, **Install and restart** downloads the update,
+  checks it against the release's `SHA256SUMS.txt`, swaps it in and starts it again. **Download only** (or
+  **Download**, for a pip or source install, which cannot replace itself) saves the release file for your system
+  in your Downloads folder, named with its version (`mitoolkit-windows-x64-v1.4.0.exe`), checks it against the
+  same checksum and installs nothing; **Show in folder** then opens it. **Release page** opens the release on
+  GitHub. Once a day the app also looks quietly and says in the status line when there is a newer version;
   turn that off with **Help > Check for updates automatically**. Versions read `v1.0.0 (build: DDMMYYYY-commit)`:
   the release number, then the date and short id of the commit it was built from (shown in the title bar,
   About and `mitoolkit --version`).
 - **Debug logging** (Help menu, `--debug`, or `MITOOLKIT_DEBUG=1`) adds step-by-step lines to `mitoolkit.log`:
   each adb and fastboot request with its timing, scans, connections. Tokens stay hidden. Off by default.
-- **Wi-Fi connection...** (Phone menu) uses the phone over Wi-Fi instead of a cable. With the phone plugged
+- **Wi-Fi Connection** (Phone menu) uses the phone over Wi-Fi instead of a cable. With the phone plugged
   in once, **Switch to Wi-Fi** switches its adb to the network and connects; after that you can
   unplug it. A phone already set up for wireless debugging can be connected by its address (for example
   `192.168.1.xx`). It needs Google's `adb` (platform-tools) on this computer, because mitoolkit's own adb

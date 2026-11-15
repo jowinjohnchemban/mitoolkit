@@ -270,7 +270,7 @@ def check_phone() -> List[Check]:
             reason = d.get("reason") or usbio.BUSY
             fix, label = None, ""
             if reason == usbio.BUSY and "adb" in usbio.blocking_programs():
-                fix, label = (lambda: with_admin("stop-adb")), "Stop Google's adb"
+                fix, label = (lambda: with_admin("stop-adb")), "Stop Google's ADB"
             elif reason == usbio.NO_PERMISSION and sys.platform.startswith("linux"):
                 fix, label = (lambda: with_admin("udev-rules")), "Allow USB access"
             out.append(Check(f"phone-{serial}", f"{name} cannot be opened", WARN, usbio.no_access_advice(reason),

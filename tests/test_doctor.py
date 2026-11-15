@@ -143,7 +143,7 @@ class PhoneCheckTests(unittest.TestCase):
     def test_a_phone_held_by_googles_adb_offers_to_stop_it_but_only_when_asked(self):
         with mock.patch.object(usbio, "blocking_programs", return_value=["adb"]):
             check = self.phone({"serial": "X", "state": "no-access", "reason": usbio.BUSY})[0]
-        self.assertEqual((check.status, check.safe, check.fix_label), (WARN, False, "Stop Google's adb"))
+        self.assertEqual((check.status, check.safe, check.fix_label), (WARN, False, "Stop Google's ADB"))
 
     def test_a_missing_driver_has_advice_but_no_automatic_fix(self):
         check = self.phone({"serial": "X", "state": "no-access", "reason": usbio.NO_DRIVER})[0]

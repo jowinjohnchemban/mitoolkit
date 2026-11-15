@@ -1,6 +1,7 @@
 """What MiToolkit puts away when it closes, so it never leaves the phone held behind it.
 
 * the files it keeps open (the log file, crash.log) are flushed and closed, last of all;
+* the AI agent connection (MCP in the app), if it is on, is stopped first, so no agent is using a phone while it closes;
 * its own USB connections to phones (adb) are closed;
 * any Google ``fastboot`` it started and that is still running is stopped;
 * the Google adb server it started (for Wi-Fi) is stopped. A server that was already running when MiToolkit
@@ -24,6 +25,12 @@ def _close_usb() -> str:
     module = sys.modules.get("mitoolkit.adb_usb")
     count = module.close_all() if module else 0
     return f"Closed {count} USB connection(s) to phones." if count else ""
+
+
+def _stop_agents() -> str:
+    """The AI agent connection (MCP in the app): agents lose it the moment the window closes."""
+    module = sys.modules.get("mitoolkit.mcp_http")
+    return module.stop_all() if module else ""
 
 
 def _stop_fastboot() -> str:
@@ -52,7 +59,7 @@ def _close_files() -> None:
     logging.shutdown()          # flushes and closes every log handler, so the log file is released (Windows can then move it)
 
 
-STEPS: List[Callable[[], str]] = [_close_usb, _stop_fastboot, _stop_adb]
+STEPS: List[Callable[[], str]] = [_stop_agents, _close_usb, _stop_fastboot, _stop_adb]
 
 
 def run() -> List[str]:

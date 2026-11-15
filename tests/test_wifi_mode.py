@@ -218,7 +218,7 @@ class WindowTests(unittest.TestCase):
                 menu = self.root.nametowidget(bar.entrycget(i, "menu"))
                 labels += [menu.entrycget(j, "label") for j in range(menu.index("end") + 1) if menu.type(j) == "command"]
         self.assertNotIn("Show log file", labels)
-        self.assertIn("Activity log", labels)
+        self.assertIn("Activity Log", labels)
 
     def test_the_wireless_window_offers_both_ways_to_pair(self):
         from mitoolkit.ui.wireless_dialog import WirelessDialog
@@ -314,6 +314,41 @@ class WindowTests(unittest.TestCase):
         self.app.android = dict(base, serial="6a81a217")                               # a cable phone
         pairs = dict(self.app._device_pairs())
         self.assertEqual((pairs["Serial"], pairs["Wi-Fi address"]), ("6a81a217", None))
+
+    def test_a_cable_plugged_in_while_on_wifi_switches_to_usb_instead_of_saying_nothing_answers(self):
+        """With the selector on Wi-Fi only a stale offline entry was left, and the window said the phone was not
+        answering although it was plugged in."""
+        app = self.app
+        app.link_var.set("wifi")
+        app._link_mode = "wifi"
+        with mock.patch.object(adb_server, "stop_started") as stop:
+            app._cable_plugged_in()
+        self.assertEqual((app.link_var.get(), app._link_mode), ("usb", "usb"))
+        stop.assert_not_called()                      # the cable is used through whatever adb is already running
+        queued = []
+        while not app.q.empty():
+            queued.append(app.q.get_nowait())
+        self.assertTrue(any(kind == "log" and "plugged in with a USB cable" in str(rest[0])
+                            for kind, *rest in queued), queued)            # and the Activity log says why
+        app._cable_plugged_in()                       # already on USB: nothing changes
+        self.assertEqual(app.link_var.get(), "usb")
+
+    def test_a_phone_on_wifi_is_told_up_front_that_fastboot_needs_a_cable(self):
+        self.app.android = {"serial": "192.168.1.5:39865", "state": "device", "model": "POCO M2 Pro"}
+        _colour, _headline, detail, _button = self.app._status_for("device")
+        self.assertIn("USB cable", detail)
+        self.app.android = {"serial": "6a81a217", "state": "device", "model": "POCO M2 Pro"}
+        _colour, _headline, detail, _button = self.app._status_for("device")
+        self.assertNotIn("Wi-Fi", detail)                                        # a cable phone gets the plain text
+
+    def test_the_wifi_search_does_not_hide_a_cable_phone_that_is_ready(self):
+        from mitoolkit import adb
+        cable = {"serial": "6a81a217", "state": "device", "link": "USB port 2-8"}
+        stale = {"serial": "192.168.1.5:39865", "state": "offline", "link": "Wi-Fi 192.168.1.5:39865"}
+        with mock.patch.object(adb, "devices", return_value=[cable, stale]):
+            self.assertEqual(self.app._adb_devices(True), [stale])           # Wi-Fi mode lists only Wi-Fi entries ...
+            ready = [d for d in adb.devices() if d["state"] == "device"]
+        self.assertEqual(ready, [cable])                                      # ... and the cable one is what it falls back to
 
     def test_a_refresh_with_new_readings_updates_the_text_in_place(self):
         """Every refresh used to tear the details down and build them again: a visible flicker."""

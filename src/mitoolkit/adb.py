@@ -53,7 +53,7 @@ _PROPS = {
 BACKUP_SETS = {
     "photos": ("Photos and videos", ["/sdcard/DCIM", "/sdcard/Pictures", "/sdcard/Movies"]),
     "documents": ("Documents and downloads", ["/sdcard/Documents", "/sdcard/Download"]),
-    "chats": ("Chat app media (WhatsApp, Telegram, ...)",
+    "chats": ("Chat app media (WhatsApp, Telegram, and others)",
               ["/sdcard/WhatsApp", "/sdcard/Android/media", "/sdcard/Telegram"]),
     "audio": ("Music and recordings", ["/sdcard/Music", "/sdcard/Recordings", "/sdcard/MIUI/sound_recorder"]),
     "everything": ("Everything in shared storage (can be very large)", ["/sdcard"]),
@@ -336,7 +336,7 @@ class _Backup:
         if mode == 0:
             self.skipped.append(remote)  # not on this phone
             return
-        self.log(f"Copying {remote} ...")
+        self.log(f"Copying {remote}")
         root = remote.rstrip("/")
         base = self.target / root.rsplit("/", 1)[-1]
         for path, _mode, size, mtime in sync.walk(remote):
@@ -353,7 +353,7 @@ class _Backup:
                 self.files += 1
                 self.in_a_row = 0
                 if self.files % 50 == 0:
-                    self.log(f"{self.files} files, {self.bytes / 1e6:.0f} MB copied ...")
+                    self.log(f"{self.files} files, {self.bytes / 1e6:.0f} MB copied")
             except AdbError as err:
                 if self._stop():
                     return

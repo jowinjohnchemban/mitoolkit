@@ -163,6 +163,51 @@ def download(release: Release, dest: Path, progress: Callable[[int, int], None] 
     return dest
 
 
+# ------------------------------------------------------------------- download without installing
+def downloads_folder() -> Path:
+    """Where a downloaded release goes: the person's Downloads folder, or their home folder if there is none."""
+    folder = Path.home() / "Downloads"
+    return folder if folder.is_dir() else Path.home()
+
+
+def download_name(release: Release) -> str:
+    """The file name a downloaded release is saved under: the version is in it, so an older download is never
+    overwritten ("mitoolkit-windows-x64-v1.4.0.exe")."""
+    stem, dot, suffix = (asset_name() or "mitoolkit").partition(".")
+    return f"{stem}-{release.tag}{dot}{suffix}"
+
+
+def download_to(release: Release, folder: Path, progress: Callable[[int, int], None] = lambda _d, _t: None,
+                cancel: Optional[threading.Event] = None) -> Path:
+    """Download this system's program from the release into ``folder`` (checked against SHA256SUMS.txt, like an
+    update) without installing or replacing anything. Returns the saved file. A download of the same version made
+    before is replaced."""
+    dest = folder / download_name(release)
+    part = dest.with_name(dest.name + ".part")
+    try:
+        download(release, part, progress, cancel)
+        os.replace(part, dest)
+        if sys.platform != "win32":
+            os.chmod(dest, 0o700)                      # a program saved from the web is not executable by default: yours only
+    except OSError as err:
+        part.unlink(missing_ok=True)
+        raise UpdateError(f"Could not save it in {folder} ({err.strerror or err.__class__.__name__}).") from None
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
+    return dest
+
+
+def reveal(path: Path) -> None:
+    """Show ``path`` in the system's file manager (selected, where the system can)."""
+    if sys.platform == "win32":
+        subprocess.Popen(["explorer", f"/select,{path}"])
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path.parent)])
+
+
 # ------------------------------------------------------------------------------------------- the swap
 def old_copy(exe: Path) -> Path:
     return exe.with_name(exe.name + ".old")

@@ -98,7 +98,7 @@ class WindowTests(unittest.TestCase):
         d = RestartDialog(self.app)
         self.assertEqual(d.choice.get(), "android")
         d.choice.set("off")
-        self.assertEqual(d.go.cget("text"), "Power off")
+        self.assertEqual(d.go.cget("text"), "Power Off")
         d.close()
         self.app.android, self.app.device = None, "FB1"
         d = RestartDialog(self.app)

@@ -199,6 +199,25 @@ class LinkTests(unittest.TestCase):
         self.assertEqual(describe_link("192.168.1.5:39865"), "Wi-Fi 192.168.1.5:39865")
         self.assertTrue(describe_link("adb-6a81a217-xyz._adb-tls-connect._tcp").startswith("Wi-Fi"))
 
+    def test_the_port_of_the_one_cable_phone_comes_from_libusb_when_adbs_list_does_not_say(self):
+        """Newer adb leaves the usb: field out of its device list; libusb still knows where the phone is plugged in."""
+        from mitoolkit import adb_usb
+
+        class Dev:
+            bus, port_numbers = 2, (8,)
+        adb_usb._placed.clear()
+        self.addCleanup(adb_usb._placed.clear)
+        with mock.patch.object(usbio, "find", return_value=[(Dev(), None)]) as find:
+            self.assertEqual(adb_usb._lone_location(["6a81a217"]), {"6a81a217": "2-8"})
+            self.assertEqual(adb_usb._lone_location(["6a81a217"]), {"6a81a217": "2-8"})
+        self.assertEqual(find.call_count, 1)                                        # found once, not on every scan
+        adb_usb._placed.clear()
+        with mock.patch.object(usbio, "find", return_value=[(Dev(), None), (Dev(), None)]):
+            self.assertEqual(adb_usb._lone_location(["6a81a217"]), {})              # two interfaces: not guessed
+        self.assertEqual(adb_usb._lone_location(["a", "b"]), {})                    # two phones: not guessed
+        with mock.patch.object(usbio, "find", side_effect=usbio.UsbError("no libusb")):
+            self.assertEqual(adb_usb._lone_location(["6a81a217"]), {})              # no USB access: the footer says USB
+
     def test_the_usb_location_is_the_bus_and_the_chain_of_hub_ports(self):
         class Dev:
             bus, port_numbers = 1, (2, 4)
