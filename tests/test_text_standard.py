@@ -8,7 +8,6 @@ The scan reads every string in the program's source (not docstrings or comments)
 fails here instead of reaching a window.
 """
 import ast
-import os
 import re
 import sys
 import unittest

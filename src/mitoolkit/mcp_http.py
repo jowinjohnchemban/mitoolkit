@@ -177,31 +177,36 @@ class McpHttpServer:
 
             def do_POST(self) -> None:
                 if self.path.split("?", 1)[0] != PATH:
-                    return self._refuse(404, "Not found.")
+                    self._refuse(404, "Not found.")
+                    return
                 ok, status, reason = self._allowed()
                 if not ok:
-                    return self._refuse(status, reason, {"WWW-Authenticate": "Bearer"} if status == 401 else None)
+                    self._refuse(status, reason, {"WWW-Authenticate": "Bearer"} if status == 401 else None)
+                    return
                 try:
                     length = int(self.headers.get("Content-Length") or 0)
                 except ValueError:
-                    return self._refuse(400, "Bad length.")
+                    self._refuse(400, "Bad length.")
+                    return
                 if length <= 0 or length > MAX_BODY:
-                    self.close_connection = True
-                    return self._refuse(413 if length > MAX_BODY else 400, "The request is empty or too large.")
+                    self._refuse(413 if length > MAX_BODY else 400, "The request is empty or too large.")
+                    return
                 raw = self.rfile.read(length)
                 try:
                     payload = json.loads(raw)
                 except ValueError:
-                    return self._send(200, json.dumps({"jsonrpc": "2.0", "id": None,
-                                                       "error": {"code": -32700, "message": "Parse error"}}).encode())
+                    error = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}
+                    self._send(200, json.dumps(error).encode())
+                    return
                 if isinstance(payload, list):                   # a batch: answer each request, skip notifications
                     replies = [r for r in (server.dispatch(m) for m in payload) if r is not None]
                     reply: Any = replies or None
                 else:
                     reply = server.dispatch(payload)
                 if reply is None:
-                    return self._send(202)                       # only notifications: accepted, nothing to say
-                self._send(200, json.dumps(reply).encode())
+                    self._send(202)                              # only notifications: accepted, nothing to say
+                else:
+                    self._send(200, json.dumps(reply).encode())
 
             def _not_offered(self) -> None:
                 self._refuse(405, "Only POST is offered.", {"Allow": "POST"})
