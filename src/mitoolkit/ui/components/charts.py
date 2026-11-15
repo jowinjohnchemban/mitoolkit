@@ -494,6 +494,7 @@ class Gauge(tk.Canvas):
         self.percent: Optional[float] = None
         self.caption = ""
         self.state_text = ""
+        self.n_a = False                     # the phone does not report this value (see set_unavailable)
         self.loading = True                  # a skeleton ring shows until the first reading
         self._draw_job: Optional[str] = None
         self._fit()
@@ -517,9 +518,18 @@ class Gauge(tk.Canvas):
             return (CRIT_COLOUR, "Critical") if percent <= crit else (WARN_COLOUR, "Low") if percent <= warn else (OK_COLOUR, "Normal")
         return (CRIT_COLOUR, "Critical") if percent >= crit else (WARN_COLOUR, "High") if percent >= warn else (OK_COLOUR, "Normal")
 
+    def set_unavailable(self, state: str, caption: str = "") -> None:
+        """The phone does not report this value: an empty ring that says so in words, not a skeleton that looks like
+        it is still loading."""
+        self.percent, self.caption, self.state_text, self.n_a = None, caption, state, True
+        self._queue_draw()
+
     def set(self, percent: Optional[float], caption: str = "") -> None:
-        self.percent, self.caption = percent, caption
+        self.percent, self.caption, self.n_a = percent, caption, False
         self.state_text = self.level(percent)[1] if percent is not None else ""
+        self._queue_draw()
+
+    def _queue_draw(self) -> None:
         if self._draw_job is None:  # one draw when idle, however many updates arrive first
             try:
                 self._draw_job = self.after_idle(self._draw_now)
@@ -547,7 +557,18 @@ class Gauge(tk.Canvas):
         cx, ring = w / 2, self.RING
         top = 14
         box = (cx - ring / 2 + 6, top + 6, cx + ring / 2 - 6, top + ring - 6)
-        self.loading = self.percent is None
+        self.loading = self.percent is None and not self.n_a
+        if self.n_a:  # the phone does not report it: an empty ring, a dash, and the words
+            c.create_arc(*box, start=225, extent=-270, style="arc", outline=GRID, width=11)
+            c.create_text(cx, top + ring / 2, text="-", fill=AXIS_TEXT, font=f.heading)
+            y = top + ring + 4
+            c.create_text(cx, y, text=self.title, anchor="n", fill=TEXT, font=f.bold)
+            y += f.bold.metrics("linespace") + 1
+            c.create_text(cx, y, text=self.state_text, anchor="n", fill=AXIS_TEXT, font=f.bold)
+            y += f.bold.metrics("linespace")
+            c.create_text(cx, y, text=self.caption, anchor="n", fill=AXIS_TEXT, font=f.small, width=w - 20,
+                          justify="center")
+            return
         if self.loading:  # a shimmering skeleton ring and text bars while we wait for the first reading
             clock.watch(self)
             c.create_arc(*box, start=225, extent=-270, style="arc", outline=bar_colour(0.5), width=11)

@@ -132,7 +132,7 @@ class MenuBar:
         self._add(m, "C&onnections and signal...", app._connect_dialog, enabled=self._on_android)
         self._add(m, "Log v&iewer...", app._log_dialog, enabled=self._on_android)
         m.add_separator()
-        self._add(m, "&Wireless adb...", app._wireless_dialog, enabled=self._idle)
+        self._add(m, "&Wi-Fi connection...", app._wireless_dialog, enabled=self._idle)
         self._add(m, "Copy device &details", app._copy_device, enabled=lambda: bool(app._device_pairs()))
         self._add(m, "&Export device details...", app._export_device, enabled=lambda: bool(app._device_pairs()))
         self._add(m, "Stop &Google's adb", app._stop_google_adb,

@@ -9,6 +9,7 @@ import unittest.mock as mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))
 
+from isolate import isolate_settings  # noqa: E402
 from tkhelper import make_root  # noqa: E402
 
 from mitoolkit import adb_server  # noqa: E402
@@ -61,6 +62,9 @@ class ReplyTests(unittest.TestCase):
 
 
 class QrPairingTests(unittest.TestCase):
+    def setUp(self):
+        isolate_settings(self)
+
     def test_the_qr_text_carries_a_random_name_and_a_six_digit_password(self):
         a, b = adb_server.pairing_qr(), adb_server.pairing_qr()
         self.assertRegex(a["payload"], r"^WIFI:T:ADB;S:mitoolkit-[a-z0-9]{6};P:\d{6};;$")
@@ -89,8 +93,14 @@ class QrPairingTests(unittest.TestCase):
 
 class DiscoveryTests(unittest.TestCase):
     def setUp(self):
+        isolate_settings(self)
         adb_server._tried.clear()
+        adb_server._scanned.clear()
         self.addCleanup(adb_server._tried.clear)
+        self.addCleanup(adb_server._scanned.clear)
+        patcher = mock.patch.object(adb_server, "start", return_value=True)       # no real adb server in these tests
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_connected_paired_and_unpaired_phones(self):
         services = [{"name": "a", "kind": "connect", "address": "192.168.1.5:1"},
@@ -144,6 +154,9 @@ class HandlerTests(unittest.TestCase):
 class WindowTests(unittest.TestCase):
     def setUp(self):
         from mitoolkit import gui
+        isolate_settings(self)
+        adb_server._scanned.clear()
+        self.addCleanup(adb_server._scanned.clear)
         self.root = make_root()
         self.app = gui.App(self.root)
         self.app._polling = True
@@ -255,14 +268,26 @@ class WindowTests(unittest.TestCase):
         """The phone announces its connect address a few seconds after pairing: one look is not enough."""
         from mitoolkit.ui.wireless_dialog import WirelessDialog
         looks = [[], [], [{"name": "adb-1", "kind": "connect", "address": "192.168.1.5:37445"}]]
+        silent = adb_server.NothingListening("nothing there")
         with mock.patch.object(adb_server, "mdns_services", side_effect=lambda: looks.pop(0)), \
+                mock.patch.object(adb_server, "find_on_host", side_effect=silent), \
                 mock.patch.object(adb_server, "connect", return_value="192.168.1.5:37445") as connect:
             result = WirelessDialog._connect_announced("192.168.1.5:41234", wait=5, poll=0.001)
         self.assertEqual(result, ("192.168.1.5:37445", True))
         connect.assert_called_once_with("192.168.1.5:37445")
-        with mock.patch.object(adb_server, "mdns_services", return_value=[]):
+        with mock.patch.object(adb_server, "mdns_services", return_value=[]), \
+                mock.patch.object(adb_server, "find_on_host", side_effect=silent):
             self.assertEqual(WirelessDialog._connect_announced("192.168.1.5:41234", wait=0.05, poll=0.01),
                              ("192.168.1.5:41234", False))                # gives up politely, after the time is up
+
+    def test_when_the_network_never_announces_the_port_is_found_on_the_phones_address(self):
+        """A PC on a cable and a phone on Wi-Fi often cannot hear each other's mDNS: the port is looked for directly."""
+        from mitoolkit.ui.wireless_dialog import WirelessDialog
+        with mock.patch.object(adb_server, "mdns_services", side_effect=AdbError("mDNS unavailable")), \
+                mock.patch.object(adb_server, "find_on_host", return_value="192.168.1.5:39865") as scan:
+            result = WirelessDialog._connect_announced("192.168.1.5:41234", wait=5, poll=0.001)
+        self.assertEqual(result, ("192.168.1.5:39865", True))
+        scan.assert_called_once_with("192.168.1.5")
 
     def test_a_phone_listed_by_its_network_name_is_wireless_and_counts_as_connected(self):
         from mitoolkit.adb_core import is_wireless
@@ -277,6 +302,38 @@ class WindowTests(unittest.TestCase):
             found = adb_server.discover_and_connect()
         self.assertEqual(found[0]["state"], "connected")
         connect.assert_not_called()                                       # it is connected already: nothing to do
+
+    def test_the_serial_row_is_the_phones_own_serial_and_the_wifi_address_has_its_own_row(self):
+        base = {"state": "device", "model": "POCO M2 Pro", "battery": 63}
+        self.app.android = dict(base, serial="192.168.1.5:39865", serialno="6a81a217")
+        pairs = dict(self.app._device_pairs())
+        self.assertEqual((pairs["Serial"], pairs["Wi-Fi address"]), ("6a81a217", "192.168.1.5:39865"))
+        self.app.android = dict(base, serial="192.168.1.5:39865", serialno=None)      # unknown: never the address
+        pairs = dict(self.app._device_pairs())
+        self.assertEqual((pairs["Serial"], pairs["Wi-Fi address"]), (None, "192.168.1.5:39865"))
+        self.app.android = dict(base, serial="6a81a217")                               # a cable phone
+        pairs = dict(self.app._device_pairs())
+        self.assertEqual((pairs["Serial"], pairs["Wi-Fi address"]), ("6a81a217", None))
+
+    def test_a_refresh_with_new_readings_updates_the_text_in_place(self):
+        """Every refresh used to tear the details down and build them again: a visible flicker."""
+        app = self.app
+        app.android = {"serial": "192.168.1.5:39865", "state": "device", "serialno": "6a81a217",
+                       "model": "POCO M2 Pro", "battery": 63}
+        app._render_status()
+        self.root.update()
+        cells, layout = list(app._info_cells), app._shown_layout
+        packed = [str(w) for w in (app.buttons, app.details, app.copy_btn, app.export_btn) if w.winfo_manager()]
+        with mock.patch.object(app.buttons, "pack_forget") as forget:
+            app.android = dict(app.android, battery=62)
+            app._render_status()
+        self.root.update()
+        forget.assert_not_called()                                         # the sections were not unpacked
+        self.assertEqual(app._shown_layout, layout)
+        self.assertTrue(all(a is b for a, b in zip(cells, app._info_cells)))      # the same widgets, new text
+        self.assertTrue(any("62%" in c.cget("text") for c in app._info_cells))
+        self.assertEqual(packed, [str(w) for w in (app.buttons, app.details, app.copy_btn, app.export_btn)
+                                  if w.winfo_manager()])
 
     def test_pairing_resets_the_search_so_the_phone_is_tried_again_at_once(self):
         adb_server._tried["192.168.1.5:39865"] = 1e12

@@ -46,10 +46,12 @@ does **not** bypass the waiting period or any account requirement.
   automatic releases from GitHub
 - A doctor (`mitoolkit doctor`, or Help > Check and fix problems) that finds what is wrong with the setup, and fixes
   what is safe to fix by itself
-- Wireless adb: use the phone over Wi-Fi for everything except fastboot and unlocking (those need a cable)
+- Wi-Fi connection: use the phone over Wi-Fi for everything except fastboot and unlocking (those need a cable);
+  pair by QR code or code, and find the phone again by its address when the network hides it
 - App manager: remove preinstalled bloat for your user, with plain ratings, and restore it
 - Security check: missing Android security fixes (from OSV / Android Security Bulletins),
-  Google Play Protect, where apps came from, apps with powerful access, known stalkerware
+  Google Play Protect, where apps came from, apps with powerful access, known stalkerware, and a malware scan
+  (risky app access, hidden or fake system apps, leftover programs, root) read through adb
 - Python API for your own scripts and automation
 - Login happens on Xiaomi's own page (browser or QR code); your password never
   passes through this program

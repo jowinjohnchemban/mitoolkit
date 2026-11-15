@@ -16,7 +16,7 @@ import threading
 import time
 from typing import Dict, List, Optional, Tuple
 
-from mitoolkit import adbkey, usbio
+from mitoolkit import adb_core, adbkey, usbio
 from mitoolkit.adb_core import AdbError, SyncSession, is_wireless  # re-exported: adb_usb.AdbError, adb_usb.SyncSession
 
 ADB = (0xFF, 0x42, 0x01)  # USB interface class, subclass, protocol
@@ -42,6 +42,7 @@ class AdbDevice:
     def __init__(self, dev, intf, serial: str):
         self.serial = serial
         self.port = (getattr(dev, "bus", None), getattr(dev, "address", None))  # recognise it without reopening
+        self.location = usbio.location(dev)         # where it is plugged in, like "1-3" (bus 1, port 3)
         self.state = "offline"
         self.max_data = 4096
         self._lock = threading.RLock()
@@ -277,6 +278,7 @@ def _scan_server() -> List[Dict[str, str]]:
     # A phone plugged in AND on Wi-Fi shows up twice: keep the USB entry (fastboot needs the cable anyway)
     wired = {s for s in _devices if not is_wireless(s)}
     out = []
+    places = adb_server.usb_locations() if any(not is_wireless(d["serial"]) for d in found) else {}
     for d in found:
         dev = _devices[d["serial"]]
         if dev.wireless and d["state"] == "device" and wired:
@@ -288,7 +290,8 @@ def _scan_server() -> List[Dict[str, str]]:
             if _real_serials[d["serial"]] in wired:
                 _devices.pop(d["serial"], None)
                 continue
-        out.append({"serial": d["serial"], "state": d["state"], "via": "adb server"})
+        out.append({"serial": d["serial"], "state": d["state"], "via": "adb server",
+                    "link": adb_core.describe_link(d["serial"], places.get(d["serial"]))})
     return out
 
 
@@ -307,24 +310,25 @@ def _scan_usb() -> List[Dict[str, str]]:
                 except AdbError:
                     # still waiting for the person to tap Allow: the next scan asks again
                     pass
-            results.append({"serial": known.serial, "state": known.state})
+            results.append({"serial": known.serial, "state": known.state, "link": adb_core.describe_link(known.serial, known.location)})
             continue
         serial, reason = usbio.identify(dev)
         seen.add(serial)
         stale = _devices.pop(serial, None)
         if stale is not None:
             stale.close()
+        link = adb_core.describe_link(serial, usbio.location(dev))
         if reason:
-            results.append({"serial": serial, "state": "no-access", "reason": reason})
+            results.append({"serial": serial, "state": "no-access", "reason": reason, "link": link})
             continue
         try:
             fresh = AdbDevice(dev, intf, serial)
             fresh.connect()
         except AdbError as err:
-            results.append({"serial": serial, "state": "offline", "error": str(err)})
+            results.append({"serial": serial, "state": "offline", "error": str(err), "link": link})
             continue
         _devices[serial] = fresh
-        results.append({"serial": serial, "state": fresh.state})
+        results.append({"serial": serial, "state": fresh.state, "link": link})
     for serial in list(_devices):
         if serial not in seen:
             _devices.pop(serial).close()

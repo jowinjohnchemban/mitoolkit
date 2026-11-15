@@ -1,5 +1,5 @@
-"""Live status window: gauges and graphs of the phone's processor (and every core), GPU, memory,
-battery, temperatures and network, plus a task-manager style list of processes.
+"""Live status window: gauges and graphs of the phone's SoC (processor with every core, GPU and memory, each with its
+temperature), battery, temperatures and network, plus a task-manager style list of processes.
 
 One reading a second. Read-only: nothing on the phone is changed, and closing the window stops it.
 """
@@ -29,7 +29,7 @@ WINDOWS = ((60, "1 min"), (300, "5 min"), (900, "15 min"), (1800, "30 min"), (36
 PROCESS_FILTERS = (("apps", "Apps"), ("apps+system", "Apps and system"), ("all", "Everything"))
 COLUMNS = (("name", "Name", 300, "w"), ("pid", "PID", 70, "e"), ("cpu", "CPU %", 80, "e"),
            ("mem", "Memory", 90, "e"), ("state", "State", 70, "w"))
-TABS = (("overview", "Overview"), ("processor", "Processor"), ("sensors", "Sensors"),
+TABS = (("overview", "Overview"), ("processor", "SoC"), ("sensors", "Sensors"),
         ("processes", "Processes"))
 STATES = {"R": "Running", "S": "Sleeping", "D": "Waiting", "Z": "Zombie", "T": "Stopped"}
 
@@ -45,6 +45,14 @@ def _percent(v: float) -> str:
 def temperature_level(degrees: float) -> str:
     """A word as well as a colour, so the meaning never rests on colour alone."""
     return "Hot" if degrees >= 60 else "Warm" if degrees >= 45 else "Normal"
+
+
+def with_temperature(text: str, degrees: Optional[float]) -> str:
+    """``text`` followed by a part's temperature and what it means, like "2208 MHz · 49 °C warm"."""
+    if degrees is None:
+        return text
+    reading = f"{degrees:.0f} °C {temperature_level(degrees).lower()}"
+    return f"{text} · {reading}" if text else reading
 
 
 class LiveStatusDialog(Dialog):
@@ -204,7 +212,25 @@ class LiveStatusDialog(Dialog):
         self.facts.pack(anchor="w", pady=(2, 0))
 
     def _build_processor(self) -> None:
+        """The SoC (system on a chip) page: the processor, the graphics chip and the memory with their load, speed and
+        temperature, then every processor core."""
         page = self._scrolling_page("processor")
+        ttk.Label(page, text="The chip that runs the phone (SoC): its processor, graphics (GPU) and memory (RAM), "
+                             "each with its load, speed and temperature.", foreground=MUTED).pack(anchor="w", pady=(0, 10))
+        parts = ttk.Frame(page)
+        parts.pack(fill="x", pady=(0, 6))
+        for col in range(3):
+            parts.columnconfigure(col, weight=1, uniform="soc")
+        f = self.fonts
+        self.s_cpu = Gauge(parts, "Processor", f, (70, 90))
+        self.s_gpu = Gauge(parts, "Graphics (GPU)", f, (70, 90))
+        self.s_ram = Gauge(parts, "Memory (RAM)", f, (75, 90))
+        for col, gauge in enumerate((self.s_cpu, self.s_gpu, self.s_ram)):
+            gauge.grid(row=0, column=col, sticky="ew", padx=6, pady=(0, 4))
+        self.soc_note = ttk.Label(page, text="Temperatures are the hottest sensor of each part (see Sensors for all "
+                                             "of them).", foreground=MUTED)
+        self.soc_note.pack(anchor="w", pady=(0, 14))
+        ttk.Label(page, text="Cores", font=self.fonts.bold).pack(anchor="w")
         ttk.Label(page, text="Each core with its own trend (the last minute), its usage and its speed.",
                   foreground=MUTED).pack(anchor="w", pady=(0, 10))
         self.cores = ttk.Frame(page)
@@ -377,8 +403,18 @@ class LiveStatusDialog(Dialog):
         if not last:
             return
         self._badge("● Live", GREEN_TEXT)
-        self.g_cpu.set(g("cpu"), f"{max(g('cores_mhz') or [0])} MHz top core" if g("cores_mhz") else "")
-        self.g_mem.set(g("mem_pct"), f"{g('mem_used_gb')} of {g('mem_total_gb')} GB" if g("mem_total_gb") else "")
+        cpu_speed = f"{max(g('cores_mhz') or [0])} MHz top core" if g("cores_mhz") else ""
+        mem_text = f"{g('mem_used_gb')} of {g('mem_total_gb')} GB" if g("mem_total_gb") else ""
+        gpu_speed = f"{g('gpu_mhz')} MHz" if g("gpu_mhz") else ""
+        self.g_cpu.set(g("cpu"), cpu_speed)
+        self.g_mem.set(g("mem_pct"), mem_text)
+        # the SoC page: each part with its load, speed and temperature (the load is blank when the phone does not say)
+        self.s_cpu.set(g("cpu"), with_temperature(cpu_speed, g("cpu_temp")))
+        if g("gpu_pct") is not None:
+            self.s_gpu.set(g("gpu_pct"), with_temperature(gpu_speed, g("gpu_temp")))
+        else:                                              # many phones give the GPU's temperature but not its load
+            self.s_gpu.set_unavailable("No load reading", with_temperature("", g("gpu_temp")))
+        self.s_ram.set(g("mem_pct"), with_temperature(mem_text, g("ram_temp")))
         self.g_bat.set(g("battery_level"), (g("battery_status") or "").lower())
         if g("gpu_pct") is not None:
             if self.g_gpu not in self._gauge_order:  # this phone reports GPU load: add its gauge and graph

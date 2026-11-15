@@ -171,6 +171,20 @@ def find(triple: Tuple[int, int, int]) -> List[Tuple[Any, Any]]:
     return result
 
 
+def location(dev) -> Optional[str]:
+    """Where a device is plugged in, in the form adb uses for ``usb:``: the bus and the chain of hub ports, like "1-3"
+    (bus 1, port 3) or "1-2.4" (a hub on port 2, the phone on its port 4). None when libusb cannot tell."""
+    bus = getattr(dev, "bus", None)
+    try:
+        ports = getattr(dev, "port_numbers", None)
+    except Exception:
+        # some backends cannot read the port chain; the location is then simply not shown
+        return None
+    if bus is None or not ports:
+        return None
+    return f"{bus}-" + ".".join(str(p) for p in ports)
+
+
 def identify(dev) -> Tuple[str, Optional[str]]:
     """(serial, reason). reason is None when the phone can be opened, else BUSY, NO_DRIVER or
     NO_PERMISSION. When it cannot be opened the serial is unreadable, so the USB bus position

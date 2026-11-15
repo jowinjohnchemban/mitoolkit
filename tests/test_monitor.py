@@ -59,6 +59,17 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(nice_ceiling(87), 100)
         self.assertEqual(nice_ceiling(0.07), 0.08)
 
+    def test_the_temperature_of_each_part_of_the_chip_is_its_hottest_sensor(self):
+        """From a Snapdragon phone's real sensor names: cores, cluster, GPU and memory sensors, plus limiters."""
+        sensors = [("cpu-0-0-usr", 48.5), ("cpu-0-4-usr", 50.4), ("cpuss-1-usr", 50.7), ("cpu-0-max-step", 99.0),
+                   ("gpuss-0-usr", 45.9), ("gpuss-max-step", 99.0), ("ddr-0-usr", 47.0), ("ddr-1-usr", 48.6),
+                   ("battery", 38.0), ("pm6150-ibat-lvl0", 70.0)]
+        self.assertEqual(monitor.soc_temps(sensors), {"cpu_temp": 50.7, "gpu_temp": 45.9, "ram_temp": 48.6})
+
+    def test_a_part_without_a_sensor_is_left_out_not_guessed(self):
+        self.assertEqual(monitor.soc_temps([("battery", 38.0), ("skin", 41.0)]), {})
+        self.assertEqual(monitor.soc_temps([("cpu_thermal", 55.0)]), {"cpu_temp": 55.0})
+
 
 class FakePhone:
     def __init__(self):

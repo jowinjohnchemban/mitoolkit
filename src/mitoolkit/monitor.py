@@ -96,6 +96,23 @@ def parse_thermal(text: str) -> List[Tuple[str, float]]:
     return out
 
 
+_PARTS = (("cpu_temp", re.compile(r"^cpu", re.I)),                       # cpu-0-0-usr, cpuss-0-usr, cpu_thermal
+          ("gpu_temp", re.compile(r"^(gpu|mali|kgsl)", re.I)),            # gpuss-0-usr, gpu-thermal
+          ("ram_temp", re.compile(r"^(ddr|dram|lpddr|mem)", re.I)))       # ddr-0-usr, dram
+_VIRTUAL = re.compile(r"(step|lvl|lowf|limit)", re.I)                     # thermal limiters, not measurements
+
+
+def soc_temps(sensors: List[Tuple[str, float]]) -> Dict[str, float]:
+    """The temperature of the chip's parts, from the phone's sensors: {"cpu_temp", "gpu_temp", "ram_temp"} in degrees
+    C, each the hottest sensor of that part. A part the phone has no sensor for is left out."""
+    out: Dict[str, float] = {}
+    for key, pattern in _PARTS:
+        values = [round(d, 1) for n, d in sensors if pattern.match(n) and not _VIRTUAL.search(n)]
+        if values:
+            out[key] = max(values)
+    return out
+
+
 def parse_battery(text: str) -> Dict[str, object]:
     kv = dict(re.findall(r"^\s*([A-Za-z ]+):\s*(\S.*)$", text, re.M))
 
@@ -298,6 +315,7 @@ class Monitor:
                 name, degrees = max(sensors, key=lambda s: s[1])
                 out["hottest"] = (name, round(degrees, 1))
                 out["thermal"] = sorted(((n, round(d, 1)) for n, d in sensors), key=lambda s: -s[1])
+                out.update(soc_temps(sensors))
 
         for step in (cpu_step, gpu_step, memory_step, battery_step, network_step, speed_step, storage_step, sensor_step):
             try:

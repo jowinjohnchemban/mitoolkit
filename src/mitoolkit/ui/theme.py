@@ -7,6 +7,7 @@ Text can be enlarged up to 200% with Ctrl + (scale_fonts)."""
 from __future__ import annotations
 
 import sys
+from typing import Optional
 from tkinter import font as tkfont
 
 REPO = "https://github.com/jowinjohnchemban/mitoolkit"
@@ -44,20 +45,27 @@ def named_font(name: str, root=None) -> tkfont.Font:
 
 
 def _family(root) -> str:
-    """The system UI font: Segoe UI on Windows, else whatever Tk uses by default."""
+    """The system UI font: Segoe UI Variable on Windows 11 (its newer, finer UI font), Segoe UI on Windows 10, else
+    whatever Tk uses by default."""
     families = set(tkfont.families(root))
-    for name in (("Segoe UI",) if sys.platform == "win32" else ()) + (".AppleSystemUIFont", "SF Pro Text",
-                                                                    "Cantarell", "Ubuntu", "Noto Sans"):
+    for name in (("Segoe UI Variable Text", "Segoe UI") if sys.platform == "win32" else ()) + (
+            ".AppleSystemUIFont", "SF Pro Text", "Cantarell", "Ubuntu", "Noto Sans"):
         if name in families:
             return name
     return named_font("TkDefaultFont", root).actual("family")
+
+
+def semibold_family(family: str, root=None) -> Optional[str]:
+    """The semibold face of a Segoe UI family ("Segoe UI Semibold"), when it is installed; else None (bold is used)."""
+    name = f"{family} Semibold"
+    return name if family.startswith("Segoe UI") and name in tkfont.families(root) else None
 
 
 def _unify_fonts(root) -> str:
     """Give every named font (Tk's and the theme's) the same family and a consistent size, so
     labels, buttons, lists and fields all match."""
     family = _family(root)
-    semibold = "Segoe UI Semibold" if family == "Segoe UI" and "Segoe UI Semibold" in tkfont.families(root) else None
+    semibold = semibold_family(family, root)
     sizes = {
         "TkDefaultFont": SIZE_BODY, "TkTextFont": SIZE_BODY, "TkMenuFont": SIZE_BODY,
         "TkHeadingFont": SIZE_BODY, "TkCaptionFont": SIZE_BODY, "TkIconFont": SIZE_BODY,
@@ -215,7 +223,7 @@ class Fonts:
     def __init__(self, root=None):
         base = named_font("TkDefaultFont", root)
         family = base.actual("family")
-        semi = "Segoe UI Semibold" if family == "Segoe UI" and "Segoe UI Semibold" in tkfont.families(root) else None
+        semi = semibold_family(family, root)
 
         def make(size: int, strong: bool = False, **kw) -> tkfont.Font:
             if strong and semi:

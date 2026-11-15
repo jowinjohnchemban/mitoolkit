@@ -12,6 +12,7 @@ import logging
 from typing import Dict, List, Optional, Tuple
 
 from mitoolkit import usbio
+from mitoolkit.adb_core import describe_link
 from mitoolkit.errors import MitoolkitError
 
 FASTBOOT = (0xFF, 0x42, 0x03)  # USB interface class, subclass, protocol
@@ -33,7 +34,8 @@ def devices() -> List[Dict[str, object]]:
     out = []
     for dev, _intf in usbio.find(FASTBOOT):
         serial, reason = usbio.identify(dev)
-        out.append({"serial": serial, "accessible": reason is None, "reason": reason})
+        out.append({"serial": serial, "accessible": reason is None, "reason": reason,
+                    "link": describe_link(serial, usbio.location(dev))})
     return out
 
 

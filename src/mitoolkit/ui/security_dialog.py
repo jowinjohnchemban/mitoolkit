@@ -36,7 +36,8 @@ class SecurityDialog(Dialog):
         self.verdict.pack(anchor="w")
         self.summary = ttk.Label(body, foreground=MUTED, justify="left", text=(
             "Compares the phone with Android's security bulletins (OSV), checks Google Play Protect and "
-            "where apps came from, and looks for known stalkerware. Nothing on the phone is changed."))
+            "where apps came from, looks for known stalkerware, and scans for malware warning signs (risky app "
+            "access, hidden or fake system apps, leftover programs, root). Nothing on the phone is changed."))
         self.summary.pack(anchor="w", fill="x", pady=(2, 8))
         self.summary.bind("<Configure>", lambda e: self.summary.configure(wraplength=max(e.width - 10, 200)))
         self.bar = ttk.Progressbar(body, mode="indeterminate")
@@ -111,7 +112,7 @@ class SecurityDialog(Dialog):
         t = self.text
         t.configure(state="normal")
         t.delete("1.0", "end")
-        for area in ("Phone software", "Google Play", "Apps"):
+        for area in ("Phone software", "Google Play", "Apps", "Malware scan"):
             items = sorted((f for f in report.findings if f.area == area), key=lambda f: order[f.level])
             if not items:
                 continue

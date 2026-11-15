@@ -134,6 +134,13 @@ Read-only check of a phone running Android, printed as JSON:
 - **Apps**: apps with accessibility, notification or device-admin access, and a comparison
   with [known stalkerware](https://github.com/AssoEchap/stalkerware-indicators) (package name,
   confirmed by signing certificate where the app has a v1 signature).
+- **Malware scan**: warning signs, read through adb (nothing is uploaded or changed). Apps that were not installed
+  from a store and hold the access spyware and banking trojans rely on (reading or sending text messages, drawing
+  over other apps, the call log, the microphone with your contacts), and more so when they hide their icon; an app
+  that calls itself a system app (`com.android.*`, `com.google.android.*`, `com.miui.*`) but is not one; program
+  files left in `/data/local/tmp`; a `su` binary or Magisk (root); a debug build; adb listening on the network.
+  Apps from a store are left alone unless they are hidden and read messages. Hiding alone is not flagged
+  (keyboards and plug-ins have no icon).
 
 It is not an antivirus; keep Google Play Protect on. The GUI has the same check under
 **Security check...** in step 2.
@@ -273,14 +280,17 @@ Handy features:
     with a legend table of last, min, average and max. Dashed lines mark thresholds (for example 80%
     load, 45 and 60 °C). Point at a graph for a tooltip with the exact value. The time range (1 min up
     to 1 hr) is at the top right, on this tab only.
-  - **Processor**: every core with its own trend, usage and speed, labelled Performance or Efficiency
-    where the phone has both.
+  - **SoC** (the chip that runs the phone): the processor, the graphics chip (GPU) and the memory (RAM),
+    each with its load, speed and temperature (the hottest sensor of that part, with Normal, Warm or Hot), then
+    every processor core with its own trend, usage and speed, labelled Performance or Efficiency where the
+    phone has both.
   - **Sensors**: every thermal sensor the phone lets us read, hottest first, with Normal, Warm or Hot.
   - **Processes**: a task-manager style list (name, PID, CPU %, memory, state): sort by any column,
     search, and filter to apps, apps and system, or everything. Read-only: nothing can be stopped here.
   Each list has a page to itself, so the window never holds two scrollbars. A **Live** marker shows
   whether readings are arriving; **Pause** freezes them and **Copy snapshot** copies the latest numbers.
-- **Copy details** and **Export...** (top of the Phone section) copy or save the device details, plus the
+- **Copy details** and **Export details...** (the two small icons at the top of the Phone section, next to the
+  USB | Wi-Fi selector and **Rescan**: point at an icon to see its name) copy or save the device details, plus the
   extra details once they are read, as text, CSV (for a spreadsheet) or Markdown (for a bug report). The files
   contain the serial number and, in the extra details, the IMEI: you choose where they go.
 - **Restart or power off...** (Phone menu, and **Restart phone...** in fastboot mode) is one place to pick
@@ -309,33 +319,42 @@ Handy features:
   About and `mitoolkit --version`).
 - **Debug logging** (Help menu, `--debug`, or `MITOOLKIT_DEBUG=1`) adds step-by-step lines to `mitoolkit.log`:
   each adb and fastboot request with its timing, scans, connections. Tokens stay hidden. Off by default.
-- **Wireless adb...** (Phone menu) uses the phone over Wi-Fi instead of a cable. With the phone plugged
+- **Wi-Fi connection...** (Phone menu) uses the phone over Wi-Fi instead of a cable. With the phone plugged
   in once, **Switch to Wi-Fi** switches its adb to the network and connects; after that you can
   unplug it. A phone already set up for wireless debugging can be connected by its address (for example
-  `192.168.1.5`). It needs Google's `adb` (platform-tools) on this computer, because mitoolkit's own adb
+  `192.168.1.xx`). It needs Google's `adb` (platform-tools) on this computer, because mitoolkit's own adb
   speaks USB only, and the phone returns to USB-only when it restarts. **Fastboot and unlocking work over
   a USB cable only**: the bootloader has no Wi-Fi, so mitoolkit asks you to plug the phone in before it
   reboots into fastboot. When a phone is both plugged in and on Wi-Fi, it is listed once, by USB.
-  **The USB | Wireless selector** in the Phone section chooses how phones are looked for; both choices are
+  **The USB | Wi-Fi selector** in the Phone section chooses how phones are looked for; both choices are
   always visible and you click the one you want (or use the arrow keys). USB (the default) lists phones on a
-  cable. Choose Wireless and MiToolkit searches the network for phones with Wireless debugging on, connects to
+  cable. Choose Wi-Fi and MiToolkit searches the network for phones with Wireless debugging on, connects to
   the ones that already trust this computer, and for a new one says it needs pairing and opens the pairing
   window. Choosing USB again stops the adb server it started for Wi-Fi, and a phone that was just connected over
-  Wi-Fi moves the selector to Wireless by itself so it shows up. Wireless needs Google's adb.
-  **Pairing by QR code (Android 11 or newer, no cable at all):** in the Wireless adb window choose *QR code*,
+  Wi-Fi moves the selector to Wi-Fi by itself so it shows up. Wi-Fi needs Google's adb. The footer on the right
+  says how the phone is connected: `USB port 1-3` (the bus and port it is plugged into) or `Wi-Fi 192.168.1.xx:39865`
+  (its address and port), and `... · fastboot` in fastboot mode.
+  **When the network hides phones from this computer** (common with a PC on a cable and a phone on Wi-Fi, a
+  guest network or client isolation: nothing answers the mDNS search), MiToolkit remembers the address of each
+  phone it connected to and looks for the phone's Wireless debugging port directly on that one address (a few
+  seconds), so a phone that was connected once is found again by itself even though its port changes. Typing just
+  the address in *Connect by address* does the same; the port is optional. Only the address you gave is probed.
+  **Pairing by QR code (Android 11 or newer, no cable at all):** in the Wi-Fi connection window choose *QR code*,
   press **Show QR code**, then on the phone open Settings > Developer options > Wireless debugging > *Pair device
   with QR code* and scan it. MiToolkit finds the phone on the network and pairs and connects by itself. The code
   is random, used once, and shown only while it waits (2 minutes, or until you press Cancel).
   **Pairing with a code:** choose *Pairing code* instead. On the phone open the same screen but
   *Pair device with pairing code* and leave it open. Press **Find phones**
   (or type the address with its port and the 6-digit code it shows) and **Pair**. Pairing makes the
-  phone trust this computer's adb key, so it does not ask to allow debugging again. The phone announces
-  its connect address a few seconds after pairing and MiToolkit waits for it (up to 20 seconds), then
-  connects by itself and switches to Wireless; if it never shows up, enter the *IP address & port* from
-  the Wireless debugging screen and press **Connect**. The code works once and is never logged or kept. If the phone shows an
-  "Allow debugging?" prompt instead (a cable or address connection), tap Allow and tick *Always allow from
-  this computer*; until you do, the phone is listed as waiting for authorisation. Finding phones needs
-  mDNS on the network (some routers and guest networks block it: then type the address).
+  phone trust this computer's adb key, so it does not ask to allow debugging again. The phone starts
+  listening for connections a few seconds after pairing and MiToolkit waits for it (up to 30 seconds), using the
+  network announcement or, when there is none, the direct search above, then connects by itself and switches to
+  Wi-Fi; if it never shows up, type the address from the Wireless debugging screen and press **Connect**. The
+  code works once and is never logged or kept. While a pairing or connection runs the other buttons are greyed.
+  If the phone shows an "Allow debugging?" prompt instead (a cable or address connection), tap Allow and tick
+  *Always allow from this computer*; until you do, the phone is listed as waiting for authorisation. **Find
+  phones** and QR pairing need the network announcements (mDNS); where they are blocked use *Pairing code* and
+  type the address and the code.
 - The window looks for the phone every second, and Live status and Connections show at once when it is
   unplugged and carry on when it is back. Automatic updates change only the readings, not the text bar.
 - When Xiaomi says to wait, the message includes the date and time to try again.

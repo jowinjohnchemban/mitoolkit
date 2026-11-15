@@ -21,11 +21,13 @@ from typing import Callable, Dict, Optional, Tuple
 
 from mitoolkit.ui.components.shapes import mix as _mix
 from mitoolkit.ui.components.shapes import page_background, rounded
+from mitoolkit.ui.components.tooltip import Tooltip
 from mitoolkit.ui.theme import ACCENT
 
 # Windows 11 (Fluent) button colours: a near-white face, a hairline border, a darker bottom edge,
 # 4 px corners, and the accent colour for the main action.
 FACE, BORDER = "#fbfbfb", "#e0e0e0"
+QUIET_TEXT = "#3b3f45"                        # the glyph of a quiet button (11:1 on the window background)
 # Colour follows what the button is doing: a blue tint when the pointer is over it, a deeper blue
 # while it is pressed, and an accent ring when the keyboard is on it (never a black box).
 HOVER, BORDER_HOVER = "#eaf2fc", "#86b6e8"
@@ -71,10 +73,13 @@ def icon_family(widget) -> Optional[str]:
 class ModernButton(tk.Canvas):
     def __init__(self, parent, text: str = "", command: Optional[Callable[[], None]] = None, *,
                  primary: bool = False, variable: Optional[tk.Variable] = None, value=None,
-                 font: Optional[tkfont.Font] = None, icon: Optional[str] = None, kind: str = "normal"):
+                 font: Optional[tkfont.Font] = None, icon: Optional[str] = None, kind: str = "normal",
+                 compact: bool = False):
         """icon: a name from ICONS (drawn only when the system has an icon font).
-        kind: "normal", "flat" (an expander bar), or a state colour: "danger" (red), "warn" (amber) or
-        "good" (green). It can be changed later with configure(kind=...)."""
+        kind: "normal", "flat" (an expander bar), "quiet" (no border until the pointer is on it: for tools that sit
+        in a row), or a state colour: "danger" (red), "warn" (amber) or "good" (green). It can be changed later with
+        configure(kind=...). compact: show only the icon, in a square, with the text as its tooltip (the text is
+        shown when the system has no icon font)."""
         self._bg = page_background(parent)
         super().__init__(parent, highlightthickness=0, borderwidth=0, bg=self._bg, takefocus=True, cursor="arrow")
         self._text, self._command, self.primary = text, command, primary
@@ -86,8 +91,11 @@ class ModernButton(tk.Canvas):
         self._hover = self._down = self._focus = False
         self._mouse = False          # focus that came from a click: no focus ring for that
         self.kind = kind
+        self.compact = compact
         self._anim: Optional[str] = None
         self._shown: Tuple[str, str] = (FACE, BORDER)
+        if compact:
+            Tooltip(self, lambda: self._text)
         self._fit()
         self._shown = self._colours()[:2]
         for seq, fn in (("<Enter>", self._on_enter), ("<Leave>", self._on_leave), ("<Motion>", self._on_motion),
@@ -108,11 +116,15 @@ class ModernButton(tk.Canvas):
         """Size to the icon and text (re-run when they, or the text size, change)."""
         glyph = self._icon_glyph()
         if glyph:
-            self._icon_font = tkfont.Font(family=icon_family(self), size=int(self._font.actual("size")))
+            # an icon alone is larger than one beside a word: it is the whole label
+            self._icon_font = tkfont.Font(family=icon_family(self),
+                                          size=int(self._font.actual("size")) + (3 if self.compact else 0))
         width = self._font.measure(self._text) + 2 * PAD_X
         if glyph:
             width += self._icon_font.measure(glyph) + (10 if self._text else 0)
         height = max(MIN_HEIGHT, self._font.metrics("linespace") + 18)
+        if self.compact and glyph:
+            width = height                                       # an icon alone: a square
         self.configure(width=width, height=height)
         self._paint()
 
@@ -239,6 +251,9 @@ class ModernButton(tk.Canvas):
         if self.kind == "flat":  # an expander bar: no border or shadow, a blue wash when the pointer is on it
             face = PRESSED if self._down else HOVER if self._hover else self._bg
             return face, face, ACCENT
+        if self.kind == "quiet":  # a tool in a row: nothing around it until the pointer is on it, dark grey glyph
+            face = PRESSED if self._down else HOVER if self._hover else self._bg
+            return face, face, QUIET_TEXT
         if self.primary:
             face = PRIMARY_PRESSED if self._down else PRIMARY_HOVER if self._hover else PRIMARY
             return face, face, "#ffffff"
@@ -281,7 +296,7 @@ class ModernButton(tk.Canvas):
         face, border = self._shown
         text = self._colours()[2]
         bottom = h - 2                                           # the body; a 1 px shadow sits under it
-        rounded(self, 1, 2, w - 1, h - 1, RADIUS, fill=self._bg if self.kind == "flat" else SHADOW, outline="")
+        rounded(self, 1, 2, w - 1, h - 1, RADIUS, fill=self._bg if self.kind in ("flat", "quiet") else SHADOW, outline="")
         rounded(self, 1, 1, w - 1, bottom, RADIUS, fill=border, outline="")
         rounded(self, 2, 2, w - 2, bottom - 1, RADIUS - 1, fill=face, outline="")
         if self._focus and self._state != "disabled":  # keyboard focus: an accent ring with a white gap
@@ -291,6 +306,9 @@ class ModernButton(tk.Canvas):
         cy = (bottom + 1) / 2
         if glyph and self._icon_font is not None:
             icon_w = self._icon_font.measure(glyph)
+            if self.compact:                                     # the icon alone, centred; the text is the tooltip
+                self.create_text(w / 2, cy, text=glyph, fill=text, font=self._icon_font)
+                return
             text_w = self._font.measure(self._text) if self._text else 0
             x = (w - (icon_w + (10 if self._text else 0) + text_w)) / 2
             self.create_text(x, cy, text=glyph, fill=text, font=self._icon_font, anchor="w")
@@ -326,7 +344,7 @@ class _NativeRadio(_Native, ttk.Radiobutton):
 
 def Button(parent, text: str = "", command: Optional[Callable[[], None]] = None, *, primary: bool = False,
            variable: Optional[tk.Variable] = None, value=None, font=None, icon: Optional[str] = None,
-           kind: str = "normal"):
+           kind: str = "normal", compact: bool = False):
     """A button in the best look for this system (see the module notes)."""
     if sys.platform == "darwin":
         if variable is not None:
@@ -334,7 +352,7 @@ def Button(parent, text: str = "", command: Optional[Callable[[], None]] = None,
                                 command=command)
         return _NativeButton(parent, text=text, command=command, style="Primary.TButton" if primary else "TButton")
     return ModernButton(parent, text, command, primary=primary, variable=variable, value=value, font=font,
-                        icon=icon, kind=kind)
+                        icon=icon, kind=kind, compact=compact)
 
 
 def segmented(parent, choices, variable: tk.Variable, command: Optional[Callable[[], None]] = None):

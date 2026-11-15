@@ -369,6 +369,7 @@ def build(raw: Dict[str, str]) -> Dict[str, object]:
         "sections": sections,
         "signals": {"wifi_dbm": _num(wifi.get("RSSI")), "mobile_dbm": tele.get("lte_rsrp") or tele.get("nr_rsrp")},
         "state": {"airplane": airplane, "wifi_on": wifi_on, "data_on": data_on},
+        "gateway": str(wifi_net.get("gateway") or ""),      # the Wi-Fi router, for the network test (not the carrier's)
     }
     report["findings"] = findings(wifi, wifi_net, mobile_net, tele, props, airplane, wifi_on, data_on, networks)
     return report
@@ -412,19 +413,21 @@ def _wifi_rows(wifi, net, scan, wifi_on: bool, airplane: bool, raw) -> List[Row]
         rows.append(("Security", sec, BAD if wifi["Security type"] in ("0", "1") else None))
     if wifi.get("MAC"):
         rows.append(("Phone's Wi-Fi address", wifi["MAC"], None))
-    rows += _network_detail(net)
+    rows += _network_detail(net, router=True)
     if net:
         rows.append(("Internet check", "Android reached the internet through this Wi-Fi" if net.get("validated")
                      else "Connected, but Android could not confirm internet access", OK if net.get("validated") else BAD))
     return rows
 
 
-def _network_detail(net: Dict[str, object]) -> List[Row]:
+def _network_detail(net: Dict[str, object], router: bool = False) -> List[Row]:
+    """Address, gateway, DNS and MTU of a network. Only a Wi-Fi gateway is a router: a mobile network's gateway is
+    the carrier's equipment, which does not answer pings."""
     rows: List[Row] = []
     if net.get("addresses"):
         rows.append(("Phone's address", ", ".join(net["addresses"]), None))  # type: ignore[arg-type]
     if net.get("gateway"):
-        rows.append(("Gateway (router)", str(net["gateway"]), None))
+        rows.append(("Gateway (router)" if router else "Gateway", str(net["gateway"]), None))
     if net.get("dns"):
         rows.append(("DNS servers", ", ".join(net["dns"]), None))  # type: ignore[arg-type]
     elif net:
@@ -636,7 +639,7 @@ def run(phone) -> Dict[str, object]:
 
 
 # Rows that identify you or your place: names and addresses of networks and devices.
-_PRIVATE_LABELS = {"Connected to", "Router (BSSID)", "Phone's Wi-Fi address", "Phone's address", "Gateway (router)",
+_PRIVATE_LABELS = {"Connected to", "Router (BSSID)", "Phone's Wi-Fi address", "Phone's address", "Gateway (router)", "Gateway",
                    "DNS servers", "Phone's Bluetooth name", "Wi-Fi IP address"}
 
 
@@ -659,7 +662,10 @@ def redact(report: Dict[str, object]) -> Dict[str, object]:
             else:
                 clean.append((label, value, level))
         sections.append((title, clean))
-    return {**report, "sections": sections}
+    out = {**report, "sections": sections}
+    if out.get("gateway"):
+        out["gateway"] = "(hidden)"                       # the router's address is the same private information
+    return out
 
 
 def as_text(report: Dict[str, object]) -> str:
