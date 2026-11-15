@@ -6,6 +6,7 @@ alongside so nothing is hidden; this only adds a readable title and a next step.
 from __future__ import annotations
 
 import re
+import time
 from typing import NamedTuple, Optional
 
 
@@ -88,5 +89,7 @@ def explain(code: Optional[int], description: Optional[str] = None) -> Hint:
             hours = int(m.group(1))
             days = hours / 24
             span = f"about {hours} hours ({days:.1f} days)" if hours >= 48 else f"about {hours} hours"
-            return Hint(hint.title, f"Xiaomi says to wait {span}. " + hint.advice, hint.kind)
+            when = time.strftime("%a %d %b, %H:%M", time.localtime(time.time() + hours * 3600))
+            return Hint(hint.title, f"Xiaomi says to wait {span}, so try again after {when} (your time). "
+                        + hint.advice, hint.kind)
     return hint

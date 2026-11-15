@@ -99,6 +99,26 @@ def _cmd_reboot_fastboot(args):
         sys.exit(1)
 
 
+def _cmd_backup(args):
+    from miunlock import adb
+    sets = [s.strip() for s in args.only.split(",") if s.strip()]
+    try:
+        path = adb.get_adb()
+        phones = [d for d in adb.devices(path) if d["state"] == "device"]
+        if args.serial:
+            phones = [d for d in phones if d["serial"] == args.serial]
+        if not phones:
+            raise adb.AdbError("No phone with USB debugging allowed was found. Run `miunlock devices`.")
+        if len(phones) > 1:
+            raise adb.AdbError("More than one phone is connected; pass --serial.")
+        result = adb.backup_files(phones[0]["serial"], args.dest, sets, path,
+                                  log=lambda t: print(t, file=sys.stderr))
+        _print_json(result)
+    except adb.AdbError as e:
+        _print_json({"copied": [], "error": str(e)})
+        sys.exit(1)
+
+
 def _cmd_status(args):
     try:
         token = api.login(silent_if_cached=True)
@@ -237,6 +257,13 @@ def main():
     p_rb = sub.add_parser("reboot-fastboot", help="Use adb to reboot a phone running Android into fastboot mode. Erases nothing.")
     p_rb.add_argument("--serial", help="Device serial, if more than one phone is connected.")
     p_rb.set_defaults(func=_cmd_reboot_fastboot)
+
+    p_bk = sub.add_parser("backup", help="Copy files from a phone running Android to this computer with adb. Read-only for the phone.")
+    p_bk.add_argument("--dest", required=True, help="Folder to save into.")
+    p_bk.add_argument("--only", default="photos,documents",
+                      help="Comma-separated: photos, documents, chats, audio, everything (default: photos,documents).")
+    p_bk.add_argument("--serial", help="Device serial, if more than one phone is connected.")
+    p_bk.set_defaults(func=_cmd_backup)
 
     p_status = sub.add_parser("status", help="Print account + device status as JSON. Never touches fastboot oem unlock.")
     p_status.set_defaults(func=_cmd_status)

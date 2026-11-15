@@ -10,8 +10,9 @@ Everything here is read-only or a plain reboot. Nothing runs ``adb root``,
 """
 import shutil
 import subprocess
+import threading
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from miunlock.system import SYSTEM, IS_TERMUX, NO_WINDOW, make_executable
 
@@ -33,6 +34,18 @@ _FASTBOOT_VARS = {
     "bootloader_version": "version-bootloader",
     "slot": "current-slot",
     "serial": "serialno",
+}
+
+
+# What "Back up files" can copy. Each choice is a list of folders in the phone's shared
+# storage. Copying only reads from the phone; nothing on it is changed or deleted.
+BACKUP_SETS = {
+    "photos": ("Photos and videos", ["/sdcard/DCIM", "/sdcard/Pictures", "/sdcard/Movies"]),
+    "documents": ("Documents and downloads", ["/sdcard/Documents", "/sdcard/Download"]),
+    "chats": ("Chat app media (WhatsApp, Telegram, ...)",
+              ["/sdcard/WhatsApp", "/sdcard/Android/media", "/sdcard/Telegram"]),
+    "audio": ("Music and recordings", ["/sdcard/Music", "/sdcard/Recordings", "/sdcard/MIUI/sound_recorder"]),
+    "everything": ("Everything in shared storage (can be very large)", ["/sdcard"]),
 }
 
 
@@ -132,3 +145,79 @@ def reboot_to_bootloader(serial: Optional[str] = None, adb: Optional[str] = None
     adb = adb or get_adb()
     args = ["-s", serial] if serial else []
     _run(adb, *args, "reboot", "bootloader")
+
+
+def list_user_apps(serial: str, adb: Optional[str] = None) -> List[str]:
+    """Package names of the apps you installed (not the system ones)."""
+    adb = adb or get_adb()
+    out = _run(adb, "-s", serial, "shell", "pm", "list", "packages", "-3")
+    return sorted(line.split(":", 1)[1].strip() for line in out.splitlines() if line.startswith("package:"))
+
+
+def backup_files(
+    serial: str,
+    dest: str,
+    sets: List[str],
+    adb: Optional[str] = None,
+    log: Callable[[str], None] = lambda _t: None,
+    cancel: Optional[threading.Event] = None,
+) -> Dict[str, object]:
+    """Copy the chosen folders from the phone to ``dest`` with ``adb pull``, plus a list of
+    installed apps. Read-only for the phone. Returns {"copied": [...], "skipped": [...],
+    "dest": path, "cancelled": bool}. Raises AdbError if there is nothing to copy."""
+    adb = adb or get_adb()
+    unknown = [k for k in sets if k not in BACKUP_SETS]
+    if unknown:
+        raise AdbError(f"Unknown backup choice: {', '.join(unknown)}")
+    target = Path(dest).expanduser()
+    target.mkdir(parents=True, exist_ok=True)
+
+    # "everything" already contains the other folders; do not copy them twice.
+    wanted = ["/sdcard"] if "everything" in sets else [p for k in sets for p in BACKUP_SETS[k][1]]
+    copied: List[str] = []
+    skipped: List[str] = []
+    cancelled = False
+    for remote in wanted:
+        if cancel is not None and cancel.is_set():
+            cancelled = True
+            break
+        try:
+            _run(adb, "-s", serial, "shell", "ls", "-d", remote)
+        except AdbError:
+            skipped.append(remote)  # folder does not exist on this phone
+            continue
+        log(f"Copying {remote} ...")
+        proc = subprocess.Popen(
+            [adb, "-s", serial, "pull", "-a", remote, str(target)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            errors="replace", creationflags=NO_WINDOW,
+        )
+        last = ""
+        for line in proc.stdout:  # type: ignore[union-attr]
+            last = line.strip()
+            if last.startswith("[") and last.count("%") and "]" in last:
+                if int(last[1:last.index("%")].strip() or 0) % 10 == 0:
+                    log(last[:140])
+            if cancel is not None and cancel.is_set():
+                proc.terminate()
+                cancelled = True
+                break
+        proc.wait()
+        if cancelled:
+            break
+        if proc.returncode == 0:
+            copied.append(remote)
+            log(last[:140] or f"Copied {remote}")
+        else:
+            skipped.append(remote)
+            log(f"Could not copy {remote}: {last[:140]}")
+
+    try:
+        apps = list_user_apps(serial, adb)
+        (target / "installed-apps.txt").write_text("\n".join(apps) + "\n", encoding="utf-8")
+        log(f"Saved the list of {len(apps)} installed apps.")
+    except (AdbError, OSError):
+        pass
+    if not copied and not cancelled:
+        raise AdbError("Nothing was copied. Is the phone unlocked and USB file access allowed?")
+    return {"copied": copied, "skipped": skipped, "dest": str(target), "cancelled": cancelled}

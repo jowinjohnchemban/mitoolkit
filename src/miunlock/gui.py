@@ -14,15 +14,17 @@ from __future__ import annotations
 
 import ctypes
 import io
+import datetime
 import queue
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
 import webbrowser
 from pathlib import Path
 from tkinter import font as tkfont
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 from typing import Callable, Optional
 
 from miunlock import __version__, adb, api, guide, log
@@ -92,6 +94,7 @@ class App:
         self._adb: Optional[str] = None
         self._info: dict = {}
         self._fbinfo: dict = {}
+        self._none_since: Optional[float] = time.time()  # when we last started seeing no phone
         self.fb_info: Optional[dict] = None
         self._wrap_labels: list[ttk.Label] = []
 
@@ -244,6 +247,12 @@ class App:
         self.dev_text = ttk.Label(drow, text="Preparing fastboot...", foreground=MUTED)
         self.dev_text.pack(side="left", padx=6)
         self.fb_btn = ttk.Button(drow, text="Reboot to fastboot", command=self._to_fastboot)
+        self.rescan_btn = ttk.Button(drow, text="Rescan", command=self._scan)
+        self.rescan_btn.pack(side="right")
+        self.copy_btn = ttk.Button(drow, text="Copy info", command=self._copy_device)
+        self.backup_btn = ttk.Button(drow, text="Back up files...", command=self._backup_dialog)
+        self.dev_tip = self._wrap(b2, "", foreground=AMBER, font=self.f_small)
+        self.dev_tip.pack_forget()
         self.info_box = ttk.Frame(b2)  # device details, filled in when a phone is seen
         row2 = ttk.Frame(b2)
         self._row2 = row2
@@ -390,6 +399,8 @@ class App:
                     done(status, payload)
                 elif kind == "fastboot":
                     self._fastboot_ready(*rest)
+                elif kind == "backup":
+                    self._backup_progress(rest[0])
                 elif kind == "device":
                     self._device_seen(rest[0], rest[1] if len(rest) > 1 else None,
                                       rest[2] if len(rest) > 2 else None)
@@ -478,6 +489,35 @@ class App:
     def _poll_device(self):
         if not self.fastboot:
             return
+        self._scan()
+        self._update_tip()
+        self.root.after(2000, self._poll_device)
+
+    def _update_tip(self):
+        """After a while with no phone, say what usually fixes it."""
+        waiting = self.device is None and self.android is None and self._none_since is not None \
+            and time.time() - self._none_since > 20
+        if waiting and not self.dev_tip.winfo_ismapped():
+            tip = ("Still no phone. Use a data cable (not charge-only) in another USB port, and check the "
+                   "phone shows the fastboot screen.")
+            if sys.platform == "win32":
+                tip += " On Windows you may need Xiaomi or Google USB drivers."
+            self.dev_tip.configure(text=tip)
+            self.dev_tip.pack(anchor="w", pady=(6, 0), after=self.dev_text.master)
+        elif not waiting and self.dev_tip.winfo_ismapped():
+            self.dev_tip.pack_forget()
+
+    def _copy_device(self):
+        pairs = self._device_pairs(self.device, self.android, self.fb_info)
+        if pairs:
+            text = "\n".join(f"{k}: {v}" for k, v in pairs if v not in (None, ""))
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            self._set_status("Device info copied (serial is masked).")
+
+    def _scan(self):
+        if not self.fastboot:
+            return
         if not self.busy and not self._polling:
             self._polling = True
 
@@ -520,7 +560,6 @@ class App:
                 self.q.put(("device", serial, android, fbinfo))
 
             threading.Thread(target=work, daemon=True).start()
-        self.root.after(2000, self._poll_device)
 
     def _show_info(self, pairs):
         """Show a small table of device facts (label, value), or hide it when empty."""
@@ -568,7 +607,17 @@ class App:
             return
         was_connected = self.device is not None
         self.device, self.android, self.fb_info = serial, android, fb
-        self._show_info(self._device_pairs(serial, android, fb))
+        pairs = self._device_pairs(serial, android, fb)
+        self._show_info(pairs)
+        self._none_since = None if (serial or android) else (self._none_since or time.time())
+        if pairs:
+            self.copy_btn.pack(side="right", padx=6, before=self.rescan_btn)
+        else:
+            self.copy_btn.pack_forget()
+        if android and android.get("state") == "device" and not serial:
+            self.backup_btn.pack(side="right", before=self.copy_btn if pairs else self.rescan_btn)
+        else:
+            self.backup_btn.pack_forget()
         self.fb_btn.pack_forget()
         if serial:
             self.dev_dot.configure(fg=GREEN)
@@ -769,6 +818,95 @@ class App:
                     webbrowser.open(path.parent.as_uri())
             except Exception as err:
                 self._log(f"Could not open the folder: {err}")
+
+    # ------------------------------------------------------------------ backup
+    def _backup_dialog(self):
+        serial = (self.android or {}).get("serial")
+        if not serial or not self._adb:
+            return
+        win = tk.Toplevel(self.root)
+        win.title("Back up files from the phone")
+        win.transient(self.root)
+        win.resizable(False, False)
+        body = ttk.Frame(win, padding=16)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="Copy files from the phone to this computer", font=self.f_bold).pack(anchor="w")
+        ttk.Label(body, foreground=MUTED, justify="left", text=(
+            "Nothing on the phone is changed or deleted. Keep the screen unlocked and allow file\n"
+            "access if the phone asks. App data, contacts, SMS and chats are not covered: use\n"
+            "Mi Cloud, Google or each app's own backup for those (see the guide).")).pack(anchor="w", pady=(2, 10))
+
+        vars_ = {}
+        for key, (label, _folders) in adb.BACKUP_SETS.items():
+            v = tk.BooleanVar(value=key in ("photos", "documents"))
+            vars_[key] = v
+            ttk.Checkbutton(body, text=label, variable=v).pack(anchor="w")
+
+        name = (self.android.get("model") or "phone").replace(" ", "-")
+        default = Path.home() / "miunlock-backup" / f"{name}-{datetime.date.today().isoformat()}"
+        dest_var = tk.StringVar(value=str(default))
+        row = ttk.Frame(body)
+        row.pack(fill="x", pady=(12, 0))
+        ttk.Label(row, text="Save to:").pack(side="left")
+        ttk.Entry(row, textvariable=dest_var, width=48).pack(side="left", padx=6, fill="x", expand=True)
+        ttk.Button(row, text="Browse...", command=lambda: dest_var.set(
+            filedialog.askdirectory(parent=win, initialdir=str(Path.home())) or dest_var.get())).pack(side="left")
+
+        self._bk_label = ttk.Label(body, text="", foreground=MUTED, wraplength=520, justify="left")
+        self._bk_label.pack(anchor="w", pady=(10, 0))
+        bar = ttk.Progressbar(body, mode="indeterminate")
+        buttons = ttk.Frame(body)
+        buttons.pack(fill="x", pady=(12, 0))
+        cancel_event = threading.Event()
+        self._bk_cancel = cancel_event
+        start = ttk.Button(buttons, text="Start backup", style="Primary.TButton")
+        close = ttk.Button(buttons, text="Close", command=lambda: (cancel_event.set(), win.destroy()))
+        close.pack(side="right")
+        start.pack(side="right", padx=6)
+
+        def begin():
+            chosen = [k for k, v in vars_.items() if v.get()]
+            if not chosen:
+                messagebox.showinfo("Back up", "Tick at least one thing to copy.", parent=win)
+                return
+            cancel_event.clear()
+            start.configure(state="disabled")
+            bar.pack(fill="x", pady=(8, 0))
+            bar.start(12)
+            dest = dest_var.get().strip()
+
+            def work():
+                return adb.backup_files(serial, dest, chosen, self._adb, self._bk_log, cancel_event)
+
+            def done(status, result):
+                bar.stop()
+                bar.pack_forget()
+                start.configure(state="normal")
+                if status == "error":
+                    msg = f"Backup did not finish: {result}"
+                elif result.get("cancelled"):
+                    msg = f"Cancelled. Files copied so far are in {result['dest']}"
+                else:
+                    msg = f"Done. {len(result['copied'])} folder(s) saved to {result['dest']}"
+                    if result["skipped"]:
+                        msg += f"  (not found or failed: {', '.join(result['skipped'])})"
+                self._bk_label.configure(text=msg, foreground=RED if status == "error" else GREEN)
+                self._log(msg)
+
+            self._run(work, done, "Backing up files from the phone...")
+
+        start.configure(command=begin)
+
+    def _bk_log(self, text: str):
+        self.q.put(("log", text))
+        self.q.put(("backup", text))
+
+    def _backup_progress(self, text: str):
+        try:
+            if getattr(self, "_bk_label", None) is not None and self._bk_label.winfo_exists():
+                self._bk_label.configure(text=text, foreground=MUTED)
+        except tk.TclError:
+            pass
 
     def _open_guide(self):
         """Offline step-by-step guide in its own window; one copy at a time."""

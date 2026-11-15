@@ -93,6 +93,16 @@ When eligible, `check` returns `"eligible": true` together with
 > device is in fastboot mode they wait for one, so press Ctrl+C to stop. Put the
 > phone in fastboot mode and connect it first.
 
+### backup
+
+```sh
+miunlock backup --dest D:\\phone-backup --only photos,documents
+```
+
+Copies folders from a phone running Android to your computer with `adb pull`, and writes
+`installed-apps.txt`. Choices for `--only`: `photos`, `documents`, `chats`, `audio`,
+`everything`. Read-only for the phone; progress goes to stderr and the result is JSON.
+
 ## GUI
 
 ```sh
@@ -115,6 +125,10 @@ Handy features:
 - **Show details** reveals what the program is doing, with **Copy** and **Clear** buttons.
 - The numbered badges are grey (not yet), orange (do this next) and green (done).
 - Ctrl+Q quits.
+- Connected phones show their details (model, versions, bootloader state, battery). **Copy
+  info** copies them, **Rescan** looks again, and a tip appears if no phone shows up for 20 s.
+- **Back up files...** copies photos, documents, chat media and more from a phone that is on.
+- When Xiaomi says to wait, the message includes the date and time to try again.
 
 ## Saved session and log
 

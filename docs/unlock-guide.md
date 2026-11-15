@@ -18,6 +18,14 @@ How to prepare a Xiaomi, Redmi or POCO device and unlock its bootloader with
 - **Back up everything you care about.** Photos and files, app data you cannot
   re-download, and chat history. For chats, use the app's own backup: a local
   backup file on the device is erased by the unlock too, so copy it to a computer.
+- **Copy your files with miunlock.** While the phone is on with USB debugging allowed, the
+  GUI's **Back up files...** button (or `miunlock backup --dest <folder>`) copies photos,
+  videos, documents, downloads, chat-app media or all shared storage to your computer. It
+  only reads from the phone, and it also saves a list of installed apps. It does **not**
+  cover app data, contacts or SMS.
+- **Sync the rest.** Use Mi Cloud (*Settings > Mi Account > Xiaomi Cloud*) for contacts,
+  notes, SMS and call history, and Google backup and Google Photos where you use them.
+- **Check the backup.** Open a few files on the computer before you continue.
 - **Export two-factor codes** from authenticator apps that do not sync, or you may
   be locked out of accounts after the wipe.
 - Use a good USB data cable and charge the phone above 50%.

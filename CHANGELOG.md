@@ -13,6 +13,12 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
 - GUI shows device details when a phone is connected: model, codename, Android and HyperOS/MIUI
   version, security patch, bootloader state, battery and a masked serial (fastboot mode shows
   codename, bootloader state and version, and active slot).
+- Back up files before unlocking: a **Back up files...** dialog in the GUI and
+  `miunlock backup --dest <folder> --only photos,documents` copy photos, documents, chat media,
+  audio or all shared storage from a running phone with `adb pull`, plus a list of installed
+  apps. Read-only for the phone. The guide has a new "Back up your data" section.
+- Waiting-period message now says when to try again; GUI shows a tip when no phone is found
+  after 20 s, and has Rescan and Copy info buttons.
 - Step-by-step guide inside the GUI (Help menu or F1), available offline.
 - GUI: scrollable page with a scrollbar and mouse wheel, Copy and Clear for the details
   panel, step badges that show what to do next, Ctrl+Q to quit.

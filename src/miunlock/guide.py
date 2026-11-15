@@ -18,6 +18,20 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
               "locked out of accounts afterwards."),
         ("b", "Use a good USB data cable and charge the phone above 50%."),
     ]),
+    ("Back up your data", [
+        ("p", "The unlock erases the phone, so copy what matters first. Use several of these:"),
+        ("b", "Back up files... (step 2, while the phone is on and USB debugging is allowed): copies "
+              "photos, videos, documents, downloads and chat-app media to this computer. It only "
+              "reads from the phone. It also saves a list of your installed apps."),
+        ("b", "Mi Cloud: Settings > Mi Account > Xiaomi Cloud. Syncs contacts, notes, SMS, gallery "
+              "and call history."),
+        ("b", "Google: Settings > Google > Backup, and Google Photos for pictures."),
+        ("b", "Chat apps: use each app's own backup (WhatsApp: Settings > Chats > Chat backup), "
+              "and copy the backup file off the phone."),
+        ("b", "Authenticator apps and passwords: export or note them down so you are not locked out."),
+        ("b", "Check the backup opens on the computer before you go on."),
+        ("w", "App data, SMS, contacts and settings are not copied by the file backup."),
+    ]),
     ("1. Add your account to the phone", [
         ("p", "Do this on the phone, before using miunlock."),
         ("b", "Settings > About phone: tap Build number (or MIUI/OS version) seven times to "
