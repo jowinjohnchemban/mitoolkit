@@ -36,6 +36,13 @@ APPROVAL: Dict[str, str] = {
     "login": "use your saved Mi Account session, or open the sign-in page if there is none",
 }
 
+# What the window can copy, as (key, name): the first is the standard, for any MCP client.
+FORMATS = (("json", "Any MCP Client (JSON)"), ("claude", "Claude Code (Command)"), ("vscode", "VS Code (JSON)"),
+           ("bridge", "Clients That Start a Program (Command)"), ("openai", "ChatGPT and OpenAI API (JSON)"),
+           ("curl", "Test with curl (Command)"))
+# Said after copying, when a format has a catch worth knowing.
+FORMAT_NOTES = {"openai": "ChatGPT and OpenAI call from the internet, so they need a public address: see the agents guide."}
+
 Approve = Callable[[str, dict], bool]
 OnCall = Callable[[str], None]
 OnClient = Callable[[str], None]
@@ -110,9 +117,36 @@ class McpHttpServer:
                 f'--header "Authorization: Bearer {self.token}"')
 
     def json_settings(self) -> str:
-        """The same as the JSON that MCP clients read (for example Claude Desktop through mcp-remote, or Cursor)."""
+        """The standard JSON that MCP clients read (``mcpServers``), for any client that supports an HTTP server."""
         return json.dumps({"mcpServers": {"mitoolkit": {
             "type": "http", "url": self.url, "headers": {"Authorization": f"Bearer {self.token}"}}}}, indent=2)
+
+    def vscode_settings(self) -> str:
+        """The same for VS Code's ``mcp.json``, which names the list ``servers``."""
+        return json.dumps({"servers": {"mitoolkit": {
+            "type": "http", "url": self.url, "headers": {"Authorization": f"Bearer {self.token}"}}}}, indent=2)
+
+    def curl_test(self) -> str:
+        """A command that asks the server for its tools: a way to try it without any client (a Unix shell)."""
+        return (f"curl -s {self.url} -H 'Authorization: Bearer {self.token}' -H 'Content-Type: application/json' "
+                "-d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}'")
+
+    def bridge_command(self) -> str:
+        """For a client that can only start a program (stdio), not call an address: the mcp-remote bridge turns one into
+        the other. Use it as the client's command."""
+        return f'npx -y mcp-remote {self.url} --header "Authorization: Bearer {self.token}"'
+
+    def openai_tool(self) -> str:
+        """The MCP tool entry for OpenAI's Responses API (and so ChatGPT-style connectors). OpenAI's servers make the
+        call, so the address must be one they can reach over the internet: a local address only works for clients on
+        this computer."""
+        return json.dumps({"type": "mcp", "server_label": "mitoolkit", "server_url": self.url,
+                           "headers": {"Authorization": f"Bearer {self.token}"}, "require_approval": "always"}, indent=2)
+
+    def settings(self, kind: str) -> str:
+        """The text to copy for one of the FORMATS (by key)."""
+        return {"json": self.json_settings, "claude": self.claude_code_command, "vscode": self.vscode_settings,
+                "bridge": self.bridge_command, "openai": self.openai_tool, "curl": self.curl_test}[kind]()
 
     # ------------------------------------------------------------------------------------------- one request
     def dispatch(self, msg: Any) -> Any:

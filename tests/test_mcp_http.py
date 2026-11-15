@@ -241,6 +241,36 @@ class ServerTests(unittest.TestCase):
         entry = settings["mcpServers"]["mitoolkit"]
         self.assertEqual((entry["url"], entry["headers"]["Authorization"]), (server.url, f"Bearer {server.token}"))
 
+    def test_settings_are_offered_for_any_client_not_only_one_product(self):
+        server, _ = self.start()
+        keys = [key for key, _name in mcp_http.FORMATS]
+        self.assertEqual(keys[0], "json")                                           # the standard one comes first
+        for key in keys:
+            text = server.settings(key)
+            self.assertIn(server.url, text)
+            self.assertIn(server.token, text)
+        self.assertEqual(json.loads(server.settings("vscode"))["servers"]["mitoolkit"]["type"], "http")
+        openai = json.loads(server.settings("openai"))
+        self.assertEqual((openai["type"], openai["server_url"], openai["require_approval"]), ("mcp", server.url, "always"))
+        self.assertIn("mcp-remote", server.settings("bridge"))
+        self.assertIn("openai", mcp_http.FORMAT_NOTES)                              # the catch is said after copying
+        self.assertIn("mcpServers", server.settings("json"))
+        curl = server.settings("curl")
+        self.assertTrue(curl.startswith("curl ") and "tools/list" in curl)
+        names = [name for _key, name in mcp_http.FORMATS]
+        self.assertEqual(len(set(names)), len(names))
+
+    def test_the_curl_command_really_works_against_the_server(self):
+        import subprocess
+        import shutil
+        if not shutil.which("curl"):
+            self.skipTest("no curl here")
+        server, _ = self.start()
+        if os.name == "nt":                                                         # the quoting of a Unix shell
+            self.skipTest("the command is for a Unix shell")
+        out = subprocess.run(server.settings("curl"), shell=True, capture_output=True, text=True, timeout=20).stdout
+        self.assertIn('"tools"', out)
+
     def test_the_closing_steps_include_the_agent_connection(self):
         from mitoolkit import shutdown
         self.assertIs(shutdown.STEPS[0], shutdown._stop_agents)           # before the phone is let go
@@ -363,11 +393,12 @@ class AppTests(unittest.TestCase):
         server = self.app._agent
         self.assertEqual((d.address.get(), d.token.get()), (server.url, server.token))
         self.assertEqual(str(d.switch.cget("text")), "Turn Off")
-        d._copy_command()
-        self.assertEqual(self.root.clipboard_get(), server.claude_code_command())
-        self.assertIn("Copied the Claude Code command", d.copied.cget("text"))
-        d._copy_json()
+        d._copy_settings()                                                         # the first choice: any MCP client
         self.assertEqual(json.loads(self.root.clipboard_get())["mcpServers"]["mitoolkit"]["url"], server.url)
+        self.assertIn("Copied the settings for Any MCP Client (JSON)", d.copied.cget("text"))
+        d.format.set("Claude Code (Command)")
+        d._copy_settings()
+        self.assertEqual(self.root.clipboard_get(), server.claude_code_command())
         self.assertEqual((d.win.winfo_width(), d.win.winfo_height()), size)        # the window never changes size
         d.switch.invoke()
         self.root.update()

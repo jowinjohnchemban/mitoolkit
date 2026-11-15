@@ -93,7 +93,9 @@ class LiveDialogTests(unittest.TestCase):
         for _ in range(5):
             d._deliver(self.mon.sample(), None)
         self.assertTrue(d._scheduled)                      # one task for the whole batch
-        self.assertEqual(self.app.q.qsize(), 1)
+        # one task for this window (the app's queue may hold others of its own: a log line, a status change)
+        mine = [item for item in list(self.app.q.queue) if item[0] == "call" and item[1] == d._drain]
+        self.assertEqual(len(mine), 1)
         queued = len(d._inbox)                             # (the real reading thread may have added one)
         self.assertGreaterEqual(queued, 5)
         d._drain()                                         # what the window's pump does with that task
