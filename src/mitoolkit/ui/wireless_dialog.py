@@ -202,6 +202,8 @@ class WirelessDialog(Dialog):
                     if service["kind"] == "connect" and service["address"].startswith(host + ":"):
                         return adb_server.connect(service["address"]), True
             except AdbError:
+                # Pairing itself worked. Finding or reaching the connect address failed (mDNS blocked on this
+                # network, say), so the person is told to connect by address instead of seeing an error.
                 pass
             return target, False
 
