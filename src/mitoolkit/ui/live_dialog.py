@@ -227,8 +227,8 @@ class LiveStatusDialog(Dialog):
         self.s_ram = Gauge(parts, "Memory (RAM)", f, (75, 90))
         for col, gauge in enumerate((self.s_cpu, self.s_gpu, self.s_ram)):
             gauge.grid(row=0, column=col, sticky="ew", padx=6, pady=(0, 4))
-        self.soc_note = ttk.Label(page, text="Temperatures are the hottest sensor of each part (see Sensors for all "
-                                             "of them).", foreground=MUTED)
+        self.soc_note = ttk.Label(page, text="A part's temperature is the highest reading among its sensors. Every "
+                                             "sensor is listed on the Sensors tab.", foreground=MUTED)
         self.soc_note.pack(anchor="w", pady=(0, 14))
         ttk.Label(page, text="Cores", font=self.fonts.bold).pack(anchor="w")
         ttk.Label(page, text="Each core with its own trend (the last minute), its usage and its speed.",

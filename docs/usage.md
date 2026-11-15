@@ -281,7 +281,8 @@ Handy features:
     load, 45 and 60 °C). Point at a graph for a tooltip with the exact value. The time range (1 min up
     to 1 hr) is at the top right, on this tab only.
   - **SoC** (the chip that runs the phone): the processor, the graphics chip (GPU) and the memory (RAM),
-    each with its load, speed and temperature (the hottest sensor of that part, with Normal, Warm or Hot), then
+    each with its load, speed and temperature (the highest reading among that part's sensors, with Normal, Warm
+    or Hot), then
     every processor core with its own trend, usage and speed, labelled Performance or Efficiency where the
     phone has both.
   - **Sensors**: every thermal sensor the phone lets us read, hottest first, with Normal, Warm or Hot.
@@ -310,10 +311,13 @@ Handy features:
   Android Studio or a terminal may be using it. In `~/.mitoolkit/settings.json`, `"stop_any_adb_on_exit": true`
   stops that one too, and `"stop_adb_on_exit": false` stops none. A phone connected over Wi-Fi is disconnected
   when the adb server stops, so reconnect it the next time.
-- **Help > Check for updates...** shows what is new in the latest release. For the single-file program from
-  the Releases page, **Install and restart** downloads the update, checks it against the release's
-  `SHA256SUMS.txt`, swaps it in and starts it again; a pip or source install is pointed to the release page
-  instead. Once a day the app also looks quietly and says in the status line when there is a newer version;
+- **Help > Check for updates...** shows what is new in the latest release, and when there is a newer one offers
+  three things. For the single-file program from the Releases page, **Install and restart** downloads the update,
+  checks it against the release's `SHA256SUMS.txt`, swaps it in and starts it again. **Download only** (or
+  **Download**, for a pip or source install, which cannot replace itself) saves the release file for your system
+  in your Downloads folder, named with its version (`mitoolkit-windows-x64-v1.4.0.exe`), checks it against the
+  same checksum and installs nothing; **Show in folder** then opens it. **Release page** opens the release on
+  GitHub. Once a day the app also looks quietly and says in the status line when there is a newer version;
   turn that off with **Help > Check for updates automatically**. Versions read `v1.0.0 (build: DDMMYYYY-commit)`:
   the release number, then the date and short id of the commit it was built from (shown in the title bar,
   About and `mitoolkit --version`).

@@ -607,6 +607,16 @@ class App:
             self._link_mode = "wifi"
             self._info.clear()
 
+    def _cable_plugged_in(self) -> None:
+        """A phone was plugged in while the selector said Wi-Fi and nothing answered there: switch to USB, where it is,
+        instead of saying the phone is not answering. (Setting the variable does not run the selector's command, so
+        this does not start another scan; the next regular one finds the phone.)"""
+        if self._link_mode == "wifi":
+            self.link_var.set("usb")
+            self._link_mode = "usb"
+            self._info.clear()
+            self._log("The phone is plugged in with a USB cable: switched to USB.")
+
     def expect_wifi_phone(self) -> None:
         """A phone was just paired: search the network again at once and try it again even if it was refused a moment
         ago (it is trusted now). The Wi-Fi search connects it as soon as it announces itself."""
@@ -650,6 +660,11 @@ class App:
                 wifi = self._link_mode == "wifi"
                 try:  # no phone in fastboot: is one running Android? (over the cable, or Wi-Fi in Wireless mode)
                     found = self._adb_devices(wifi)
+                    if wifi and not any(d["state"] == "device" for d in found):
+                        cable = [d for d in adb.devices() if not is_wireless(d["serial"]) and d["state"] == "device"]
+                        if cable:       # plugged in while looking on Wi-Fi: the cable is the better link, use it
+                            wifi, found = False, cable
+                            self.call_soon(self._cable_plugged_in)
                     if not found and wifi:
                         android = self._wifi_candidate()
                     if found:
@@ -744,6 +759,11 @@ class App:
                 self.leave_btn
         if state == "device":
             name = self._phone_name(android) or "Phone"
+            if is_wireless(android.get("serial", "")):       # fastboot has no Wi-Fi: say so before the button is pressed
+                return (ORANGE_DOT, f"{name} is on",
+                        "Connected over Wi-Fi. To unlock, it must be in fastboot mode, which needs a USB cable: plug "
+                        "the phone in and choose USB. Restarting into fastboot is safe and erases nothing.",
+                        self.fb_btn)
             return (ORANGE_DOT, f"{name} is on",
                     "To unlock, it must be in fastboot mode. Restarting into it is safe and erases nothing.",
                     self.fb_btn)

@@ -59,6 +59,30 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(nice_ceiling(87), 100)
         self.assertEqual(nice_ceiling(0.07), 0.08)
 
+    def test_without_a_baseline_the_first_sample_just_has_no_load(self):
+        class NoStat(FakePhone):
+            def shell(self, command, timeout_ms=0):
+                if command == "cat /proc/stat":
+                    raise OSError("not readable")
+                return super().shell(command, timeout_ms)
+        mon = monitor.Monitor(NoStat())
+        self.assertNotIn("cpu", mon.sample())
+        time.sleep(0.05)
+        self.assertIn("cpu", mon.sample())                   # and the second one does, as before
+
+    def test_zones_that_are_not_temperatures_are_left_out(self):
+        """A Snapdragon phone lists battery voltage and current limits beside the temperatures: 3737 (mV) is not 3.7 C."""
+        text = ("pm6150-vbat-lvl0 3737\npm6150-ibat-lvl0 703\npm6150l-bcl-lvl1 0\npm6150l-vph-lvl2 12\nsoc 60\n"
+                "pm6150-bcl-lvl2 25\nbattery 38000\nbms 38000\ncpu-0-0-usr 48500\ngpuss-0-usr 45900\nconn-therm-usr -40000\n"
+                "cpu-0-max-step 50400\ncpu-1-1-step 48800\naoss-0-lowf 48800\n")
+        self.assertEqual([n for n, _d in monitor.parse_thermal(text)], ["battery", "bms", "cpu-0-0-usr", "gpuss-0-usr"])
+
+    def test_the_battery_charge_is_never_the_hottest_sensor(self):
+        """A phone with a zone named soc (the battery's charge, 54) showed "54 C, warm" as its hottest sensor."""
+        text = "soc 54\ncpu-0-0-usr 38500\nbattery 36000\n"
+        hottest = max(monitor.parse_thermal(text), key=lambda s: s[1])
+        self.assertEqual(hottest, ("cpu-0-0-usr", 38.5))
+
     def test_the_temperature_of_each_part_of_the_chip_is_its_hottest_sensor(self):
         """From a Snapdragon phone's real sensor names: cores, cluster, GPU and memory sensors, plus limiters."""
         sensors = [("cpu-0-0-usr", 48.5), ("cpu-0-4-usr", 50.4), ("cpuss-1-usr", 50.7), ("cpu-0-max-step", 99.0),
@@ -91,10 +115,12 @@ class FakePhone:
 
 
 class MonitorTests(unittest.TestCase):
-    def test_first_sample_has_no_rates_then_rates_appear(self):
+    def test_the_first_sample_already_has_a_load_but_network_rates_need_a_second(self):
+        """The load is read against a quick baseline taken first, so the gauge does not wait for a second sample
+        (over USB a sample takes several seconds). Network speed is still a rate over time."""
         mon = monitor.Monitor(FakePhone())
         first = mon.sample()
-        self.assertNotIn("cpu", first)
+        self.assertAlmostEqual(first["cpu"], 10.0)
         self.assertNotIn("net_down_kbs", first)
         self.assertEqual(first["mem_pct"], 75.0)
         self.assertEqual(first["current_ma"], -450)

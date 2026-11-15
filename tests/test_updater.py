@@ -129,6 +129,41 @@ class DownloadAndInstallTests(unittest.TestCase):
         with self.assertRaisesRegex(updater.UpdateError, "SHA256SUMS"):
             updater.download(r, self.dir / "new")
 
+    def test_a_release_can_be_downloaded_to_a_folder_without_installing_it(self):
+        body = b"new program"
+        with self.get(body, hashlib.sha256(body).hexdigest()):
+            path = updater.download_to(release("v9.9.9"), self.dir)
+        self.assertEqual(path, self.dir / "mitoolkit-linux-x64-v9.9.9")           # the version is in the name
+        self.assertEqual(path.read_bytes(), body)
+        self.assertEqual([p.name for p in self.dir.iterdir()], [path.name])         # no .part left behind
+        if sys.platform != "win32":
+            self.assertTrue(os.access(path, os.X_OK))                                # a program, not a plain file
+
+    def test_a_download_of_another_version_is_kept_and_the_same_one_is_replaced(self):
+        for version, body in (("v9.9.8", b"old"), ("v9.9.9", b"new"), ("v9.9.9", b"new again")):
+            with self.get(body, hashlib.sha256(body).hexdigest()):
+                updater.download_to(release(version), self.dir)
+        self.assertEqual(sorted(p.name for p in self.dir.iterdir()),
+                         ["mitoolkit-linux-x64-v9.9.8", "mitoolkit-linux-x64-v9.9.9"])
+        self.assertEqual((self.dir / "mitoolkit-linux-x64-v9.9.9").read_bytes(), b"new again")
+
+    def test_a_download_with_a_wrong_checksum_leaves_nothing_in_the_folder(self):
+        with self.get(b"tampered", "0" * 64):
+            with self.assertRaisesRegex(updater.UpdateError, "checksum"):
+                updater.download_to(release(), self.dir)
+        self.assertEqual(list(self.dir.iterdir()), [])
+
+    def test_a_folder_that_cannot_be_written_is_a_plain_error(self):
+        with self.get(b"x", hashlib.sha256(b"x").hexdigest()):
+            with self.assertRaisesRegex(updater.UpdateError, "Could not save it"):
+                updater.download_to(release(), self.dir / "missing" / "folder")
+
+    def test_the_downloads_folder_falls_back_to_home(self):
+        with mock.patch.object(Path, "home", return_value=self.dir):
+            self.assertEqual(updater.downloads_folder(), self.dir)                    # no Downloads folder here
+            (self.dir / "Downloads").mkdir()
+            self.assertEqual(updater.downloads_folder(), self.dir / "Downloads")
+
     def test_install_swaps_and_keeps_the_old_copy_until_next_start(self):
         exe, new = self.dir / "mitoolkit", self.dir / "mitoolkit.new"
         exe.write_bytes(b"old")
@@ -196,16 +231,68 @@ class UpdateWindowTests(unittest.TestCase):
         from mitoolkit.ui.update_dialog import UpdateDialog
         return UpdateDialog(self.app, rel, start=True)
 
-    def test_newer_release_offers_the_right_button(self):
+    def packed(self, d):
+        return [str(w.cget("text")) for w in (d.action, d.download_btn, d.page_btn) if w.winfo_manager()]
+
+    def test_newer_release_offers_the_right_buttons(self):
         with mock.patch.object(updater, "can_self_update", return_value=False):
             d = self.dialog(release("v99.0.0"))
             self.assertIn("v99.0.0", d.line.cget("text"))
-            self.assertEqual(d.action.cget("text"), "Open the release page")
+            self.assertEqual(d.action.cget("text"), "Download")                  # a pip or source install: get the file
+            self.assertEqual(self.packed(d), ["Download", "Release page"])
             d.close()
         with mock.patch.object(updater, "can_self_update", return_value=True):
             d = self.dialog(release("v99.0.0"))
             self.assertEqual(d.action.cget("text"), "Install and restart")
+            self.assertEqual(self.packed(d), ["Install and restart", "Download only", "Release page"])
             d.close()
+
+    def test_the_buttons_all_fit_in_the_window(self):
+        with mock.patch.object(updater, "can_self_update", return_value=True):
+            d = self.dialog(release("v99.0.0"))
+            self.root.update()
+            right = max(b.winfo_rootx() + b.winfo_width() for b in (d.action, d.download_btn, d.page_btn))
+            self.assertLessEqual(right, d.win.winfo_rootx() + d.win.winfo_width())
+            d.close()
+
+    def test_download_only_saves_the_checked_file_and_installs_nothing(self):
+        body = b"program"
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(folder, ignore_errors=True))
+
+        def fake(url, **kw):
+            return FakeReply(body=body) if url.endswith(NAME) else FakeReply(text=f"{hashlib.sha256(body).hexdigest()}  {NAME}\n")
+        with mock.patch.object(updater, "can_self_update", return_value=True), \
+                mock.patch.object(updater, "asset_name", return_value=NAME), \
+                mock.patch.object(updater, "downloads_folder", return_value=folder), \
+                mock.patch.object(updater, "install") as install, mock.patch("requests.get", side_effect=fake):
+            d = self.dialog(release("v99.0.0"))
+            d._download()
+            for _ in range(100):
+                self.root.update()
+                if d.saved is not None:
+                    break
+                self.root.after(20)
+        install.assert_not_called()
+        self.assertEqual(d.saved, folder / "mitoolkit-linux-x64-v99.0.0")
+        self.assertIn("not installed", d.line.cget("text"))
+        self.assertTrue(d.reveal_btn.winfo_manager())                              # Show in folder appears
+        self.assertEqual(str(d.action.cget("state")), "normal")                    # and the buttons are back
+        d.close()
+
+    def test_a_failed_download_says_why_and_brings_the_buttons_back(self):
+        with mock.patch.object(updater, "can_self_update", return_value=True), \
+                mock.patch.object(updater, "download_to", side_effect=updater.UpdateError("The download stopped.")):
+            d = self.dialog(release("v99.0.0"))
+            d._download()
+            for _ in range(100):
+                self.root.update()
+                if not d._busy:
+                    break
+                self.root.after(20)
+        self.assertIn("The download stopped.", d.line.cget("text"))
+        self.assertEqual(str(d.download_btn.cget("state")), "normal")
+        d.close()
 
     def test_same_version_says_up_to_date(self):
         d = self.dialog(release(f"v{build.__version__}"))

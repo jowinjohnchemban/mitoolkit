@@ -25,7 +25,19 @@ pull request titles (see CONTRIBUTING.md); the full, generated notes of each rel
 - The log file and crash.log are written in a `logs` folder next to the program instead of beside it, and that folder
   is ignored by git (a rotated `mitoolkit.log.1` was once committed by accident).
 
+- Live status listed things that are not temperatures as sensors: the battery's charge as a "54 °C, warm" hottest
+  sensor, battery voltage and current limits as a few degrees, and the thermal governor's derived `-step` and `lowf`
+  zones. They are left out. The SoC page's note about temperatures now says what it means.
+- The Processor gauge waited for a second reading before it showed anything (about 15 s over USB); the first
+  reading now already has a load.
+- With the selector on Wi-Fi, a phone plugged in with a cable showed "The phone isn't answering"; the app now
+  switches to USB. A phone on Wi-Fi says up front that fastboot needs a cable. The footer shows the USB port
+  (`USB port 2-8`) even when adb's device list does not say where the phone is plugged in.
+
 ### Added
+- Check for updates can download the latest release file (checked against its SHA-256, saved in Downloads with the
+  version in its name, nothing installed) as well as install it, for every kind of install, and opens the release
+  page. The window grows to fit its buttons.
 - A USB | Wi-Fi selector in the Phone section (USB by default; both choices always visible, the labels fade as the
   thumb slides). Wi-Fi mode finds phones with Wireless debugging on the network, connects the ones that already
   trust this computer, and guides pairing for a new one: with a QR code that the phone scans, or with the pairing

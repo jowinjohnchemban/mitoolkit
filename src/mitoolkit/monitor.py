@@ -82,12 +82,20 @@ def parse_freqs(text: str) -> List[int]:
     return [int(n) // 1000 for n in re.findall(r"^\d+$", text, re.M) if int(n) > 0]
 
 
+# Thermal zones that are not sensors of a temperature: the phone lists battery voltage (vbat, in millivolts) and
+# current (ibat), battery-current-limit and power-level steps (bcl, lvl, vph), the battery's charge (a zone called soc,
+# in percent) and the thermal governor's derived limiter zones (step, lowf) in the same folder. Read as degrees they
+# show up as "3.7 °C", or as a "hottest sensor" of 54 °C that is really 54 % charge.
+_NOT_TEMPERATURE = re.compile(r"(vbat|ibat|vph|bcl|lvl|step|lowf)|^soc$", re.I)
+
+
 def parse_thermal(text: str) -> List[Tuple[str, float]]:
-    """(sensor name, degrees C). Values come as millidegrees (or degrees on some phones)."""
+    """(sensor name, degrees C). Values come as millidegrees (or degrees on some phones). Zones that are not
+    temperatures (battery voltage, current limits, the battery's charge) are left out."""
     out: List[Tuple[str, float]] = []
     for line in text.splitlines():
         m = re.match(r"^(\S+)\s+(-?\d+)$", line.strip())
-        if not m:
+        if not m or _NOT_TEMPERATURE.search(m.group(1)):
             continue
         value = int(m.group(2))
         degrees = value / 1000 if abs(value) >= 1000 else float(value)
@@ -245,7 +253,18 @@ class Monitor:
         self._net: Optional[Tuple[int, int, float]] = None
         self._count = 0
 
+    def _baseline(self) -> None:
+        """A load is the change between two readings of /proc/stat, so the first full sample (which takes a few
+        seconds over USB) would have none and the gauge would wait for the second. Read it once, quickly, first."""
+        try:
+            self._cpu = parse_cpu_cores(self.phone.shell("cat /proc/stat", 10000)) or {}
+        except Exception:
+            # no baseline: the first sample just has no load, as it always did
+            self._cpu = {}
+
     def sample(self) -> Dict[str, object]:
+        if not self._cpu and self._count == 0:
+            self._baseline()
         now = time.monotonic()
         raw = self.phone.shell(SAMPLE_COMMAND, 20000)
         parts = [p.strip() for p in raw.split(_MARK)[1:]]
