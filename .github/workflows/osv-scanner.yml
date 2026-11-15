@@ -1,0 +1,49 @@
+name: OSV-Scanner
+
+# Checks the exact dependency versions the program installs against Google's OSV database (which includes
+# the GitHub advisory and PyPA advisory data). pip-audit in security.yml covers the same ground from PyPA's
+# side; OSV also lists advisories that one does not. Results go to the Security tab.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 5 * * 1"   # weekly: a dependency can become known-vulnerable without any change here
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  osv:
+    name: OSV-Scanner
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write   # to publish the results to the Security tab
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Resolve the dependencies the program installs (pyproject.toml has ranges, OSV needs versions)
+        run: |
+          python -m pip install .
+          python -m pip freeze --exclude mitoolkit > requirements-resolved.txt
+          cat requirements-resolved.txt
+      - name: Scan them with OSV-Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
+        with:
+          scan-args: |-
+            --lockfile=requirements.txt:requirements-resolved.txt
+            --format=sarif
+            --output=osv-results.sarif
+      - name: Publish the results to the Security tab
+        if: always() && hashFiles('osv-results.sarif') != '' && github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: osv-results.sarif
+          category: osv-scanner
