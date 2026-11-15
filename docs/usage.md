@@ -276,7 +276,7 @@ Handy features:
   the Releases page, **Install and restart** downloads the update, checks it against the release's
   `SHA256SUMS.txt`, swaps it in and starts it again; a pip or source install is pointed to the release page
   instead. Once a day the app also looks quietly and says in the status line when there is a newer version;
-  turn that off with **Help > Check for updates automatically**. Versions read `v1.8.0 (build: DDMMYYYY-commit)`:
+  turn that off with **Help > Check for updates automatically**. Versions read `v1.0.0 (build: DDMMYYYY-commit)`:
   the release number, then the date and short id of the commit it was built from (shown in the title bar,
   About and `miunlock --version`).
 - **Debug logging** (Help menu, `--debug`, or `MIUNLOCK_DEBUG=1`) adds step-by-step lines to `miunlock.log`:

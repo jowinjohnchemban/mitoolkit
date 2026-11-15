@@ -71,7 +71,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertIsNone(updater.parse_version("1.8"))
         self.assertIsNone(updater.parse_version("v1.8.1-beta"))
         self.assertTrue(updater.is_newer(release("v1.10.0"), "1.9.9"))      # numbers, not text
-        self.assertFalse(updater.is_newer(release("v1.8.0"), "1.8.0"))
+        self.assertFalse(updater.is_newer(release("v1.0.0"), "1.0.0"))
 
     def test_latest_keeps_only_downloads_from_this_project(self):
         data = {"tag_name": "v9.9.9", "body": "What is new", "html_url": "https://github.com/p",

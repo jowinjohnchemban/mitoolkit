@@ -1,11 +1,11 @@
-"""The version as shown to people: ``v1.8.0 (build: 15112026-8ae71a1)``.
+"""The version as shown to people: ``v1.0.0 (build: 15112026-8ae71a1)``.
 
-``1.8.0`` is major.minor.patch (``miunlock.__version__``). The build is the date of the commit the
+``1.0.0`` is major.minor.patch (``miunlock.__version__``). The build is the date of the commit the
 program was made from, as DDMMYYYY, and that commit's short id, so a bug report names the exact code.
 
 Release builds read them from ``miunlock/_build.py``, which the release workflow writes just before
 building. A program run from a git checkout asks git. Anywhere else (an install from a source archive) only
-``v1.8.0`` is shown.
+``v1.0.0`` is shown.
 """
 from __future__ import annotations
 
@@ -45,6 +45,6 @@ def _from_git(folder: Path) -> Optional[Tuple[str, str]]:
 
 
 def full_version() -> str:
-    """``v1.8.0 (build: 15112026-8ae71a1)``, or ``v1.8.0`` when the build is not known."""
+    """``v1.0.0 (build: 15112026-8ae71a1)``, or ``v1.0.0`` when the build is not known."""
     known = info()
     return f"v{__version__}" + (f" (build: {known[0]}-{known[1]})" if known else "")
