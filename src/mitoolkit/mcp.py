@@ -10,7 +10,6 @@ erases the phone and must be a person's decision, made in the GUI or with
 ``mitoolkit --cli unlock --confirm-wipe``. That is deliberate, see docs/safety.md.
 """
 import json
-import re
 import sys
 from typing import Any, Dict
 
@@ -143,8 +142,8 @@ def _call(name: str, args: dict) -> dict:
     except api.UnlockError as err:
         return {"isError": True, "content": [{"type": "text", "text": json.dumps({"error": str(err)})}]}
     except Exception as err:  # keep the server alive; never leak a traceback with data in it
-        safe_name = re.sub(r"[\r\n]+", " ", str(name))
-        log.get("mcp").error("tool %s failed: %s", safe_name, type(err).__name__)
+        logged_name = name if name in TOOLS else "<unknown>"
+        log.get("mcp").error("tool %s failed: %s", logged_name, type(err).__name__)
         return {"isError": True, "content": [{"type": "text", "text": json.dumps({"error": type(err).__name__})}]}
 
 
