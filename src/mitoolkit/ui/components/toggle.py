@@ -1,8 +1,12 @@
-"""A toggle switch in the style of Tailwind UI's switches, for a choice between two things such as USB and Wireless.
+"""A toggle switch for a choice between two things such as USB and Wireless: a vivid blue pill with a white thumb.
 
-A clean gray pill with a plain white thumb that has a soft shadow. Switched on, the pill turns a vivid blue and the
-thumb slides right; pressing it stretches the thumb a little, as on a phone. The two names sit either side, the
-chosen one dark and bold, so colour is never the only signal. A hover darkens the pill.
+A clean gray pill with a white thumb that has a soft shadow and a small glyph of what is chosen: a USB plug for
+the first choice, the Wi-Fi symbol for the second. Switched on, the pill turns blue and the thumb slides right;
+pressing it stretches the thumb a little, as on a phone. The two names sit either side, the chosen one dark and
+bold, so colour is never the only signal. A hover darkens the pill.
+
+It is drawn anti-aliased at several times its size (Pillow, like the charts) and scaled to the screen's DPI, so it is
+sharp on a high-DPI display. Without Pillow a plainer canvas drawing is used.
 
 Click anywhere on it, or press Space or Enter when it has the keyboard focus (a blue ring with a gap around the pill
 shows for the keyboard, never after a mouse click). One variable holds the chosen value, as with the selector bar.
@@ -14,19 +18,20 @@ import tkinter as tk
 from tkinter import font as tkfont
 from typing import Callable, Optional, Tuple
 
-from mitoolkit.ui.components import skeleton
-from mitoolkit.ui.components.shapes import mix, page_background, rounded
+from mitoolkit.ui.components import render, skeleton
+from mitoolkit.ui.components.shapes import mix, page_background
 
-TRACK_W, TRACK_H = 50, 30
+TRACK_W, TRACK_H = 50, 30                   # design sizes in pixels at 96 dpi; everything scales with the screen
 THUMB = 24
 PAD = 3                                     # the gap between the thumb and the track's edge
 STRETCH = 4                                 # the thumb gets this much wider while pressed
 GAP = 12                                    # between a name and the switch
-HEIGHT = 44
+HEIGHT = 46
+MARGIN = 8                                  # room around the pill for the focus ring
 FRAMES, FRAME_MS = 12, 16
 TEXT, MUTED_TEXT = "#1b1b1b", "#555555"
 OFF_TRACK, OFF_HOVER = "#d1d5db", "#c3c8d0"  # gray-300, a touch darker on hover
-OFF_BORDER = "#6b7280"                      # gray-500: the off pill's outline (3:1 or better on the page)
+OFF_BORDER = "#6b7280"                      # gray-500: the off pill's outline and glyph (3:1 or better on the page)
 ON_TRACK, ON_HOVER = "#2f5bff", "#2449d9"    # a vivid blue, a touch deeper on hover
 KNOB_ON = "#ffffff"                         # the thumb
 
@@ -44,10 +49,10 @@ class ToggleSwitch(tk.Canvas):
         self._bold.configure(weight="bold")
         self._pos = 1.0 if self._is_on() else 0.0       # 0 = thumb left, 1 = thumb right (animated)
         self._anim: Optional[str] = None
+        self._image = None                              # the picture of the switch (kept referenced while shown)
         self._focus = self._mouse = self._hover = self._pressed = False
-        self._left_w = self._bold.measure(off[1])
-        self._right_w = self._bold.measure(on[1])
-        self.configure(width=self._left_w + GAP + TRACK_W + GAP + self._right_w + 10, height=HEIGHT)
+        self._k = max(1.0, self.winfo_fpixels("1i") / 96.0)        # the screen's scale: 1.0 at 96 dpi, 1.5 at 150 %
+        self._measure()
         for seq, fn in (("<Configure>", lambda e: self.draw()), ("<ButtonPress-1>", self._on_press),
                         ("<ButtonRelease-1>", self._on_release), ("<Enter>", lambda e: self._set(hover=True)),
                         ("<Leave>", lambda e: self._set(hover=False)), ("<FocusIn>", lambda e: self._focused(True)),
@@ -56,6 +61,17 @@ class ToggleSwitch(tk.Canvas):
             self.bind(seq, fn)
         self._trace = variable.trace_add("write", lambda *_: self._slide())
         self.draw()
+
+    def _measure(self) -> None:
+        """Sizes in device pixels for this screen, and the control's own size."""
+        k = self._k
+        self._tw, self._th = round(TRACK_W * k), round(TRACK_H * k)
+        self._thumb, self._pad, self._stretch = round(THUMB * k), round(PAD * k), round(STRETCH * k)
+        self._gap, self._height, self._margin = round(GAP * k), round(HEIGHT * k), round(MARGIN * k)
+        self._left_w = self._bold.measure(self.off[1])
+        self._right_w = self._bold.measure(self.on[1])
+        self.configure(width=round(5 * k) + self._left_w + self._gap + self._tw + self._gap + self._right_w + round(10 * k),
+                       height=self._height)
 
     # ---------------------------------------------------------------------------------------------- state
     def _is_on(self) -> bool:
@@ -80,7 +96,7 @@ class ToggleSwitch(tk.Canvas):
 
     def _on_release(self, event) -> None:
         self._pressed = False
-        if 0 <= event.x <= int(self.cget("width")) and 0 <= event.y <= HEIGHT:
+        if 0 <= event.x <= int(self.cget("width")) and 0 <= event.y <= self._height:
             self.toggle()
         self.winfo_toplevel().focus_set()
         self.draw()
@@ -111,6 +127,7 @@ class ToggleSwitch(tk.Canvas):
             # the trace is already off the variable
             pass
         self.command = None
+        self._image = None
 
     # ------------------------------------------------------------------------------------------ animation
     def _slide(self) -> None:
@@ -130,7 +147,7 @@ class ToggleSwitch(tk.Canvas):
 
         def step(i: int) -> None:
             x = i / FRAMES
-            self._pos = start + (end - start) * (x * x * (3 - 2 * x))             # ease in and out, like Tailwind's
+            self._pos = start + (end - start) * (x * x * (3 - 2 * x))             # ease in and out
             self.draw()
             self._anim = self.after(FRAME_MS, step, i + 1) if i < FRAMES else None
         step(1)
@@ -141,33 +158,40 @@ class ToggleSwitch(tk.Canvas):
         c.delete("all")
         on = self._is_on()
         t = self._pos
-        mid = HEIGHT // 2
-        x0 = 5 + self._left_w + GAP
+        mid = self._height // 2
+        k = self._k
+        x0 = round(5 * k) + self._left_w + self._gap
         # the two names: the chosen one dark and bold
-        c.create_text(5, mid, text=self.off[1], anchor="w", fill=MUTED_TEXT if on else TEXT,
+        c.create_text(round(5 * k), mid, text=self.off[1], anchor="w", fill=MUTED_TEXT if on else TEXT,
                       font=self._font if on else self._bold)
-        c.create_text(x0 + TRACK_W + GAP, mid, text=self.on[1], anchor="w", fill=TEXT if on else MUTED_TEXT,
+        c.create_text(x0 + self._tw + self._gap, mid, text=self.on[1], anchor="w", fill=TEXT if on else MUTED_TEXT,
                       font=self._bold if on else self._font)
         # the pill: gray, blue when on (blending as the thumb moves), a touch darker under the pointer
         off_fill, on_fill = (OFF_HOVER, ON_HOVER) if self._hover else (OFF_TRACK, ON_TRACK)
-        fill = mix(off_fill, on_fill, t)
-        top, bottom = mid - TRACK_H // 2, mid + TRACK_H // 2
-        if self._focus and not self._mouse:                 # ring with a gap, like Tailwind's ring-2 ring-offset-2
-            rounded(c, x0 - 4, top - 4, x0 + TRACK_W + 4, bottom + 4, TRACK_H // 2 + 4, fill="", outline=ON_TRACK,
-                    width=2, tags="ring")
-        self._capsule(x0, top, x0 + TRACK_W, bottom, mix(OFF_BORDER, on_fill, t))          # outline, then the fill
-        self._capsule(x0 + 1, top + 1, x0 + TRACK_W - 1, bottom - 1, fill)
-        # the white thumb with a soft shadow; pressed, it stretches towards the side it is moving to
-        stretch = STRETCH if self._pressed else 0
-        left = x0 + PAD + (TRACK_W - THUMB - 2 * PAD) * t - (stretch * t)
-        right = left + THUMB + stretch
-        ty = mid - THUMB // 2
-        c.create_oval(left, ty + 1.5, right, ty + THUMB + 1.5, fill=mix(fill, "#000000", 0.22), outline="")   # shadow
-        c.create_oval(left, ty, right, ty + THUMB, fill=KNOB_ON, outline=mix(fill, "#000000", 0.08))
+        fill, border = mix(off_fill, on_fill, t), mix(OFF_BORDER, on_fill, t)
+        ring = ON_TRACK if (self._focus and not self._mouse) else ""      # keyboard focus ring, with a gap
+        stretch = self._stretch if self._pressed else 0
+        top = mid - self._th // 2
+        if render.HAVE:
+            self._image = render.toggle_photo(self._tw, self._th, t, fill, border, KNOB_ON, self._thumb, self._pad,
+                                              stretch, "usb" if t < 0.5 else "wifi", OFF_BORDER if t < 0.5 else ON_TRACK,
+                                              ring, self._margin, k)
+            c.create_image(x0 - self._margin, top - self._margin, image=self._image, anchor="nw")
+            if ring:
+                c.addtag_withtag("ring", c.find_all()[-1])
+            return
+        self._plain(x0, top, fill, border, ring, stretch, t)
 
-    def _capsule(self, x0: float, y0: float, x1: float, y1: float, colour: str) -> None:
-        """A true pill: two half circles and a bar between them (a smoothed polygon looks chamfered when small)."""
-        h = y1 - y0
-        self.create_oval(x0, y0, x0 + h, y1, fill=colour, outline=colour)
-        self.create_oval(x1 - h, y0, x1, y1, fill=colour, outline=colour)
-        self.create_rectangle(x0 + h / 2, y0, x1 - h / 2, y1 + 0.5, fill=colour, outline=colour)
+    def _plain(self, x0: int, top: int, fill: str, border: str, ring: str, stretch: int, t: float) -> None:
+        """Without Pillow: the same switch with plain canvas shapes (they have jagged edges and no glyph)."""
+        c, h = self, self._th
+        if ring:
+            gap = self._margin // 2
+            c.create_rectangle(x0 - gap, top - gap, x0 + self._tw + gap, top + h + gap, outline=ring, width=2, tags="ring")
+        for colour, inset in ((border, 0), (fill, 1)):
+            c.create_oval(x0 + inset, top + inset, x0 + h - inset, top + h - inset, fill=colour, outline=colour)
+            c.create_oval(x0 + self._tw - h + inset, top + inset, x0 + self._tw - inset, top + h - inset, fill=colour, outline=colour)
+            c.create_rectangle(x0 + h / 2, top + inset, x0 + self._tw - h / 2, top + h - inset, fill=colour, outline=colour)
+        left = x0 + self._pad + (self._tw - self._thumb - 2 * self._pad) * t - stretch * t
+        c.create_oval(left, top + (h - self._thumb) / 2, left + self._thumb + stretch, top + (h + self._thumb) / 2,
+                      fill=KNOB_ON, outline=mix(fill, "#000000", 0.12))

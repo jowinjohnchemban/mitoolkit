@@ -111,7 +111,7 @@ class ImageCacheTests(unittest.TestCase):
             self.assertLessEqual(len(render._photos), render.MAX_PHOTOS)
             self.assertIsNotNone(first)
             again = render.ring_photo(40, 11 + render.MAX_PHOTOS + 19, "#2f9e6b", "#e8ebf2")   # recent: still cached
-            self.assertIn((id(tk._default_root), "ring", 40, 11 + render.MAX_PHOTOS + 19, "#2f9e6b", "#e8ebf2", 11),
+            self.assertIn((tk._default_root._mitoolkit_image_token, "ring", 40, 11 + render.MAX_PHOTOS + 19, "#2f9e6b", "#e8ebf2", 11),
                           render._photos)
             self.assertIsNotNone(again)
             render.release_images()

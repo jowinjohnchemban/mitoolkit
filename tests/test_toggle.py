@@ -95,6 +95,25 @@ class SwitchTests(unittest.TestCase):
         self.switch.draw()
         self.assertFalse(self.switch.find_withtag("ring"))
 
+    def test_it_scales_with_the_screen_dpi_and_is_drawn_smoothly(self):
+        from mitoolkit.ui.components import render
+        base_w = self.switch._tw
+        self.assertEqual(self.switch._tw, round(toggle.TRACK_W * self.switch._k))
+        self.root.tk.call("tk", "scaling", 2.0)                 # 144 dpi: a 150 % screen
+        big = toggle.ToggleSwitch(self.root, tk.StringVar(value="usb"), ("usb", "USB"), ("wifi", "Wireless"))
+        big.pack()
+        self.root.update()
+        self.assertAlmostEqual(big._k, 1.5, places=1)
+        self.assertGreater(big._tw, base_w)
+        self.assertEqual(big._tw, round(toggle.TRACK_W * 1.5))
+        if render.HAVE:                                         # an anti-aliased picture, not canvas shapes
+            self.assertTrue(any(big.type(i) == "image" for i in big.find_all()))
+            image = render.toggle_image(big._tw, big._th, 1.0, "#2f5bff", "#2f5bff", "#ffffff", big._thumb, big._pad, 0,
+                                        "wifi", "#2f5bff", "", big._margin, big._k)
+            self.assertEqual(image.size, (big._tw + 2 * big._margin, big._th + 2 * big._margin))
+            colours = {image.getpixel((x, image.height // 2)) for x in range(image.width)}
+            self.assertGreater(len(colours), 6)                # soft edges: many in-between shades, not 2 or 3
+
     def test_a_release_outside_does_not_toggle(self):
         self.switch._on_press(SimpleNamespace(x=10, y=10))
         self.switch._on_release(SimpleNamespace(x=-40, y=-40))
