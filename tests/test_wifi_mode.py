@@ -1,0 +1,258 @@
+"""Wireless mode: the USB / Wireless switch, finding phones on the network, pairing by QR code, and clear errors."""
+import logging
+import os
+import re
+import sys
+import threading
+import unittest
+import unittest.mock as mock
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.dirname(__file__))
+
+from tkhelper import make_root  # noqa: E402
+
+from mitoolkit import adb_server  # noqa: E402
+from mitoolkit.adb_usb import AdbError  # noqa: E402
+
+try:
+    import tkinter as tk
+    tk.Tk().destroy()
+    HAVE_DISPLAY = True
+except Exception:
+    HAVE_DISPLAY = False
+
+
+class FakeConn:
+    """Stands in for a socket to Google's adb server: serves the bytes it is given, 4 or n at a time."""
+
+    def __init__(self, data: bytes):
+        self.data = data
+
+    def read(self, n, timeout_ms=0):
+        out, self.data = self.data[:n], self.data[n:]
+        return out
+
+
+class ReplyTests(unittest.TestCase):
+    def test_a_length_prefixed_text_is_read(self):
+        self.assertEqual(adb_server._read_text(FakeConn(b"0005hello")), "hello")
+
+    def test_a_fail_after_okay_is_shown_as_the_error_it_is(self):
+        with self.assertRaisesRegex(AdbError, "Could not connect to 192.168.1.5:39865."):
+            adb_server._read_text(FakeConn(b"FAIL0026failed to connect to 192.168.1.5:39865"))
+
+    def test_common_failures_are_put_in_plain_words(self):
+        self.assertIn("different number (port)", adb_server._readable("cannot connect: actively refused it. (10061)"))
+        self.assertIn("same Wi-Fi", adb_server._readable("connection timed out (10060)"))
+        self.assertIn("Pair it first", adb_server._readable("failed to authenticate to 192.168.1.5:5555"))
+        self.assertEqual(adb_server._readable("something else"), "something else")
+
+    def test_garbage_is_an_explained_error_not_a_crash(self):
+        with self.assertRaisesRegex(AdbError, "Unexpected answer"):
+            adb_server._read_text(FakeConn(b"zzzzrest"))
+
+    def test_a_refused_connection_explains_pairing(self):
+        with mock.patch.object(adb_server, "start", return_value=True), mock.patch.object(
+                adb_server, "_host_command", side_effect=AdbError("failed to connect to 192.168.1.5:39865")):
+            with self.assertRaises(AdbError) as caught:
+                adb_server.connect("192.168.1.5:39865")
+        self.assertIn("Could not connect to 192.168.1.5:39865", str(caught.exception))
+        self.assertIn("pair it first", str(caught.exception))
+
+
+class QrPairingTests(unittest.TestCase):
+    def test_the_qr_text_carries_a_random_name_and_a_six_digit_password(self):
+        a, b = adb_server.pairing_qr(), adb_server.pairing_qr()
+        self.assertRegex(a["payload"], r"^WIFI:T:ADB;S:mitoolkit-[a-z0-9]{6};P:\d{6};;$")
+        self.assertIn(a["name"], a["payload"])
+        self.assertIn(a["password"], a["payload"])
+        self.assertNotEqual(a["name"], b["name"])
+
+    def test_it_waits_for_the_phone_that_scanned_it_then_pairs(self):
+        seen = [[], [{"name": "other", "kind": "pairing", "address": "192.168.1.9:1111"}],
+                [{"name": "mitoolkit-abc123", "kind": "pairing", "address": "192.168.1.5:41234"}]]
+        with mock.patch.object(adb_server, "mdns_services", side_effect=lambda: seen.pop(0)), \
+                mock.patch.object(adb_server, "pair", return_value="192.168.1.5:41234") as pair:
+            address = adb_server.wait_for_qr_pairing("mitoolkit-abc123", "123456", threading.Event(), poll=0.001)
+        self.assertEqual(address, "192.168.1.5:41234")
+        pair.assert_called_once_with("192.168.1.5:41234", "123456")          # another phone's service was ignored
+
+    def test_cancel_and_timeout_stop_the_wait(self):
+        stop = threading.Event()
+        stop.set()
+        with mock.patch.object(adb_server, "mdns_services", return_value=[]):
+            with self.assertRaisesRegex(AdbError, "Cancelled"):
+                adb_server.wait_for_qr_pairing("n", "123456", stop, poll=0.001)
+            with self.assertRaisesRegex(AdbError, "did not scan"):
+                adb_server.wait_for_qr_pairing("n", "123456", threading.Event(), timeout=0.05, poll=0.01)
+
+
+class DiscoveryTests(unittest.TestCase):
+    def setUp(self):
+        adb_server._tried.clear()
+        self.addCleanup(adb_server._tried.clear)
+
+    def test_connected_paired_and_unpaired_phones(self):
+        services = [{"name": "a", "kind": "connect", "address": "192.168.1.5:1"},
+                    {"name": "b", "kind": "connect", "address": "192.168.1.6:2"},
+                    {"name": "c", "kind": "connect", "address": "192.168.1.7:3"},
+                    {"name": "d", "kind": "pairing", "address": "192.168.1.8:4"}]
+
+        def connect(address):
+            if address.endswith(":3"):
+                raise AdbError("failed to connect")
+            return address
+        with mock.patch.object(adb_server, "mdns_services", return_value=services), \
+                mock.patch.object(adb_server, "devices", return_value=[{"serial": "192.168.1.5:1", "state": "device"}]), \
+                mock.patch.object(adb_server, "connect", side_effect=connect) as connect_mock:
+            found = adb_server.discover_and_connect()
+        self.assertEqual([(f["address"], f["state"]) for f in found],
+                         [("192.168.1.5:1", "connected"), ("192.168.1.6:2", "connected"), ("192.168.1.7:3", "needs-pairing")])
+        self.assertEqual(connect_mock.call_count, 2)                      # the one already connected is left alone
+
+    def test_a_refused_phone_is_not_hammered(self):
+        services = [{"name": "c", "kind": "connect", "address": "192.168.1.7:3"}]
+        with mock.patch.object(adb_server, "mdns_services", return_value=services), \
+                mock.patch.object(adb_server, "devices", return_value=[]), \
+                mock.patch.object(adb_server, "connect", side_effect=AdbError("no")) as connect:
+            adb_server.discover_and_connect()
+            again = adb_server.discover_and_connect()
+        self.assertEqual(connect.call_count, 1)
+        self.assertEqual(again[0]["state"], "needs-pairing")
+
+
+class HandlerTests(unittest.TestCase):
+    def test_warnings_reach_the_activity_log_scrubbed_and_info_does_not(self):
+        from mitoolkit import gui
+        lines = []
+        handler = gui.ActivityHandler(lines.append)
+        logger = logging.getLogger("activity-test")
+        logger.propagate = False
+        logger.setLevel(logging.DEBUG)
+        logger.addHandler(handler)
+        self.addCleanup(logger.removeHandler, handler)
+        logger.info("just information")
+        logger.warning("could not read %s with token=%s", "the phone", "abcdefghijabcdefghijabcdefghij12")
+        logger.error("something broke")
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[0].startswith("Warning: could not read the phone"))
+        self.assertNotIn("abcdefghij", lines[0])                         # tokens never show
+        self.assertEqual(lines[1], "Error: something broke")
+
+
+@unittest.skipUnless(HAVE_DISPLAY, "needs a display")
+class WindowTests(unittest.TestCase):
+    def setUp(self):
+        from mitoolkit import gui
+        self.root = make_root()
+        self.app = gui.App(self.root)
+        self.app._polling = True
+        self.root.update()
+
+    def tearDown(self):
+        self.root.destroy()
+
+    def test_usb_is_the_default_and_the_switch_changes_the_mode(self):
+        self.assertEqual((self.app.link_var.get(), self.app._link_mode), ("usb", "usb"))
+        with mock.patch.object(self.app, "_scan"), mock.patch.object(adb_server, "stop_started"):
+            self.app.link_var.set("wifi")
+            self.app._link_changed()
+            self.assertEqual(self.app._link_mode, "wifi")
+
+    def test_leaving_wireless_stops_the_adb_server_we_started(self):
+        with mock.patch.object(self.app, "_scan"), mock.patch.object(adb_server, "stop_started") as stop, \
+                mock.patch("threading.Thread") as thread:
+            self.app.link_var.set("usb")
+            self.app._link_changed()
+        self.assertEqual(thread.call_args.kwargs["target"], stop)
+
+    def test_each_mode_lists_only_its_own_phones(self):
+        both = [{"serial": "6a81a217", "state": "device"}, {"serial": "192.168.1.5:5555", "state": "device"}]
+        with mock.patch("mitoolkit.adb.devices", return_value=both), mock.patch.object(adb_server, "running", return_value=True):
+            self.assertEqual([d["serial"] for d in self.app._adb_devices(False)], ["6a81a217"])
+            self.assertEqual([d["serial"] for d in self.app._adb_devices(True)], ["192.168.1.5:5555"])
+        with mock.patch.object(adb_server, "running", return_value=False), mock.patch("mitoolkit.adb.devices") as devices:
+            self.assertEqual(self.app._adb_devices(True), [])             # no USB claimed while Wi-Fi is still starting
+        devices.assert_not_called()
+
+    def test_wireless_mode_says_what_to_do(self):
+        with mock.patch("mitoolkit.platform_tools.find", return_value=None):
+            self.assertEqual(self.app._wifi_candidate()["state"], "wifi-no-adb")
+        self.app._wifi_probing = True                                    # a search is already running
+        with mock.patch("mitoolkit.platform_tools.find", return_value="/sdk/adb"):
+            self.assertEqual(self.app._wifi_candidate()["state"], "wifi-search")
+            self.app._wifi_found = {"address": "192.168.1.5:39865", "name": "adb-6a81a217"}
+            found = self.app._wifi_candidate()
+        self.assertEqual((found["state"], found["serial"]), ("wifi-pair", "192.168.1.5:39865"))
+        dot, headline, detail, action = self.app._status_for("wifi-pair")
+        self.assertIs(action, self.app.wifi_btn)
+        self.assertIn("QR code", detail)
+
+    def test_the_search_connects_what_it_can_and_remembers_what_needs_pairing(self):
+        found = [{"address": "a:1", "name": "x", "state": "needs-pairing"}, {"address": "b:2", "name": "y", "state": "connected"}]
+        with mock.patch.object(adb_server, "discover_and_connect", return_value=found):
+            self.app._wifi_probing = True
+            self.app._probe_wifi()
+        self.assertEqual(self.app._wifi_found["address"], "a:1")
+        self.assertFalse(self.app._wifi_probing)
+        self.assertEqual(self.app._wifi_probe_at, 0.0)                   # a phone connected: look again at once
+
+    def test_no_show_log_file_item(self):
+        bar = self.root.nametowidget(self.root.cget("menu"))
+        labels = []
+        for i in range(bar.index("end") + 1):
+            if bar.type(i) == "cascade":
+                menu = self.root.nametowidget(bar.entrycget(i, "menu"))
+                labels += [menu.entrycget(j, "label") for j in range(menu.index("end") + 1) if menu.type(j) == "command"]
+        self.assertNotIn("Show log file", labels)
+        self.assertIn("Activity log", labels)
+
+    def test_the_wireless_window_offers_both_ways_to_pair(self):
+        from mitoolkit.ui.wireless_dialog import WirelessDialog
+        d = WirelessDialog(self.app)
+        self.root.update()
+        self.assertEqual(d.method.get(), "qr")
+        self.assertTrue(d.qr_panel.winfo_ismapped())
+        self.assertFalse(d.code_panel.winfo_ismapped())
+        d.method.set("code")
+        d._show_method()
+        self.root.update()
+        self.assertTrue(d.code_panel.winfo_ismapped())
+        self.assertFalse(d.qr_panel.winfo_ismapped())
+        d.close()
+
+    def test_qr_pairing_draws_a_code_and_connects_after_the_phone_scans(self):
+        from mitoolkit.ui.wireless_dialog import WirelessDialog
+        d = WirelessDialog(self.app)
+        request = {"payload": "WIFI:T:ADB;S:mitoolkit-abc123;P:123456;;", "name": "mitoolkit-abc123", "password": "123456"}
+        services = [{"name": "adb-1", "kind": "connect", "address": "192.168.1.5:37445"}]
+        with mock.patch.object(adb_server, "pairing_qr", return_value=request), \
+                mock.patch.object(adb_server, "wait_for_qr_pairing", return_value="192.168.1.5:41234"), \
+                mock.patch.object(adb_server, "mdns_services", return_value=services), \
+                mock.patch.object(adb_server, "connect", return_value="192.168.1.5:37445"), mock.patch.object(self.app, "_rescan"):
+            d._pair_qr()
+            self.root.update()
+            self.assertGreater(len(d.qr_canvas.find_all()), 50)            # modules were drawn
+            for _ in range(80):
+                self.root.update()
+                if not d._busy:
+                    break
+                import time
+                time.sleep(0.03)
+        self.assertIn("Paired and connected", d.result.cget("text"))
+        self.assertFalse(d.qr_canvas.winfo_ismapped())                    # the spent code is gone
+        d.close()
+
+    def test_cancelling_the_qr_wait_stops_it(self):
+        from mitoolkit.ui.wireless_dialog import WirelessDialog
+        d = WirelessDialog(self.app)
+        stop = threading.Event()
+        d._qr_stop_event = stop
+        d._qr_stop()
+        self.assertTrue(stop.is_set())
+        d.close()
+
+
+if __name__ == "__main__":
+    unittest.main()

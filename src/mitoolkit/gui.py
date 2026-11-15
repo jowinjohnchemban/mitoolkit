@@ -13,29 +13,29 @@ from __future__ import annotations
 
 import ctypes
 import io
+import logging
 import queue
-import subprocess
 import sys
 import threading
 import time
 import tkinter as tk
-import webbrowser
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, List, Optional
 
-from mitoolkit import adb, api, build, details, export, fastboot, log, memory, security, shutdown, updater, usbio, watchdog
+from mitoolkit import (adb, adb_server, api, build, details, export, fastboot, log, memory, platform_tools, security,
+                       shutdown, updater, usbio, watchdog)
 from mitoolkit.auth import store
 from mitoolkit.auth.redact import mask_id
 from mitoolkit.errors import MitoolkitError
 from mitoolkit.hints import explain
-from mitoolkit.system import NO_WINDOW
 from mitoolkit.ui.activity_window import ActivityLog, ActivityWindow
 from mitoolkit.ui.apps_dialog import AppManagerDialog
 from mitoolkit.ui.backup_dialog import BackupDialog
 from mitoolkit.ui.base import fit_to_screen
 from mitoolkit.ui.components.button_row import ButtonRow
 from mitoolkit.ui.components.buttons import Button, ModernButton
+from mitoolkit.ui.components.toggle import ToggleSwitch
 from mitoolkit.ui.driver_dialog import DriverHelpDialog
 from mitoolkit.ui.guide_window import GuideWindow
 from mitoolkit.ui.menu import MenuBar
@@ -48,6 +48,7 @@ from mitoolkit.ui.theme import (AMBER, GREEN, MUTED, ORANGE_DOT, RED, Fonts, app
 
 
 POLL_MS = 1000           # how often the window looks for the phone: an unplugged phone shows within a second
+WIFI_PROBE_S = 12       # in Wireless mode: how often the network is searched for phones
 INFO_REFRESH_S = 15     # how often the basic phone details (battery, storage, ...) are read again
 MORE_REFRESH_S = 20      # and the extra details (Wi-Fi, uptime, ...) while Show more is open
 
@@ -96,6 +97,10 @@ class App:
         self.busy = False
         self._polling = False
         self._scan_started = 0.0
+        self._link_mode = "usb"                 # "usb" or "wifi" (a plain copy of link_var that threads may read)
+        self._wifi_found: Optional[dict] = None    # a phone seen on the network that is not paired yet
+        self._wifi_probing = False
+        self._wifi_probe_at = 0.0
         self._info: dict = {}
         self._fbinfo: dict = {}
         self._guide: Optional[GuideWindow] = None
@@ -209,6 +214,10 @@ class App:
         head.pack(fill="x")
         self.rescan_btn = Button(head, text="Rescan", icon="refresh", command=self._rescan)
         self.rescan_btn.pack(side="right", anchor="n")
+        # How the phone is reached: a cable (the default) or Wi-Fi. Wireless mode looks for phones on the network.
+        self.link_var = tk.StringVar(value="usb")
+        self.link = ToggleSwitch(head, self.link_var, ("usb", "USB"), ("wifi", "Wireless"), command=self._link_changed)
+        self.link.pack(side="right", anchor="n", padx=(0, 8))
         self.dev_dot = tk.Label(head, text="\u25cf", fg=MUTED, bg=self.bg, font=self.f_base)
         self.dev_dot.pack(side="left", anchor="n")
         self.dev_text = ttk.Label(head, text="Looking for a phone...", font=self.f_bold, justify="left")
@@ -221,6 +230,8 @@ class App:
         self.stop_adb_btn = Button(self.buttons, text="Stop Google's adb", primary=True, command=self._stop_google_adb)
         self.driver_btn = Button(self.buttons, text="Driver help", primary=True, command=self._driver_help)
         self.leave_btn = Button(self.buttons, text="Restart phone...", icon="power", command=self._restart_dialog)
+        self.wifi_btn = Button(self.buttons, text="Pair or connect...", primary=True, icon="wifi",
+                               command=self._wireless_dialog)
         self.fb_btn = Button(self.buttons, text="Reboot to fastboot", primary=True, icon="power", command=self._to_fastboot)
         self.tool_btns = [Button(self.buttons, text=text, icon=icon, command=cmd) for text, icon, cmd in (
             ("Back up files...", "save", self._backup_dialog), ("Manage apps...", "apps", self._apps_dialog),
@@ -527,6 +538,7 @@ class App:
             self._log("The last look took too long; looking again.")
         self._info.clear()                                 # read the phone's details afresh
         self._fbinfo.clear()
+        self._wifi_probe_at = 0.0                          # and, in Wireless mode, search the network again now
         self._set_status("Looking for the phone...")
         self._scan()
 
@@ -539,6 +551,63 @@ class App:
             self.dev_tip.pack(anchor="w", padx=(22, 0), pady=(8, 0))
         elif not waiting and self.dev_tip.winfo_ismapped():
             self.dev_tip.pack_forget()
+
+    def _adb_devices(self, wifi: bool) -> list:
+        """Phones adb sees, for the chosen way of connecting: the ones on a cable, or the ones on Wi-Fi (their
+        serial is an address like 192.168.1.5:5555)."""
+        if wifi and not adb_server.running():
+            return []                    # the network search starts Google's adb; meanwhile do not claim a USB phone
+        return [d for d in adb.devices() if (":" in d["serial"]) == wifi]
+
+    def _wifi_candidate(self) -> dict:
+        """What to show in Wireless mode when no phone is connected yet: it is looking, there is a phone that needs
+        pairing, or Google's adb (which Wi-Fi needs) is not installed. Starts a network search when one is due."""
+        if not platform_tools.find("adb"):
+            return {"serial": "", "state": "wifi-no-adb"}
+        now = time.monotonic()
+        if not self._wifi_probing and now - self._wifi_probe_at >= WIFI_PROBE_S:
+            self._wifi_probing, self._wifi_probe_at = True, now
+            threading.Thread(target=self._probe_wifi, daemon=True, name="wifi-search").start()
+        found = self._wifi_found
+        if found:
+            return {"serial": found["address"], "state": "wifi-pair", "model": found.get("name", "")}
+        return {"serial": "", "state": "wifi-search"}
+
+    def _probe_wifi(self) -> None:
+        """Search the network for phones with Wireless debugging on, and connect to those that trust this computer."""
+        try:
+            results = adb_server.discover_and_connect()
+            pairing = [r for r in results if r["state"] == "needs-pairing"]
+            self._wifi_found = pairing[0] if pairing else None
+            if any(r["state"] == "connected" for r in results):
+                self._wifi_probe_at = 0.0                      # it is listed by the next look: no need to wait
+        except Exception as err:
+            log.get("gui").debug("Looking for phones on Wi-Fi failed: %s", err)
+            self._wifi_found = None
+        finally:
+            self._wifi_probing = False
+
+    def use_wireless(self) -> None:
+        """A phone was just connected over Wi-Fi: switch to Wireless mode so it is listed (USB mode shows cable phones
+        only). The windows that connected it ask for a rescan themselves."""
+        if self._link_mode != "wifi":
+            self.link_var.set("wifi")
+            self._link_mode = "wifi"
+            self._info.clear()
+
+    def _link_changed(self) -> None:
+        """USB / Wireless switch: look for phones the chosen way. Leaving Wireless stops the adb server MiToolkit
+        started for it, so the cable path has the phone to itself."""
+        mode = self.link_var.get()
+        self._link_mode = mode
+        self._wifi_found, self._wifi_probe_at = None, 0.0
+        self._info.clear()
+        self._log("Looking for phones on Wi-Fi (Wireless mode)." if mode == "wifi" else "Looking for phones on the cable (USB mode).")
+        if mode == "usb":
+            threading.Thread(target=adb_server.stop_started, daemon=True, name="adb-release").start()
+        self._set_status("Looking for the phone...")
+        self._polling = False
+        self._scan()
 
     def _scan(self):
         if not self.fastboot or self.busy or self._polling:
@@ -559,8 +628,11 @@ class App:
             except Exception:
                 serial = None
             if serial is None and android is None:
-                try:  # no phone in fastboot: is one running Android?
-                    found = adb.devices()
+                wifi = self._link_mode == "wifi"
+                try:  # no phone in fastboot: is one running Android? (over the cable, or Wi-Fi in Wireless mode)
+                    found = self._adb_devices(wifi)
+                    if not found and wifi:
+                        android = self._wifi_candidate()
                     if found:
                         ready = [d for d in found if d["state"] == "device"]
                         android = dict(ready[0] if ready else found[0])
@@ -573,7 +645,7 @@ class App:
                                 self._quick_audit(serial_, self._info[serial_])
                             android.update(self._info[serial_])
                 except Exception:
-                    android = None
+                    android = self._wifi_candidate() if wifi else None
             if android and android.get("state") == "no-access":  # say why, off the UI thread
                 reason = android.get("reason") or usbio.BUSY
                 android["adb_running"] = reason == usbio.BUSY and "adb" in usbio.blocking_programs()
@@ -657,6 +729,17 @@ class App:
                 return AMBER, "This user can't open the phone", android.get("advice", ""), None
             return (AMBER, "Another program is using the phone", android.get("advice", ""),
                     self.stop_adb_btn if android.get("adb_running") else None)
+        if state == "wifi-pair":
+            return (ORANGE_DOT, "A phone with Wireless debugging is on this network",
+                    "It has not been paired with this computer yet. Pair it once with a QR code or the code on "
+                    "its Wireless debugging screen.", self.wifi_btn)
+        if state == "wifi-search":
+            return (MUTED, "Looking for phones on Wi-Fi...",
+                    "On the phone: Settings > Developer options > Wireless debugging, switched on, on the same "
+                    "Wi-Fi as this computer. A new phone is paired once, with a QR code or a code.", self.wifi_btn)
+        if state == "wifi-no-adb":
+            return (AMBER, "Wireless needs Google's adb",
+                    "Install Android's platform-tools (they provide adb), then click Rescan. USB works without it.", None)
         if state == "unauthorized":
             if ":" in str(android.get("serial", "")):                      # connected over Wi-Fi
                 return (ORANGE_DOT, "Allow debugging on the phone",
@@ -1130,20 +1213,6 @@ class App:
     def _driver_help(self):
         DriverHelpDialog(self)
 
-    def _show_log(self):
-        path = log.log_path()
-        if path is None:
-            messagebox.showinfo("Log file", "Logging to a file is off: the program's folder is not writable.")
-        elif messagebox.askyesno("Log file", f"The log is saved here:\n\n{path}\n\nIt never contains tokens. "
-                                             "Open its folder?"):
-            try:
-                if sys.platform == "win32":
-                    subprocess.Popen(["explorer", "/select,", str(path)], creationflags=NO_WINDOW)
-                else:
-                    webbrowser.open(path.parent.as_uri())
-            except Exception as err:
-                self._log(f"Could not open the folder: {err}")
-
     # ============================================================= windows
     def _android_serial(self) -> Optional[str]:
         a = self.android
@@ -1262,6 +1331,22 @@ class App:
             self._about_win = AboutDialog(self)
 
 
+class ActivityHandler(logging.Handler):
+    """Warnings and errors that are written to the log file also show in the Activity log, so there is one place to
+    look in the app. The same scrubbing as the file applies: tokens are hidden before anything is shown."""
+
+    def __init__(self, add: Callable[[str], None]):
+        super().__init__(level=logging.WARNING)
+        self._add = add
+        self.addFilter(log.Scrubber())
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self._add(f"{record.levelname.title()}: {record.getMessage()}")
+        except Exception:
+            self.handleError(record)
+
+
 def _enable_dpi_awareness():
     if sys.platform == "win32":
         try:
@@ -1278,6 +1363,8 @@ def main():
     _enable_dpi_awareness()
     root = tk.Tk()
     app = App(root)
+    activity = ActivityHandler(app._log)       # warnings and errors from the log file show in the Activity log too
+    log.get().addHandler(activity)
     updater.cleanup()                          # remove the copy a previous update left behind
     root.after(1500, app.start_self_check)     # repairs what is safe to repair, and says so in the Activity log
     root.after(4000, app.start_update_check)   # once a day, after the window is up
@@ -1304,6 +1391,7 @@ def main():
     finally:
         guard.stop()
         tidy.stop()
+        log.get().removeHandler(activity)
         sys.stdout, sys.stderr = saved
         shutdown.run()                         # the window is closed: let go of the phones, stop the adb we started
 

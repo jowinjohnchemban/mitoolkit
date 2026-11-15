@@ -12,6 +12,9 @@ pull request titles (see CONTRIBUTING.md); the full, generated notes of each rel
   `mitoolkit`, which is this program, instead of Xiaomi's `miunlock` tool, since the rename.
 
 ### Added
+- A USB / Wireless switch in the Phone section (USB by default). Wireless mode finds phones with Wireless
+  debugging on the network, connects the ones that already trust this computer, and guides pairing for a new one:
+  with a QR code that the phone scans, or with the pairing code. Friendlier messages when a connection fails.
 - Closing MiToolkit lets go of the phone: its USB connections are closed, a Google fastboot it started is stopped,
   and so is the Google adb server it started (one already running is left alone). The log file and crash.log are
   closed too.

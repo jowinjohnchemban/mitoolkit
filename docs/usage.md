@@ -316,8 +316,17 @@ Handy features:
   speaks USB only, and the phone returns to USB-only when it restarts. **Fastboot and unlocking work over
   a USB cable only**: the bootloader has no Wi-Fi, so mitoolkit asks you to plug the phone in before it
   reboots into fastboot. When a phone is both plugged in and on Wi-Fi, it is listed once, by USB.
-  **Pairing (Android 11 or newer, no cable at all):** on the phone open Settings > Developer options >
-  Wireless debugging > *Pair device with pairing code* and leave that screen open. Press **Find phones on
+  **The USB / Wireless switch** in the Phone section chooses how phones are looked for. USB (the default) lists
+  phones on a cable. Switch to Wireless and MiToolkit searches the network for phones with Wireless debugging on,
+  connects to the ones that already trust this computer, and for a new one says it needs pairing and opens the
+  pairing window. Switching back to USB stops the adb server it started for Wi-Fi, and a phone that was just
+  connected over Wi-Fi switches the switch to Wireless by itself so it shows up. Wireless needs Google's adb.
+  **Pairing by QR code (Android 11 or newer, no cable at all):** in the Wireless adb window choose *QR code*,
+  press **Show QR code**, then on the phone open Settings > Developer options > Wireless debugging > *Pair device
+  with QR code* and scan it. MiToolkit finds the phone on the network and pairs and connects by itself. The code
+  is random, used once, and shown only while it waits (2 minutes, or until you press Cancel).
+  **Pairing with a code:** choose *Pairing code* instead. On the phone open the same screen but
+  *Pair device with pairing code* and leave it open. Press **Find phones on
   Wi-Fi** (or type the address with its port and the 6-digit code it shows) and **Pair**. Pairing makes the
   phone trust this computer's adb key, so it does not ask to allow debugging again; the app then connects
   using the address the phone announces, or you enter the *IP address & port* from the Wireless debugging
@@ -335,5 +344,7 @@ The session is stored encrypted where the system allows it (credential store or 
 DPAPI), expires after 24 hours, and is removed by logging out. Details, including how to
 change the expiry, are in the [safety model](safety.md#saved-session).
 
-Everything the program does is also recorded in `mitoolkit.log`, next to the executable.
-It contains no tokens. In the GUI, **File > Show log file** opens its folder.
+What the program is doing, including errors and warnings, is in the window: **File > Activity log**
+(with Copy). It contains no tokens. Behind the scenes a scrubbed `mitoolkit.log` (and `crash.log`) is kept next
+to the executable for bug reports and for debug mode (`--debug`); there is no menu item for it, because the
+Activity log shows the same thing in the app.

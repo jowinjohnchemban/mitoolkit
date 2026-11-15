@@ -105,7 +105,6 @@ class MenuBar:
         app, m = self.app, self._menu(bar, "&File")
         key, text = self._ctrl("l")
         self._add(m, "&Activity log", app._toggle_details, key, text)
-        self._add(m, "Show &log file", app._show_log)
         m.add_separator()
         self._add(m, "&Sign out and delete saved session...", app._sign_out)
         m.add_separator()

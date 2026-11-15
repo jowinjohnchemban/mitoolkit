@@ -97,13 +97,23 @@ class _Conn:
 
 
 def _readable(msg: str) -> str:
+    """Plain words for what Google's adb says."""
     low = msg.lower()
     if "unauthorized" in low:
-        return "USB debugging is not allowed on the phone yet. Tap Allow on its screen."
+        return "The phone has not allowed this computer yet. Unlock it and tap Allow."
     if "not found" in low:
         return "The phone is no longer connected."
     if "offline" in low:
-        return "The phone is offline. Unplug it and plug it back in."
+        return "The phone is offline. Unplug it and plug it back in, or turn Wireless debugging off and on."
+    if "refused" in low or "10061" in low:
+        return ("The phone refused the connection. Wireless debugging uses a different number (port) every time it "
+                "is switched on, so use the address shown on its Wireless debugging screen.")
+    if "timed out" in low or "10060" in low or "10065" in low or "unreachable" in low:
+        return "The phone did not answer. Check that it is on the same Wi-Fi as this computer, and awake."
+    if low.startswith("failed to connect to "):
+        return "Could not connect to " + msg[len("failed to connect to "):].strip(" '.") + "."
+    if low.startswith("failed to authenticate"):
+        return "The phone did not accept this computer. Pair it first, or tap Allow on the phone."
     return msg
 
 
@@ -127,7 +137,7 @@ def devices() -> List[Dict[str, str]]:
     conn = _Conn()
     try:
         conn.request("host:devices")
-        body = conn.read(int(conn.read(4), 16)).decode("utf-8", "replace")
+        body = _read_text(conn)
     finally:
         conn.close()
     out = []
@@ -186,9 +196,26 @@ def _host_command(text: str, timeout: float = 15.0) -> str:
     conn = _Conn(timeout=timeout)
     try:
         conn.request(text)
-        return conn.read(int(conn.read(4), 16), int(timeout * 1000)).decode("utf-8", "replace").strip()
+        return _read_text(conn, int(timeout * 1000))
     finally:
         conn.close()
+
+
+def _read_text(conn: "_Conn", timeout_ms: int = 30000) -> str:
+    """The length-prefixed text that follows an OKAY. Some services (host:connect when the phone refuses) send a
+    FAIL with its message after the OKAY instead, so that is read too, and shown as the error it is."""
+    head = conn.read(4, timeout_ms)
+    failed = head == b"FAIL"
+    if failed:
+        head = conn.read(4, timeout_ms)
+    try:
+        size = int(head, 16)
+    except ValueError:
+        raise AdbError("Unexpected answer from Google's adb server.") from None
+    text = conn.read(size, timeout_ms).decode("utf-8", "replace").strip()
+    if failed:
+        raise AdbError(_readable(text))
+    return text
 
 
 def valid_address(text: str, require_port: bool = False) -> Optional[str]:
@@ -206,7 +233,9 @@ def valid_address(text: str, require_port: bool = False) -> Optional[str]:
     return f"{host}:{port or 5555}"
 
 
-NEEDS_GOOGLE_ADB = "Wi-Fi needs Google's adb (platform-tools), which was not found on this computer."
+PAIR_HINT = (" If this phone uses Wireless debugging (Developer options), pair it first with Pair a new phone: "
+             "a QR code or the pairing code. It is needed once.")
+NEEDS_GOOGLE_ADB ="Wi-Fi needs Google's adb (platform-tools), which was not found on this computer."
 
 
 def pair(address: str, code: str) -> str:
@@ -259,12 +288,71 @@ def connect(address: str) -> str:
         raise AdbError("That is not an address. Use the phone's Wi-Fi address, like 192.168.1.5.")
     if not start():
         raise AdbError(NEEDS_GOOGLE_ADB)
-    answer = _host_command(f"host:connect:{target}")
+    try:
+        answer = _host_command(f"host:connect:{target}")
+    except AdbError as err:
+        raise AdbError(f"{_readable(str(err))}{PAIR_HINT}") from None
     logging.getLogger("mitoolkit.adb").debug("adb server connect %s: %s", target, answer)
     low = answer.lower()
     if "connected to" not in low:
-        raise AdbError(answer or "The phone did not answer. Check it is on the same Wi-Fi.")
+        raise AdbError((answer or "The phone did not answer. Check it is on the same Wi-Fi.") + PAIR_HINT)
     return target
+
+
+def pairing_qr() -> Dict[str, str]:
+    """A fresh request to pair by QR code (Android 11 and newer: Wireless debugging > Pair device with QR code).
+    The QR text is ``WIFI:T:ADB;S:<name>;P:<password>;;``: the phone scans it, then announces a pairing service on the
+    network under that name, and this computer pairs with it using that password. Both are random and used once."""
+    import secrets
+    import string
+    name = "mitoolkit-" + "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6))
+    password = f"{secrets.randbelow(10 ** 6):06d}"
+    return {"payload": f"WIFI:T:ADB;S:{name};P:{password};;", "name": name, "password": password}
+
+
+def wait_for_qr_pairing(name: str, password: str, cancel, timeout: float = 120.0, poll: float = 2.0) -> str:
+    """After the phone scanned the QR code: wait for its pairing service (named ``name``) to show up on the network,
+    then pair with it. Returns its address. ``cancel`` is a threading.Event that stops the wait."""
+    import time
+    end = time.monotonic() + timeout
+    while not cancel.is_set() and time.monotonic() < end:
+        for service in mdns_services():
+            if service["kind"] == "pairing" and name in service["name"]:
+                return pair(service["address"], password)
+        cancel.wait(poll)
+    if cancel.is_set():
+        raise AdbError("Cancelled.")
+    raise AdbError("The phone did not scan the code in time. Try again, or pair with the code on its screen instead.")
+
+
+_tried: Dict[str, float] = {}       # address -> when MiToolkit last tried to connect to it (so it is not hammered)
+
+
+def discover_and_connect(min_gap: float = 20.0) -> List[Dict[str, str]]:
+    """Wireless mode's look around: phones announcing Wireless debugging on this network, connected when they already
+    trust this computer. Returns [{"address", "name", "state"}] with state "connected" or "needs-pairing" (the phone is
+    there but has not been paired: pairing is a one-time step with a code shown on the phone). A phone that did not
+    accept is not tried again for ``min_gap`` seconds."""
+    import time
+    announced = [s for s in mdns_services() if s["kind"] == "connect"]
+    connected = {d["serial"] for d in devices()}
+    out: List[Dict[str, str]] = []
+    for service in announced:
+        address, name = service["address"], service["name"]
+        if address in connected:
+            out.append({"address": address, "name": name, "state": "connected"})
+            continue
+        if time.monotonic() - _tried.get(address, -1e9) < min_gap:
+            out.append({"address": address, "name": name, "state": "needs-pairing"})
+            continue
+        _tried[address] = time.monotonic()
+        try:
+            connect(address)
+            out.append({"address": address, "name": name, "state": "connected"})
+        except AdbError:
+            # not paired with this computer (or it refused): the person is shown how to pair it
+            out.append({"address": address, "name": name, "state": "needs-pairing"})
+    return out
 
 
 def disconnect(address: str) -> None:
