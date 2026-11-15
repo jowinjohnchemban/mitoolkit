@@ -25,6 +25,7 @@ from typing import Callable, List, Optional
 
 from mitoolkit import (adb, adb_server, api, build, details, export, fastboot, log, memory, platform_tools, security,
                        shutdown, updater, usbio, watchdog)
+from mitoolkit.adb_core import is_wireless
 from mitoolkit.auth import store
 from mitoolkit.auth.redact import mask_id
 from mitoolkit.errors import MitoolkitError
@@ -35,7 +36,7 @@ from mitoolkit.ui.backup_dialog import BackupDialog
 from mitoolkit.ui.base import fit_to_screen
 from mitoolkit.ui.components.button_row import ButtonRow
 from mitoolkit.ui.components.buttons import Button, ModernButton
-from mitoolkit.ui.components.toggle import ToggleSwitch
+from mitoolkit.ui.components.mode_switch import ModeSwitch
 from mitoolkit.ui.driver_dialog import DriverHelpDialog
 from mitoolkit.ui.guide_window import GuideWindow
 from mitoolkit.ui.menu import MenuBar
@@ -216,7 +217,7 @@ class App:
         self.rescan_btn.pack(side="right", anchor="n")
         # How the phone is reached: a cable (the default) or Wi-Fi. Wireless mode looks for phones on the network.
         self.link_var = tk.StringVar(value="usb")
-        self.link = ToggleSwitch(head, self.link_var, ("usb", "USB"), ("wifi", "Wireless"), command=self._link_changed)
+        self.link = ModeSwitch(head, self.link_var, ("usb", "USB"), ("wifi", "Wireless"), command=self._link_changed)
         self.link.pack(side="right", anchor="n", padx=(0, 8))
         self.dev_dot = tk.Label(head, text="\u25cf", fg=MUTED, bg=self.bg, font=self.f_base)
         self.dev_dot.pack(side="left", anchor="n")
@@ -557,7 +558,7 @@ class App:
         serial is an address like 192.168.1.5:5555)."""
         if wifi and not adb_server.running():
             return []                    # the network search starts Google's adb; meanwhile do not claim a USB phone
-        return [d for d in adb.devices() if (":" in d["serial"]) == wifi]
+        return [d for d in adb.devices() if is_wireless(d["serial"]) == wifi]
 
     def _wifi_candidate(self) -> dict:
         """What to show in Wireless mode when no phone is connected yet: it is looking, there is a phone that needs
@@ -594,6 +595,12 @@ class App:
             self.link_var.set("wifi")
             self._link_mode = "wifi"
             self._info.clear()
+
+    def expect_wifi_phone(self) -> None:
+        """A phone was just paired: search the network again at once and try it again even if it was refused a moment
+        ago (it is trusted now). The Wi-Fi search connects it as soon as it announces itself."""
+        self._wifi_found, self._wifi_probe_at = None, 0.0
+        adb_server._tried.clear()
 
     def _link_changed(self) -> None:
         """USB / Wireless switch: look for phones the chosen way. Leaving Wireless stops the adb server MiToolkit
@@ -741,7 +748,7 @@ class App:
             return (AMBER, "Wireless needs Google's adb",
                     "Install Android's platform-tools (they provide adb), then click Rescan. USB works without it.", None)
         if state == "unauthorized":
-            if ":" in str(android.get("serial", "")):                      # connected over Wi-Fi
+            if is_wireless(str(android.get("serial", ""))):                # connected over Wi-Fi
                 return (ORANGE_DOT, "Allow debugging on the phone",
                         "Unlock the phone, tap Allow and tick \"Always allow from this computer\". To skip this "
                         "prompt for good, pair it once in Phone > Wireless adb.", None)
@@ -963,7 +970,7 @@ class App:
         serial = (self.android or {}).get("serial")
         if not serial:
             return
-        if ":" in serial:                                  # connected over Wi-Fi
+        if is_wireless(serial):                            # connected over Wi-Fi
             messagebox.showinfo(
                 "Connect the USB cable", "This phone is connected over Wi-Fi, and fastboot mode works over a USB "
                 "cable only.\n\nPlug the phone into this computer with a USB cable, then choose this again.")

@@ -226,13 +226,20 @@ class WindowTests(unittest.TestCase):
         d = WirelessDialog(self.app)
         request = {"payload": "WIFI:T:ADB;S:mitoolkit-abc123;P:123456;;", "name": "mitoolkit-abc123", "password": "123456"}
         services = [{"name": "adb-1", "kind": "connect", "address": "192.168.1.5:37445"}]
+        scanned = threading.Event()                                       # the phone scans the code when this is set
+
+        def wait_for_scan(name, password, stop, **kw):
+            scanned.wait(10)
+            return "192.168.1.5:41234"
         with mock.patch.object(adb_server, "pairing_qr", return_value=request), \
-                mock.patch.object(adb_server, "wait_for_qr_pairing", return_value="192.168.1.5:41234"), \
+                mock.patch.object(adb_server, "wait_for_qr_pairing", side_effect=wait_for_scan), \
                 mock.patch.object(adb_server, "mdns_services", return_value=services), \
                 mock.patch.object(adb_server, "connect", return_value="192.168.1.5:37445"), mock.patch.object(self.app, "_rescan"):
             d._pair_qr()
             self.root.update()
-            self.assertGreater(len(d.qr_canvas.find_all()), 50)            # modules were drawn
+            self.assertGreater(len(d.qr_canvas.find_all()), 50)            # modules are drawn while it waits
+            self.assertIn("Waiting for the phone", d.qr_note.cget("text"))
+            scanned.set()                                                 # the phone scans it
             for _ in range(80):
                 self.root.update()
                 if not d._busy:
@@ -240,8 +247,42 @@ class WindowTests(unittest.TestCase):
                 import time
                 time.sleep(0.03)
         self.assertIn("Paired and connected", d.result.cget("text"))
-        self.assertFalse(d.qr_canvas.winfo_ismapped())                    # the spent code is gone
+        self.assertLess(len(d.qr_canvas.find_all()), 10)                  # the spent code is gone: the placeholder is back
+        self.assertEqual(self.app.link_var.get(), "wifi")                 # and the phone is listed under Wireless
         d.close()
+
+    def test_pairing_keeps_looking_for_the_connect_address_the_phone_announces_late(self):
+        """The phone announces its connect address a few seconds after pairing: one look is not enough."""
+        from mitoolkit.ui.wireless_dialog import WirelessDialog
+        looks = [[], [], [{"name": "adb-1", "kind": "connect", "address": "192.168.1.5:37445"}]]
+        with mock.patch.object(adb_server, "mdns_services", side_effect=lambda: looks.pop(0)), \
+                mock.patch.object(adb_server, "connect", return_value="192.168.1.5:37445") as connect:
+            result = WirelessDialog._connect_announced("192.168.1.5:41234", wait=5, poll=0.001)
+        self.assertEqual(result, ("192.168.1.5:37445", True))
+        connect.assert_called_once_with("192.168.1.5:37445")
+        with mock.patch.object(adb_server, "mdns_services", return_value=[]):
+            self.assertEqual(WirelessDialog._connect_announced("192.168.1.5:41234", wait=0.05, poll=0.01),
+                             ("192.168.1.5:41234", False))                # gives up politely, after the time is up
+
+    def test_a_phone_listed_by_its_network_name_is_wireless_and_counts_as_connected(self):
+        from mitoolkit.adb_core import is_wireless
+        for serial in ("192.168.1.5:39865", "adb-6a81a217-AbCdEf._adb-tls-connect._tcp", "adb-6a81a217-AbCdEf"):
+            self.assertTrue(is_wireless(serial), serial)
+        self.assertFalse(is_wireless("6a81a217"))
+        services = [{"name": "adb-6a81a217-AbCdEf", "kind": "connect", "address": "192.168.1.5:39865"}]
+        with mock.patch.object(adb_server, "mdns_services", return_value=services), \
+                mock.patch.object(adb_server, "devices", return_value=[
+                    {"serial": "adb-6a81a217-AbCdEf._adb-tls-connect._tcp", "state": "device"}]), \
+                mock.patch.object(adb_server, "connect") as connect:
+            found = adb_server.discover_and_connect()
+        self.assertEqual(found[0]["state"], "connected")
+        connect.assert_not_called()                                       # it is connected already: nothing to do
+
+    def test_pairing_resets_the_search_so_the_phone_is_tried_again_at_once(self):
+        adb_server._tried["192.168.1.5:39865"] = 1e12
+        self.app._wifi_found, self.app._wifi_probe_at = {"address": "x"}, 99.0
+        self.app.expect_wifi_phone()
+        self.assertEqual((self.app._wifi_found, self.app._wifi_probe_at, adb_server._tried), (None, 0.0, {}))
 
     def test_cancelling_the_qr_wait_stops_it(self):
         from mitoolkit.ui.wireless_dialog import WirelessDialog

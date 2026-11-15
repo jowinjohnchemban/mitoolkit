@@ -4,6 +4,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from mitoolkit.adb_core import is_wireless
 from mitoolkit.ui.base import Dialog
 from mitoolkit.ui.components.buttons import Button
 from mitoolkit.ui.theme import MUTED
@@ -32,7 +33,7 @@ class RestartDialog(Dialog):
                   font=self.fonts.heading).pack(anchor="w")
         ttk.Label(body, foreground=MUTED, text="Nothing is erased by any of these. Unsaved work on the phone is lost."
                   ).pack(anchor="w", pady=(2, 10))
-        wifi = ":" in (self.app._android_serial() or "")
+        wifi = is_wireless(self.app._android_serial() or "")
         choices = FASTBOOT_CHOICES if in_fastboot else ANDROID_CHOICES
         self.choice = tk.StringVar(value=choices[0][0])
         for key, label, note in choices:

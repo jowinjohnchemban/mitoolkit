@@ -20,6 +20,12 @@ class AdbError(MitoolkitError):
     """str(e) is human-readable."""
 
 
+def is_wireless(serial: str) -> bool:
+    """True for a phone reached over Wi-Fi. Its serial is an address (192.168.1.5:5555), or, with Wireless debugging,
+    a network name such as adb-6a81a217-AbCdEf._adb-tls-connect._tcp (no colon, so a colon alone is not enough)."""
+    return ":" in serial or "._adb-tls-" in serial or serial.startswith("adb-")
+
+
 class SyncSession:
     """adb's file transfer service (``sync:``): stat, list and receive files. Works over any
     byte stream with read(n), write(data), close() and .closed: a USB stream here, or a
