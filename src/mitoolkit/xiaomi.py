@@ -91,8 +91,7 @@ class UnlockServer:
             "deviceToken": device_token,
             "language": "en",
             "operate": "unlock",
-            # Xiaomi's protocol names the computer by the MD5 of its id; it is an identifier, not a security hash
-            "pcId": hashlib.md5(self.device_id.encode(), usedforsecurity=False).hexdigest(),
+            "pcId": hashlib.md5(self.device_id.encode()).hexdigest(),
             "region": "",
             "uid": self.cookies.get("userId"),
         }

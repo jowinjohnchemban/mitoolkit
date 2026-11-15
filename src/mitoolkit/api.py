@@ -30,7 +30,7 @@ from mitoolkit import adb, fastboot, log
 from mitoolkit.auth import get_passtoken, get_service, get_region, get_dataCenterZone
 from mitoolkit.auth.redact import redact_response
 from mitoolkit.errors import MitoolkitError, UnlockError
-from mitoolkit.xiaomi import UnlockServer, zone_for_region
+from mitoolkit.xiaomi import DOMAIN_BY_ZONE, REGION_TO_ZONE, UnlockServer, zone_for_region  # noqa: F401 re-exported
 
 _log = log.get("api")
 
