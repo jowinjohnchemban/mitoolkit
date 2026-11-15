@@ -24,7 +24,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, List, Optional
 
-from mitoolkit import adb, api, build, details, export, fastboot, log, memory, security, updater, usbio, watchdog
+from mitoolkit import adb, api, build, details, export, fastboot, log, memory, security, shutdown, updater, usbio, watchdog
 from mitoolkit.auth import store
 from mitoolkit.auth.redact import mask_id
 from mitoolkit.errors import MitoolkitError
@@ -1273,6 +1273,7 @@ def _enable_dpi_awareness():
 
 def main():
     log.setup(True if "--debug" in sys.argv[1:] else None)
+    shutdown.register()                       # also at exit, if the window is not closed in the usual way
     watchdog.install_crash_logging()          # background-thread errors and hard crashes go to the log file
     _enable_dpi_awareness()
     root = tk.Tk()
@@ -1304,6 +1305,7 @@ def main():
         guard.stop()
         tidy.stop()
         sys.stdout, sys.stderr = saved
+        shutdown.run()                         # the window is closed: let go of the phones, stop the adb we started
 
 
 if __name__ == "__main__":

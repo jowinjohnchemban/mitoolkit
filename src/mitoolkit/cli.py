@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-from mitoolkit import adb, api, bloat, build, drivers, log
+from mitoolkit import adb, api, bloat, build, drivers, log, shutdown
 from mitoolkit.errors import MitoolkitError
 from mitoolkit.unlock import InteractiveUnlock
 
@@ -262,6 +262,7 @@ def main():
     if "--gui" not in argv and (argv or "--cli" in argv):
         _attach_console()  # command-line use needs a console; the GUI must not have one
     log.setup(True if debug else None)
+    shutdown.register()        # when the program ends: close the phone connections, stop the adb it started
     # One program, two modes: the GUI by default, the command line with --cli
     # (a subcommand such as `check` also means command line).
     args = sys.argv[1:]
