@@ -150,8 +150,8 @@ class McpHttpServer:
         try:
             self._on_done(tool, data, failed)
         except Exception as err:               # the window failing to update must never fail the agent's call
-            known = tool if tool in mcp.TOOLS else "an unknown tool"        # the name comes from the agent: never log it raw
-            log.get("mcp").error("updating the window after %s failed: %s", known, type(err).__name__)
+            # the tool's name comes from the agent: it is not written to the log
+            log.get("mcp").error("updating the window after a tool call failed: %s", type(err).__name__)
 
     def _handler(self):
         server = self
