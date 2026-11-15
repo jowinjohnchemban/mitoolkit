@@ -71,7 +71,7 @@ def latest(timeout: float = 10.0) -> Release:
         raise UpdateError(f"Could not reach GitHub to look for updates ({err.__class__.__name__}).") from None
     version = parse_version(str(data.get("tag_name", "")))
     if version is None:
-        raise UpdateError("GitHub's latest release has a version number mitoolkit does not understand.")
+        raise UpdateError("GitHub's latest release has a version number MiToolkit does not understand.")
     assets = {a["name"]: a["browser_download_url"] for a in data.get("assets", [])
               if str(a.get("browser_download_url", "")).startswith(DOWNLOADS)}
     return Release(str(data["tag_name"]), version, str(data.get("body") or "").strip(),
@@ -196,6 +196,7 @@ def cleanup() -> None:
         try:
             old_copy(exe).unlink(missing_ok=True)
         except OSError:
+            # still in use or read-only: the next start tries again
             pass
 
 

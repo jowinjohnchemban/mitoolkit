@@ -128,10 +128,12 @@ class SelectorBar(tk.Canvas):
             try:
                 self.after_cancel(self._anim)
             except tk.TclError:
+                # the timer already fired or the window is gone
                 pass
         try:  # the variable outlives this widget: take our callback off it, or it keeps us (and the window) alive
             self.variable.trace_remove("write", self._trace)
         except (tk.TclError, ValueError):
+            # the trace is already off the variable
             pass
         self.command = None
 

@@ -23,7 +23,7 @@ FRAME_EXTRA = 12                    # window border below the client area
 
 def _windows_work_area() -> Rect:
     import ctypes
-    from ctypes import wintypes
+    import ctypes.wintypes as wintypes
     rect = wintypes.RECT()
     if not ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0):  # SPI_GETWORKAREA
         raise OSError("no work area")
@@ -47,6 +47,7 @@ def work_area(win) -> Rect:
         if sys.platform != "darwin":
             return _x11_work_area()
     except Exception:
+        # the system will not say where the taskbar is: a safe margin is used instead (below)
         pass
     top, bottom, left, right = MAC_MARGINS if sys.platform == "darwin" else OTHER_MARGINS
     return left, top, sw - left - right, sh - top - bottom

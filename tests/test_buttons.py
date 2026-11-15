@@ -81,7 +81,7 @@ class NativeButtonTests(unittest.TestCase):
     """macOS uses the system's own buttons: the app still configures them with kind= and icon=."""
 
     def test_native_buttons_accept_the_same_options(self):
-        from unittest import mock
+        import unittest.mock as mock
         from mitoolkit.ui.components import buttons
         root = make_root()
         try:

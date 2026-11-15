@@ -9,7 +9,7 @@ from typing import Optional
 from mitoolkit import fastboot
 from mitoolkit.auth import get_dataCenterZone, get_passtoken, get_region, get_service
 from mitoolkit.auth.redact import redact_response
-from mitoolkit.system import GREEN, ORANGE, RED, WHITE, console
+from mitoolkit.auth.config import GREEN, ORANGE, RED, WHITE, console
 from mitoolkit.xiaomi import ServerError, UnlockServer, zone_for_region
 
 

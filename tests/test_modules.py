@@ -4,7 +4,7 @@ import io
 import json
 import unittest
 from contextlib import redirect_stdout
-from unittest import mock
+import unittest.mock as mock
 
 from mitoolkit import adb, api, cli, fastboot, usbio, xiaomi
 from mitoolkit.errors import MitoolkitError, UnlockError

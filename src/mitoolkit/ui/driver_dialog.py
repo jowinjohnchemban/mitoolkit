@@ -18,7 +18,7 @@ class DriverHelpDialog(Dialog):
         body = self.body
         ttk.Label(body, text="Install Google's USB driver", font=self.fonts.heading).pack(anchor="w")
         ttk.Label(body, foreground=MUTED, wraplength=520, justify="left",
-                  text="Needed only if Windows shows the phone with a yellow mark, or mitoolkit says it "
+                  text="Needed only if Windows shows the phone with a yellow mark, or MiToolkit says it "
                        "can't open it.").pack(anchor="w", pady=(2, 10))
         for i, step in enumerate(drivers.STEPS, 1):
             row = ttk.Frame(body)

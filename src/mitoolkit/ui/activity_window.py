@@ -51,7 +51,7 @@ class ActivityLog:
 
 
 class ActivityWindow(Dialog):
-    title = "mitoolkit activity"
+    title = "MiToolkit activity"
     size = "820x380"
     min_size = (480, 220)
     padding = 0
@@ -62,7 +62,7 @@ class ActivityWindow(Dialog):
         head = tk.Frame(frame, bg=CONSOLE_HEAD, padx=10, pady=6)
         head.pack(side="top", fill="x")
         tk.Label(head, text="Activity", bg=CONSOLE_HEAD, fg=CONSOLE_FG, font=self.fonts.bold).pack(side="left")
-        tk.Label(head, text="what mitoolkit is doing; no tokens or passwords are shown", bg=CONSOLE_HEAD,
+        tk.Label(head, text="What MiToolkit is doing; no tokens or passwords are shown", bg=CONSOLE_HEAD,
                  fg=CONSOLE_DIM, font=self.fonts.small).pack(side="left", padx=8)
         Button(head, text="Close", command=self.close).pack(side="right")
         Button(head, text="Copy", command=self.copy).pack(side="right", padx=6)

@@ -77,7 +77,7 @@ def _send(path, params_raw, domain, ssecurity, cookies):
     try:
         encrypted_data = b64decode(response.text)
         decrypted = aes_cbc_decrypt(encrypted_data, ssecurity_key, iv)
-    except:
+    except Exception:
         return {"error": "decrypt failed"}
 
     if not decrypted:
@@ -95,7 +95,7 @@ def _send(path, params_raw, domain, ssecurity, cookies):
 
     try:
         inner_b64 = b64decode(clean_data)
-    except:
+    except Exception:
         return {"error": "inner base64 invalid"}
 
     try:
@@ -104,5 +104,5 @@ def _send(path, params_raw, domain, ssecurity, cookies):
             return clean_response
         else:
             return {"error": clean_response}
-    except:
+    except Exception:
         return {"error": "json parse failed"}

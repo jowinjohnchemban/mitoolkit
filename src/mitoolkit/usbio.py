@@ -199,6 +199,7 @@ def identify(dev) -> Tuple[str, Optional[str]]:
         try:
             usb.util.dispose_resources(dev)  # close the probe; a real connection reopens it
         except Exception:
+            # the probe was only a look: if closing it fails the phone is gone anyway
             pass
     return serial or fallback, None
 
@@ -227,6 +228,7 @@ class Handle:
                 if dev.is_kernel_driver_active(self.number):
                     dev.detach_kernel_driver(self.number)
             except (NotImplementedError, usb.core.USBError):
+                # this system has no kernel driver to detach (Windows, macOS) or it is not attached
                 pass
             usb.util.claim_interface(dev, self.number)
         except (usb.core.USBError, NotImplementedError) as err:
@@ -255,10 +257,12 @@ class Handle:
         try:
             usb.util.release_interface(self.dev, self.number)
         except Exception:
+            # closing a phone that was unplugged: there is nothing left to release
             pass
         try:
             usb.util.dispose_resources(self.dev)
         except Exception:
+            # the same: the device is already gone
             pass
 
 

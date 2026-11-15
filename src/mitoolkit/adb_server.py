@@ -92,6 +92,7 @@ class _Conn:
             try:
                 self.sock.close()
             except OSError:
+                # closing a socket that is already gone is fine
                 pass
 
 
@@ -267,6 +268,7 @@ class ServerDevice:
             try:
                 conn.read_all(5000)
             except AdbError:
+                # the phone restarts its adb daemon and drops the connection: that is the answer
                 pass
 
     def _service(self, service: str) -> _Conn:
@@ -290,6 +292,7 @@ class ServerDevice:
             try:
                 conn.read_all(5000)
             except AdbError:
+                # the phone goes away before it can answer
                 pass
         self.state = "offline"
 

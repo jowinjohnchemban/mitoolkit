@@ -162,6 +162,7 @@ class Phone:
                 if line.strip().startswith("level:"):
                     return int(line.split(":", 1)[1])
         except (AdbError, ValueError):
+            # the battery level is optional: unreadable means "not known" (None below)
             pass
         return None
 
@@ -399,6 +400,7 @@ class _Backup:
             (self.target / "installed-apps.txt").write_text("\n".join(apps) + "\n", encoding="utf-8")
             self.log(f"Saved the list of {len(apps)} installed apps.")
         except (AdbError, OSError):
+            # the app list is a bonus next to the files, which are already copied
             pass
 
     def run(self) -> Dict[str, object]:
@@ -433,6 +435,7 @@ class _Backup:
             else:
                 report.unlink(missing_ok=True)
         except OSError:
+            # the problems list is a convenience: a read-only folder must not fail the backup
             pass
 
 

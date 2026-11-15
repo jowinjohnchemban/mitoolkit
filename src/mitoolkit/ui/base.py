@@ -13,7 +13,7 @@ class Dialog:
     """A window owned by the main App: titled, sized, closed with Escape, with a padded
     ``body`` frame to build in. Subclasses implement ``build()``."""
 
-    title = "mitoolkit"
+    title = "MiToolkit"
     size: Optional[str] = None      # "WIDTHxHEIGHT", or None to fit the content
     min_size: Optional[tuple] = None
     resizable = True
@@ -70,6 +70,7 @@ class Dialog:
                         for mode in modes:
                             value.trace_remove(mode, callback)
                 except tk.TclError:
+                    # the variable is already gone with its window: nothing left to take off it
                     pass
 
     def close(self) -> None:

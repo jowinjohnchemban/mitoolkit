@@ -15,7 +15,7 @@ from mitoolkit.ui.theme import MUTED, REPO
 
 def version_text() -> str:
     """What a bug report needs: the program, Python and the system."""
-    return f"mitoolkit {build.full_version()}\nPython {sys.version.split()[0]}\n{platform.platform()}"
+    return f"MiToolkit {build.full_version()}\nPython {sys.version.split()[0]}\n{platform.platform()}"
 
 
 class AboutDialog(Dialog):

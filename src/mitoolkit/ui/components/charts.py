@@ -531,6 +531,7 @@ class Gauge(tk.Canvas):
         try:
             self.draw()
         except tk.TclError:
+            # the chart was destroyed while this redraw was waiting: there is nothing to draw on
             pass
 
     def draw(self) -> None:
@@ -547,7 +548,6 @@ class Gauge(tk.Canvas):
         top = 14
         box = (cx - ring / 2 + 6, top + 6, cx + ring / 2 - 6, top + ring - 6)
         self.loading = self.percent is None
-        colour = TEXT
         if self.loading:  # a shimmering skeleton ring and text bars while we wait for the first reading
             clock.watch(self)
             c.create_arc(*box, start=225, extent=-270, style="arc", outline=bar_colour(0.5), width=11)

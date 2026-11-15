@@ -38,6 +38,7 @@ def prefers_reduced_motion() -> bool:
             if ctypes.windll.user32.SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, ctypes.byref(enabled), 0):
                 return not enabled.value
         except Exception:
+            # the system will not say: animations stay on unless the environment variable turns them off
             pass
     return False
 

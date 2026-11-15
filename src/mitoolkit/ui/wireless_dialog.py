@@ -165,8 +165,11 @@ class WirelessDialog(Dialog):
                                           "(not for fastboot).")
         elif self._mode == "disconnect":
             serial = self.app._android_serial()
-            self._work("Disconnecting...", lambda: (adb_server.disconnect(serial), serial)[1],
-                       lambda s: f"Disconnected {s}.")
+
+            def drop() -> str:
+                adb_server.disconnect(serial)
+                return serial
+            self._work("Disconnecting...", drop, lambda s: f"Disconnected {s}.")
 
     def _find(self) -> None:
         """Look for phones that announce Wireless debugging or the pairing screen, and fill the addresses in."""

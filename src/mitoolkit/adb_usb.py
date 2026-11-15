@@ -250,6 +250,7 @@ class _Stream:
             try:
                 self.dev._send(A_CLSE, self.local, self.remote)
             except AdbError:
+                # the phone may already be gone; the stream is closed on our side either way
                 pass
             self.closed = True
 
@@ -354,6 +355,7 @@ class SyncSession:
             try:
                 self._stream.write(b"QUIT" + struct.pack("<I", 0))
             except AdbError:
+                # a polite goodbye: if the phone is gone there is nobody to say it to
                 pass
             self._stream.close()
 
@@ -415,6 +417,7 @@ def _scan_usb() -> List[Dict[str, str]]:
                 try:
                     known.poll_authorized()
                 except AdbError:
+                    # still waiting for the person to tap Allow: the next scan asks again
                     pass
             results.append({"serial": known.serial, "state": known.state})
             continue

@@ -5,7 +5,7 @@ import os
 import sys
 import unittest
 from contextlib import redirect_stdout
-from unittest import mock
+import unittest.mock as mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -61,6 +61,7 @@ class CliTests(unittest.TestCase):
             try:
                 cli.main()
             except SystemExit:
+                # the command line exits through SystemExit; its output is what the test reads
                 pass
         return out.getvalue()
 

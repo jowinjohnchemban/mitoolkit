@@ -12,7 +12,7 @@ from mitoolkit.ui.theme import BORDER, DOCS, WARN_BG, WARN_FG
 
 
 class GuideWindow(Dialog):
-    title = "mitoolkit guide"
+    title = "MiToolkit guide"
     size = "820x560"
     min_size = (560, 360)
     padding = 10

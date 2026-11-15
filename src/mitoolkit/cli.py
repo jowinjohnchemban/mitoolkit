@@ -3,7 +3,7 @@ import functools
 import json
 import sys
 
-from mitoolkit import __version__, adb, api, bloat, build, drivers, log
+from mitoolkit import adb, api, bloat, build, drivers, log
 from mitoolkit.errors import MitoolkitError
 from mitoolkit.unlock import InteractiveUnlock
 
@@ -213,6 +213,7 @@ def _attach_console():
         if sys.stdin is None:
             sys.stdin = stream(-10, "CONIN$", "r", os.O_RDONLY)
     except Exception:
+        # no console to attach to (started from a shortcut, say): carry on without one
         pass
 
 
@@ -230,15 +231,17 @@ def main():
     gui_flag = "--gui" in args
     if "--mcp" in args:  # an AI agent controls the program directly
         from mitoolkit import mcp
-        return mcp.serve()
+        mcp.serve()
+        return
     args = [a for a in args if a not in ("--cli", "--gui")]
     sys.argv = [sys.argv[0]] + args
     if gui_flag or (not args and not cli_flag):
-        if _start_gui():
-            return
-        return interactive_main()
+        if not _start_gui():          # no display or no Tk: the interactive prompt instead
+            interactive_main()
+        return
     if not args:
-        return interactive_main()
+        interactive_main()
+        return
 
     parser = argparse.ArgumentParser(
         prog="mitoolkit",

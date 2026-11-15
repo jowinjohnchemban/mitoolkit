@@ -46,7 +46,7 @@ _HINTS = {
         "This account is restricted by Xiaomi",
         "Try turning on Find device on the phone. If that doesn't help, use a different Mi Account.",
     ),
-    20035: Hint("Xiaomi says this program is outdated", "Update mitoolkit to the latest version."),
+    20035: Hint("Xiaomi says this program is outdated", "Update MiToolkit to the latest version."),
     20036: Hint(
         "Xiaomi's waiting period is still running",
         "This is normal. Do not add the account on the phone again, because that restarts the wait. "
