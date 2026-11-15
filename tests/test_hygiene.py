@@ -34,6 +34,27 @@ def freed(ref, tries: int = 20) -> bool:
 
 
 class BackgroundPoolTests(unittest.TestCase):
+    def test_a_running_job_counts_as_waiting_until_it_is_delivered(self):
+        """The delivery timer runs while waiting > 0. A job that a worker is busy with must count, or the timer
+        stops and the finished result sits undelivered."""
+        pool = workers.BackgroundPool(workers=1, name="slow")
+        release = threading.Event()
+        got = []
+        pool.submit(lambda: release.wait(10) and "late", lambda result, error: got.append(result))
+        for _ in range(200):                              # until the worker has taken the job off the queue
+            if pool._jobs.qsize() == 0:
+                break
+            time.sleep(0.01)
+        self.assertEqual(pool.waiting, 1)                 # not queued any more, but still pending
+        release.set()
+        for _ in range(200):
+            if pool._done.qsize():
+                break
+            time.sleep(0.01)
+        self.assertEqual(pool.waiting, 1)                 # finished, waiting to be delivered
+        self.assertEqual(pool.drain(), 1)
+        self.assertEqual((got, pool.waiting), (["late"], 0))
+
     def test_runs_jobs_off_the_calling_thread_and_delivers_on_drain(self):
         pool = workers.BackgroundPool(workers=2, name="test")
         got = []
