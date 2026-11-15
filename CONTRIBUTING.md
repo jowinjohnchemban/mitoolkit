@@ -59,6 +59,11 @@ touches credentials, logging or the unlock confirmation.
 
 ## Pull requests
 
+`main` is protected: nobody, including the maintainer, pushes to it directly. Every change is a pull
+request that is squash-merged once these checks pass: **CI passed** (tests on Windows, macOS and Linux,
+Python 3.9 and 3.13), **analyze** (CodeQL), **Vulnerable dependencies** (pip-audit), **Dependency review**
+and **Secret scan**. Conversations must be resolved and the history stays linear.
+
 1. Fork the repository and create a branch.
 2. Make focused commits with clear messages.
 3. Describe what changed and why, and how you checked it.
@@ -73,7 +78,7 @@ Releases are automatic. To publish one:
 
 1. Change `__version__` in `src/mitoolkit/__init__.py` (major.minor.patch).
 2. Add a `## [x.y.z] - date` section to `CHANGELOG.md`: it becomes the release notes.
-3. Push to `main`.
+3. Open a pull request. When it is merged to `main`, the release is built and published.
 
 The Release workflow builds the programs for Windows, Linux and macOS and the Python packages, writes
 `SHA256SUMS.txt`, and publishes the release with the tag `vx.y.z`. A version that already has a release is
