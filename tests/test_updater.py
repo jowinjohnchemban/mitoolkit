@@ -129,6 +129,34 @@ class DownloadAndInstallTests(unittest.TestCase):
         with self.assertRaisesRegex(updater.UpdateError, "SHA256SUMS"):
             updater.download(r, self.dir / "new")
 
+    def versioned(self, tag="v9.9.9"):
+        name = f"{NAME}-{tag}"
+        return updater.Release(tag, updater.parse_version(tag), "Notes", "https://github.com/x/releases",
+                               {name: BASE + name, updater.SUMS: BASE + updater.SUMS}), name
+
+    def test_a_release_with_the_version_in_the_file_name_is_found_and_checked_by_that_name(self):
+        rel, name = self.versioned()
+        self.assertEqual(updater.release_asset(rel), name)
+        body = b"new program"
+        sums = f"{hashlib.sha256(body).hexdigest()}  {name}\n"
+
+        def fake(url, **kw):
+            return FakeReply(body=body) if url.endswith(name) else FakeReply(text=sums)
+        with mock.patch("requests.get", side_effect=fake):
+            path = updater.download(rel, self.dir / "new")
+        self.assertEqual(path.read_bytes(), body)
+
+    def test_older_releases_without_the_version_in_the_name_still_work(self):
+        self.assertEqual(updater.release_asset(release()), NAME)
+        both = updater.Release("v9.9.9", (9, 9, 9), "", "", {NAME: "x", f"{NAME}-v9.9.9": "y"})
+        self.assertEqual(updater.release_asset(both), f"{NAME}-v9.9.9")                # the versioned one is preferred
+
+    def test_another_versions_file_is_never_taken_and_no_file_is_a_clear_error(self):
+        other = updater.Release("v9.9.9", (9, 9, 9), "", "", {f"{NAME}-v1.0.0": "x", updater.SUMS: "s"})
+        self.assertIsNone(updater.release_asset(other))
+        with self.assertRaisesRegex(updater.UpdateError, "no program for this system"):
+            updater.download(other, self.dir / "new")
+
     def test_a_release_can_be_downloaded_to_a_folder_without_installing_it(self):
         body = b"new program"
         with self.get(body, hashlib.sha256(body).hexdigest()):

@@ -91,6 +91,20 @@ def asset_name() -> Optional[str]:
     return None
 
 
+def release_asset(release: "Release") -> Optional[str]:
+    """The name this system's program has in ``release``. Releases from v1.6 on put the version in the file name
+    (``mitoolkit-windows-x64-v1.6.0.exe``); older ones did not (``mitoolkit-windows-x64.exe``). None when the release
+    has no program for this system."""
+    base = asset_name()
+    if base is None:
+        return None
+    stem, dot, suffix = base.partition(".")
+    for name in (f"{stem}-{release.tag}{dot}{suffix}", base):
+        if name in release.assets:
+            return name
+    return None
+
+
 def running_program() -> Optional[Path]:
     """The single-file program that is running, or None (a Python install or a source checkout)."""
     return Path(sys.executable).resolve() if getattr(sys, "frozen", False) else None
@@ -132,8 +146,8 @@ def download(release: Release, dest: Path, progress: Callable[[int, int], None] 
              cancel: Optional[threading.Event] = None) -> Path:
     """Download this system's program from the release to ``dest`` and check it against SHA256SUMS.txt.
     ``dest`` is removed again if anything is wrong. progress(done, total) is called as it goes."""
-    name = asset_name()
-    if name is None or name not in release.assets:
+    name = release_asset(release)
+    if name is None:
         raise UpdateError("This release has no program for this system. Download it from the release page.")
     if SUMS not in release.assets:
         raise UpdateError("This release has no SHA256SUMS.txt, so the download cannot be checked.")

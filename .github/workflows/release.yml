@@ -25,6 +25,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read             # to read the other workflows' results for this commit
     outputs:
       release: ${{ steps.version.outputs.release }}
       tag: ${{ steps.version.outputs.tag }}
@@ -35,6 +38,35 @@ jobs:
         with:
           fetch-depth: 0          # the tags and the history since the last release
           persist-credentials: false
+      - name: Release only when every check on this commit is green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # The other workflows run on the same push. Wait (up to 45 minutes) until each has finished, and stop here,
+          # so nothing is released, unless every one of them succeeded.
+          expected='["CI","CodeQL","Security","OSV-Scanner"]'
+          for attempt in $(seq 1 90); do
+            runs=$(gh run list --commit "$GITHUB_SHA" --limit 100 --json workflowName,status,conclusion)
+            summary=$(echo "$runs" | jq -c --argjson expected "$expected" '
+              . as $all
+              | [$expected[] as $name
+                 | ([$all[] | select(.workflowName == $name)] | sort_by(.status != "completed") | .[0]) as $run
+                 | {name: $name, state: (if $run == null then "waiting" elif $run.status != "completed" then "running"
+                                         elif ($run.conclusion == "success" or $run.conclusion == "skipped") then "passed" else "failed" end)}]')
+            echo "$summary"
+            if echo "$summary" | jq -e 'any(.[]; .state == "failed")' > /dev/null; then
+              echo "::error::A check failed on this commit, so no release is made."
+              exit 1
+            fi
+            if echo "$summary" | jq -e 'all(.[]; .state == "passed")' > /dev/null; then
+              echo "Every check passed."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::The checks did not finish in 45 minutes, so no release is made."
+          exit 1
       - name: Work out the version
         id: version
         env:
@@ -101,11 +133,13 @@ jobs:
         run: |
           ./dist/mitoolkit${{ matrix.ext }} --version
           if ./dist/mitoolkit${{ matrix.ext }} unlock; then echo "gate failed"; exit 1; fi
-      - name: Name artifacts
+      - name: Name artifacts (the version is in the file name, like mitoolkit-windows-x64-v1.6.0.exe)
         shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.check.outputs.tag }}
         run: |
           mkdir out
-          cp dist/mitoolkit${{ matrix.ext }}     out/mitoolkit-${{ matrix.tag }}${{ matrix.ext }}
+          cp dist/mitoolkit${{ matrix.ext }}     out/mitoolkit-${{ matrix.tag }}-${RELEASE_TAG}${{ matrix.ext }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: exe-${{ matrix.tag }}

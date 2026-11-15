@@ -76,7 +76,8 @@ fit the direction of the project.
 ## Releasing
 
 **Every merge to `main` is released automatically**, with the next version worked out for you: nothing to edit
-by hand. The rules are the standard ones, [Conventional Commits](https://www.conventionalcommits.org) for the
+by hand. The release waits for the other workflows on that commit (CI, CodeQL, Security, OSV-Scanner) and is made
+only if all of them are green; the programs are named with the version (`mitoolkit-windows-x64-v1.6.0.exe`). The rules are the standard ones, [Conventional Commits](https://www.conventionalcommits.org) for the
 messages and [Semantic Versioning](https://semver.org) for the numbers. The pull request title is what counts
 (it becomes the commit message when the pull request is squash-merged), and a check makes sure it starts with a type:
 
