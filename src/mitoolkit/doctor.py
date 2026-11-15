@@ -193,6 +193,7 @@ def check_settings() -> Check:
         if isinstance(data, dict):
             return Check("settings", "Settings", OK)
     except (OSError, ValueError):
+        # unreadable or not JSON: the damaged-file result below is what the person is told
         pass
 
     def reset() -> str:

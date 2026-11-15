@@ -1,6 +1,5 @@
 """Closing MiToolkit: phones are let go of, a fastboot it started is stopped, the adb server it started is stopped."""
 import os
-import subprocess
 import sys
 import threading
 import time
@@ -84,7 +83,8 @@ class FilesTests(unittest.TestCase):
                 self.assertEqual(shutdown.run(), ["did"])
             self.assertEqual(order, ["steps", "files"])               # files after everything that logs
             self.assertIsNone(handler.stream)                         # the file handle is released
-            self.assertIn("written before closing", open(os.path.join(tmp, "x.log"), encoding="utf-8").read())
+            with open(os.path.join(tmp, "x.log"), encoding="utf-8") as written:
+                self.assertIn("written before closing", written.read())
             logger.removeHandler(handler)
 
     def test_a_failing_file_close_never_raises(self):

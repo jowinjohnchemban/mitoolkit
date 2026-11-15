@@ -73,7 +73,7 @@ def _windows(command: List[str], timeout: int, verb: str = "runas"):
     """UAC through ShellExecuteEx ("runas"). None if the person declined. (``verb`` is "runas" in real use; a test
     uses "open" to check the plumbing without a prompt.)"""
     import ctypes
-    from ctypes import wintypes
+    import ctypes.wintypes as wintypes
 
     class ShellExecuteInfo(ctypes.Structure):
         _fields_ = [("cbSize", wintypes.DWORD), ("fMask", wintypes.ULONG), ("hwnd", wintypes.HWND),

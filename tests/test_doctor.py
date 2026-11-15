@@ -316,12 +316,12 @@ class ElevateTests(unittest.TestCase):
         self.assertTrue(seen["command"][-1].endswith(".json"))
 
     def test_declined_prompt(self):
-        (worked, message), _seen = self.run_with(None)
+        worked, message = self.run_with(None)[0]
         self.assertFalse(worked)
         self.assertIn("not given", message)
 
     def test_a_crash_without_a_result_file_is_reported(self):
-        (worked, message), _seen = self.run_with(1)
+        worked, message = self.run_with(1)[0]
         self.assertFalse(worked)
         self.assertIn("did not finish", message)
 
