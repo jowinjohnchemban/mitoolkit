@@ -38,6 +38,11 @@ CONSOLE_DIM = "#5f6368"
 SIZE_SMALL, SIZE_BODY, SIZE_HEADING, SIZE_TITLE = 9, 10, 12, 18
 
 
+def named_font(name: str, root=None) -> tkfont.Font:
+    """A named Tk font of this window's interpreter. (tkfont.nametofont only takes ``root`` from Python 3.10.)"""
+    return tkfont.Font(root=root, name=name, exists=True)
+
+
 def _family(root) -> str:
     """The system UI font: Segoe UI on Windows, else whatever Tk uses by default."""
     families = set(tkfont.families(root))
@@ -45,7 +50,7 @@ def _family(root) -> str:
                                                                     "Cantarell", "Ubuntu", "Noto Sans"):
         if name in families:
             return name
-    return tkfont.nametofont("TkDefaultFont").actual("family")
+    return named_font("TkDefaultFont", root).actual("family")
 
 
 def _unify_fonts(root) -> str:
@@ -61,7 +66,7 @@ def _unify_fonts(root) -> str:
     strong = {"TkHeadingFont"}
     for name, size in sizes.items():
         try:
-            f = tkfont.nametofont(name, root=root)
+            f = named_font(name, root)
         except tk_error():
             continue
         if name in strong and semibold:
@@ -194,7 +199,7 @@ def scale_fonts(root, factor: float, extra=()) -> None:
     """Resize every named font, and the Font objects in ``extra``, to factor x their normal
     size (1.0 = normal, 2.0 = double)."""
     for name in tkfont.names(root):
-        f = tkfont.nametofont(name, root=root)
+        f = named_font(name, root)
         base = _named_base.setdefault(name, f.actual("size"))
         f.configure(size=max(6, round(base * factor)))
     for f in extra:
@@ -208,7 +213,7 @@ class Fonts:
     """The fonts the GUI uses, on the same family and scale as the theme."""
 
     def __init__(self, root=None):
-        base = tkfont.nametofont("TkDefaultFont", root=root)
+        base = named_font("TkDefaultFont", root)
         family = base.actual("family")
         semi = "Segoe UI Semibold" if family == "Segoe UI" and "Segoe UI Semibold" in tkfont.families(root) else None
 

@@ -30,10 +30,13 @@ class SkeletonTests(unittest.TestCase):
     def setUp(self):
         from miunlock.ui.components import skeleton
         self.skeleton = skeleton
+        self._reduced = skeleton.REDUCED
+        skeleton.REDUCED = False         # a runner with animations switched off would never tick
         self.root = make_root()
         self.root.geometry("500x400")
 
     def tearDown(self):
+        self.skeleton.REDUCED = self._reduced
         self.skeleton.clock._watching.clear()
         self.skeleton.clock._job = None
         self.root.destroy()

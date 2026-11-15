@@ -101,6 +101,7 @@ class DetailsViewTests(unittest.TestCase):
         from miunlock.ui.components.details_view import DetailsView
         from miunlock.ui.theme import Fonts
         root = make_root()
+        root.geometry("600x400")                                     # a window that is mapped and has a width
         try:
             view = DetailsView(root, Fonts(root), "#5f6368", "#f0f0f0")
             view.pack(fill="x")

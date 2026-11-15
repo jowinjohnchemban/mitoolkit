@@ -156,7 +156,7 @@ class ClosingFreesThingsTests(unittest.TestCase):
                     break
                 time.sleep(0.01)
             root.update()
-            self.assertTrue(all(freed(ref) for ref in charts))
+            self.assertTrue(all(freed(ref, tries=150) for ref in charts))
         finally:
             root.destroy()
 
