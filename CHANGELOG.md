@@ -13,7 +13,8 @@ pull request titles (see CONTRIBUTING.md); the full, generated notes of each rel
 
 ### Added
 - Closing MiToolkit lets go of the phone: its USB connections are closed, a Google fastboot it started is stopped,
-  and so is the Google adb server it started (one already running is left alone).
+  and so is the Google adb server it started (one already running is left alone). The log file and crash.log are
+  closed too.
 - Automatic releases: every merge to `main` is released with a Semantic Versioning number worked out from the
   Conventional Commits pull request titles; the doctor can ask for administrator rights (UAC, polkit, the macOS
   prompt) for the few fixes that need them, and only after a person chooses.

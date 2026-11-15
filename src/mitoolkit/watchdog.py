@@ -141,3 +141,20 @@ def install_crash_logging() -> None:
                                 "".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)))
 
     threading.excepthook = thread_hook
+
+
+def close_crash_log() -> bool:
+    """Stop writing crashes to crash.log and close it (on exit). faulthandler is switched off first: it holds on to
+    the file, and closing the file under it could itself crash. Returns True if a file was closed."""
+    files = list(_crash_files)
+    _crash_files.clear()
+    if not files:
+        return False
+    faulthandler.disable()
+    for crash_file in files:
+        try:
+            crash_file.close()
+        except OSError:
+            # the disk went away: there is nothing more to flush
+            pass
+    return True

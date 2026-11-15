@@ -1,5 +1,6 @@
 """What MiToolkit puts away when it closes, so it never leaves the phone held behind it.
 
+* the files it keeps open (the log file, crash.log) are flushed and closed, last of all;
 * its own USB connections to phones (adb) are closed;
 * any Google ``fastboot`` it started and that is still running is stopped;
 * the Google adb server it started (for Wi-Fi) is stopped. A server that was already running when MiToolkit
@@ -41,6 +42,16 @@ def _stop_adb() -> str:
     return module.stop_started(also_others=bool(settings.get("stop_any_adb_on_exit", False)))
 
 
+def _close_files() -> None:
+    """Close the files MiToolkit keeps open: crash.log, and the log file (flushed first). Done last, after the
+    steps above have said what they did, so nothing is written to a log that is already closed."""
+    import logging
+    module = sys.modules.get("mitoolkit.watchdog")
+    if module is not None:
+        module.close_crash_log()
+    logging.shutdown()          # flushes and closes every log handler, so the log file is released (Windows can then move it)
+
+
 STEPS: List[Callable[[], str]] = [_close_usb, _stop_fastboot, _stop_adb]
 
 
@@ -59,6 +70,10 @@ def run() -> List[str]:
         if message:
             messages.append(message)
             _log().info(message)
+    try:
+        _close_files()
+    except Exception as err:             # the log may already be closed: say nothing, closing must not fail
+        print(f"Could not close a file: {err}", file=sys.stderr)
     return messages
 
 

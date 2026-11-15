@@ -294,8 +294,9 @@ Handy features:
   failed file is retried, and anything that still fails is listed in `backup-problems.txt` in the backup folder.
 - **Sign out** (Mi Account section, or File menu) deletes the saved session on this computer.
 - **Closing MiToolkit puts things away.** It closes its own USB connections to phones, stops any Google `fastboot`
-  it started that is still running, and stops the Google adb server it started (for Wi-Fi), so nothing keeps
-  holding the phone behind it. An adb server that was already running when it began is left alone, because
+  it started that is still running, stops the Google adb server it started (for Wi-Fi), so nothing keeps
+  holding the phone behind it, and last of all closes the files it keeps open (the log file and `crash.log`),
+  so they can be moved or deleted. An adb server that was already running when it began is left alone, because
   Android Studio or a terminal may be using it. In `~/.mitoolkit/settings.json`, `"stop_any_adb_on_exit": true`
   stops that one too, and `"stop_adb_on_exit": false` stops none. A phone connected over Wi-Fi is disconnected
   when the adb server stops, so reconnect it the next time.

@@ -51,6 +51,47 @@ class ShutdownTests(unittest.TestCase):
         adb.assert_called_once_with(also_others=True)
 
 
+class FilesTests(unittest.TestCase):
+    def setUp(self):
+        shutdown._done.clear()
+        self.addCleanup(shutdown._done.clear)
+
+    def test_the_crash_log_is_closed_with_faulthandler_switched_off_first(self):
+        import io
+        import mitoolkit.watchdog as watchdog
+        crash = io.StringIO()
+        order = []
+        crash.close = lambda: order.append("close")
+        with mock.patch.object(watchdog, "_crash_files", [crash]), \
+                mock.patch.object(watchdog.faulthandler, "disable", side_effect=lambda: order.append("disable")):
+            self.assertTrue(watchdog.close_crash_log())
+            self.assertFalse(watchdog.close_crash_log())              # nothing left to close
+        self.assertEqual(order, ["disable", "close"])
+
+    def test_the_log_file_is_flushed_and_closed_last(self):
+        import logging
+        import tempfile
+        from logging.handlers import RotatingFileHandler
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = RotatingFileHandler(os.path.join(tmp, "x.log"), encoding="utf-8")
+            logger = logging.getLogger("closing-test")
+            logger.addHandler(handler)
+            logger.warning("written before closing")
+            order = []
+            real_shutdown = logging.shutdown
+            with mock.patch.object(shutdown, "STEPS", [lambda: order.append("steps") or "did"]), \
+                    mock.patch("logging.shutdown", side_effect=lambda: order.append("files") or real_shutdown()):
+                self.assertEqual(shutdown.run(), ["did"])
+            self.assertEqual(order, ["steps", "files"])               # files after everything that logs
+            self.assertIsNone(handler.stream)                         # the file handle is released
+            self.assertIn("written before closing", open(os.path.join(tmp, "x.log"), encoding="utf-8").read())
+            logger.removeHandler(handler)
+
+    def test_a_failing_file_close_never_raises(self):
+        with mock.patch.object(shutdown, "STEPS", []), mock.patch.object(shutdown, "_close_files", side_effect=OSError("disk")):
+            self.assertEqual(shutdown.run(), [])
+
+
 class AdbServerStopTests(unittest.TestCase):
     def setUp(self):
         self.saved = dict(adb_server._started)
