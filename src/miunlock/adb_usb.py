@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple
 
 from miunlock import adbkey, usbio
+from miunlock.errors import MiunlockError
 
 ADB = (0xFF, 0x42, 0x01)  # USB interface class, subclass, protocol
 
@@ -30,7 +31,7 @@ MAX_DATA = 256 * 1024
 AUTH_TOKEN, AUTH_SIGNATURE, AUTH_RSAPUBLICKEY = 1, 2, 3
 
 
-class AdbError(Exception):
+class AdbError(MiunlockError):
     """str(e) is human-readable."""
 
 

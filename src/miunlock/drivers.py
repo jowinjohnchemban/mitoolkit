@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Callable
 
 from miunlock.system import NO_WINDOW
+from miunlock.errors import MiunlockError
 
 USB_DRIVER_URL = "https://dl.google.com/android/repository/usb_driver_r13-windows.zip"
 DRIVER_DIR = Path.home() / "miunlock-drivers"
@@ -35,7 +36,7 @@ MANUAL_STEPS = (
 )
 
 
-class DriverError(Exception):
+class DriverError(MiunlockError):
     """A driver step failed. str(e) is human-readable."""
 
 

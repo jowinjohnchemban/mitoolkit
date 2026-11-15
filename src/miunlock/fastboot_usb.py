@@ -11,13 +11,14 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 
 from miunlock import usbio
+from miunlock.errors import MiunlockError
 
 FASTBOOT = (0xFF, 0x42, 0x03)  # USB interface class, subclass, protocol
 _READ = 256  # responses are at most 256 bytes (fastboot README)
 _CHUNK = 1024 * 1024
 
 
-class FastbootError(Exception):
+class FastbootError(MiunlockError):
     """str(e) is human-readable."""
 
 

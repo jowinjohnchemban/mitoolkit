@@ -10,8 +10,10 @@ from __future__ import annotations
 import sys
 from typing import Any, List, Optional, Tuple
 
+from miunlock.errors import MiunlockError
 
-class UsbError(Exception):
+
+class UsbError(MiunlockError):
     """A USB step failed. str(e) is human-readable."""
 
 

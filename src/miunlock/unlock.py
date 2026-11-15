@@ -1,96 +1,100 @@
+"""
+The interactive command-line unlock (``miunlock --cli``): the same steps as api.py, with
+prompts in between. The requests to Xiaomi are shared through xiaomi.UnlockServer.
+"""
+from __future__ import annotations
+
+from typing import Optional
+
 from miunlock import fastboot
-from miunlock.utils import _send
-from miunlock.system import console, GREEN, ORANGE, RED, WHITE
-import random
-import hashlib
+from miunlock.auth import get_dataCenterZone, get_passtoken, get_region, get_service
+from miunlock.auth.redact import redact_response
+from miunlock.system import GREEN, ORANGE, RED, WHITE, console
+from miunlock.xiaomi import ServerError, UnlockServer, zone_for_region
 
 
-def unlock_device(domain, service):
+class InteractiveUnlock:
+    """Sign in, choose the data center, check the phone, confirm, unlock."""
 
-    cookies = service["cookies"]
-    ssecurity = service['servicedata']["ssecurity"]
-    deviceId = service['servicedata']["deviceId"]
+    PARAM = {"sid": "unlockApi", "checkSafeAddress": True}
 
-    r = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=16))
-    nonce_resp = _send("/api/v2/nonce", {"r": r}, domain, ssecurity, cookies)
-    if "error" in nonce_resp:
-        console.print(f"\n[{RED}]{nonce_resp['error']}[/]\n")
-        return
-    if nonce_resp["code"] != 0:
-        console.print(f"\n[{RED}]{nonce_resp}[/]\n")
-        return
-    nonce = nonce_resp["nonce"]
+    def say(self, text: str, colour: str = WHITE) -> None:
+        console.print(f"\n[{colour}]{text}[/]\n")
 
-    console.print(f"\n[{GREEN}][[/] [{ORANGE}]Ensure your Xiaomi device is in fastboot mode[/] [{GREEN}]] < [/]\n")
+    def ask(self, prompt: str) -> str:
+        return console.input(f"\n[{WHITE}]{prompt}[/]").strip().lower()
 
-    try:
-        product = fastboot.get_product()
-    except fastboot.FastbootError as err:
-        console.print(f"\n[{RED}]{err}[/]\n")
-        return
+    # -------------------------------------------------------------- steps
+    def sign_in(self) -> Optional[tuple]:
+        """(passToken, service) or None."""
+        pass_token = get_passtoken(dict(self.PARAM))
+        if pass_token is None:
+            return None
+        service = get_service(pass_token, dict(self.PARAM))
+        if service is None:
+            return None
+        return pass_token, service
 
-    console.print(f"\n[{GREEN}]Device Codename: {product}[/]\n")
-
-    clear = _send("/api/v2/unlock/device/clear", {"appId": "1", "data": {"product": product}, "nonce": nonce}, domain, ssecurity, cookies)
-    if "error" in clear:
-        console.print(f"\n[{RED}]{clear['error']}[/]\n")
-        return
-    if clear["code"] != 0:
-        console.print(f"\n[{RED}]{clear}[/]\n")
-        return
-
-    console.print(f"\n[{ORANGE}]notice: {clear['notice']}[/]\n")
-    if clear["cleanOrNot"] == 1:
-        console.print(f"\n[{RED}]The device will clear user data when unlocked[/]\n")
-    else:
-        console.print(f"\n[{GREEN}]Unlocking this device will not erase user data[/]\n")
-
-    console.input(f"\n[{WHITE}]Press 'Enter' to continue — unlock(encryptData)[/]")
-
-    try:
-        device_token = fastboot.get_token()
-    except fastboot.FastbootError as err:
-        console.print(f"\n[{RED}]{err}[/]\n")
-        return
-
-    data = {
-        "clientId": "2",
-        "clientVersion": "7.6.727.43",
-        "deviceInfo": {"boardVersion": "", "deviceName": "", "product": product, "socId": ""},
-        "deviceToken": device_token,
-        "language": "en",
-        "operate": "unlock",
-        "pcId": hashlib.md5(deviceId.encode()).hexdigest(),
-        "region": "",
-        "uid": cookies.get("userId"),
-    }
-
-    # /api/v2/nonce is single-use: the `clear` call above already consumed the
-    # nonce we fetched, so reusing it here makes the server answer
-    # 10005 "Invalid nonce param". Request a fresh one before unlocking.
-    r = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=16))
-    nonce_resp = _send("/api/v2/nonce", {"r": r}, domain, ssecurity, cookies)
-    if "error" in nonce_resp:
-        console.print(f"\n[{RED}]{nonce_resp['error']}[/]\n")
-        return
-    if nonce_resp["code"] != 0:
-        console.print(f"\n[{RED}]{nonce_resp}[/]\n")
-        return
-    nonce = nonce_resp["nonce"]
-
-    unlock_result = _send("/api/v3/ahaUnlock", {"appId": "1", "data": data, "nonce": nonce}, domain, ssecurity, cookies)
-    if "error" in unlock_result:
-        console.print(f"\n[{RED}]{unlock_result['error']}[/]\n")
-        return
-    if unlock_result["code"] != 0:
-        if "descEN" in unlock_result:
-            console.print(f"\n[{ORANGE}]code: {unlock_result['code']}\ndescription: {unlock_result['descEN']}[/]\n")
+    def choose_zone(self, pass_token: dict) -> str:
+        region = get_region(pass_token)
+        if region is None:
+            zone = get_dataCenterZone(pass_token["userId"])
         else:
-            console.print(f"\n[{ORANGE}]{unlock_result}[/]\n")
-        return
+            console.print(f"\n[{GREEN}]Account Region: {region}[/]")
+            zone = zone_for_region(region)
+        if zone is None:
+            return get_dataCenterZone()
+        console.print(f"\n[{GREEN}]dataCenterZone: {zone}[/]")
+        if self.ask(f"(Enter to continue, [{ORANGE}]m[/] to change dataCenterZone) > ") == "m":
+            zone = get_dataCenterZone()
+        return zone
 
-    try:
-        fastboot.stage_and_unlock(bytes.fromhex(unlock_result["encryptData"]))
-        console.print(f"\n[{GREEN}]Unlock successful[/]\n")
-    except fastboot.FastbootError as err:
-        console.print(f"\n[{RED}]{err}[/]\n")
+    def unlock(self, server: UnlockServer) -> bool:
+        self.say(f"[{GREEN}][[/] [{ORANGE}]Ensure your Xiaomi device is in fastboot mode[/] [{GREEN}]] <[/]", GREEN)
+        try:
+            product = fastboot.get_product()
+            self.say(f"Device Codename: {product}", GREEN)
+            clear = server.device_clear(product)
+        except (fastboot.FastbootError, ServerError) as err:
+            self.say(str(err), RED)
+            return False
+        if "error" in clear:
+            self.say(clear["error"], RED)
+            return False
+        if clear.get("code") != 0:
+            self.say(f"code: {clear.get('code')}\ndescription: {clear.get('descEN') or redact_response(clear)}", ORANGE)
+            return False
+
+        self.say(f"notice: {clear.get('notice')}", ORANGE)
+        if clear.get("cleanOrNot") == 1:
+            self.say("The device will clear user data when unlocked", RED)
+        else:
+            self.say("Unlocking this device will not erase user data", GREEN)
+        self.ask("Press 'Enter' to continue — unlock(encryptData)")
+
+        try:
+            data = server.unlock_data(product, fastboot.get_token())
+            fastboot.stage_and_unlock(data)
+        except ServerError as err:
+            text = f"code: {err.code}\ndescription: {err.description}" if err.code is not None else str(err)
+            self.say(text, ORANGE)
+            return False
+        except fastboot.FastbootError as err:
+            self.say(str(err), RED)
+            return False
+        self.say("Unlock successful", GREEN)
+        return True
+
+    # ---------------------------------------------------------------- run
+    def run(self) -> None:
+        try:
+            fastboot.ready()
+        except fastboot.FastbootError as err:
+            self.say(str(err), RED)
+            raise SystemExit(1)
+        signed_in = self.sign_in()
+        if signed_in is None:
+            raise SystemExit(1)
+        pass_token, service = signed_in
+        zone = self.choose_zone(pass_token)
+        self.unlock(UnlockServer(service, zone))

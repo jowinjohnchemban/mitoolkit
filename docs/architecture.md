@@ -8,14 +8,22 @@ used to be the separate `migate` library lives inside it as `miunlock.auth`.
 ```text
 src/miunlock/
 ├── __main__.py        python -m miunlock
-├── cli.py             entry point: GUI by default, --cli, JSON subcommands, --mcp
-├── gui.py             Tkinter GUI
+├── cli.py             entry point: GUI by default, --cli, JSON subcommands (@json_command), --mcp
+├── gui.py             main window (App)
+├── ui/                the other windows, one class each
+│   ├── base.py            Dialog base class
+│   ├── theme.py           colours, links, Fonts
+│   ├── guide_window.py    GuideWindow
+│   ├── backup_dialog.py   BackupDialog
+│   └── apps_dialog.py     AppManagerDialog, AppRow
 ├── mcp.py             MCP server for AI agents (no unlock tool)
 ├── api.py             programmatic API used by the subcommands, GUI and MCP
-├── adb.py             adb features: phones, details, reboot, backup, app manager
+├── xiaomi.py          UnlockServer: the requests to Xiaomi's unlock server, shared
+├── errors.py          MiunlockError, the base of every expected error
+├── adb.py             Phone: details, reboot, backup, app manager (+ short functions)
 ├── adb_usb.py         built-in adb client (USB protocol, auth, shell, sync)
 ├── adbkey.py          adb RSA key (~/.android/adbkey), pure Python
-├── fastboot.py        fastboot features: devices, getvar, token, stage + oem unlock
+├── fastboot.py        Backend interface; UsbBackend and TermuxBackend
 ├── fastboot_usb.py    built-in fastboot client (USB protocol)
 ├── usbio.py           USB access through pyusb + libusb
 ├── drivers.py         Google USB driver installer (Windows)
@@ -24,7 +32,7 @@ src/miunlock/
 ├── log.py             scrubbed miunlock.log next to the executable
 ├── hints.py           plain-English explanations of Xiaomi error codes
 ├── assets/logo.png    window icon
-├── unlock.py          the original interactive unlock sequence
+├── unlock.py          InteractiveUnlock: the prompting command-line flow
 ├── commands.py        Termux only: fastboot queries through the fastboot command
 ├── utils.py           request signing, encryption and the HTTP call to Xiaomi
 ├── system.py          platform detection helpers
@@ -42,9 +50,26 @@ src/miunlock/
     └── utilities/         region, data center, locale and area lookups
 ```
 
-`unlock.py` (interactive) and `api.py` (non-interactive) both implement the same
-request sequence. They are kept separate because the interactive flow prompts the
-user in the middle. If Xiaomi changes the protocol, update both.
+## Design
+
+- **One implementation per job.** The requests to Xiaomi live only in
+  `xiaomi.UnlockServer`; `api.py` (non-interactive) and `unlock.InteractiveUnlock` (prompts)
+  both use it. Region-to-zone mapping is `xiaomi.zone_for_region`.
+- **Interfaces over branches.** `fastboot.Backend` has two implementations,
+  `UsbBackend` (built-in USB client) and `TermuxBackend` (termux fastboot command); the rest
+  of the program calls `fastboot.get_product()`, `get_token()`, `stage_and_unlock()`
+  without knowing which one runs.
+- **Objects for things with state.** `adb.Phone` wraps one connected phone;
+  `adb_usb.AdbDevice` and `fastboot_usb.FastbootDevice` wrap the USB sessions;
+  `adbkey.Key` is the RSA key. Module-level functions in `adb.py` are one-line short forms
+  kept for the CLI, API and MCP.
+- **One error base.** Every expected failure derives from `errors.MiunlockError` and has a
+  readable message. Each layer has one type (`AdbError`, `FastbootError`, `UsbError`,
+  `UnlockError`, `DriverError`); `api.py` turns lower-layer errors into `UnlockError`.
+- **Windows as classes.** Each secondary window is a `ui.base.Dialog` subclass. They only
+  use the App's small public interface: `root`, `fonts`, `run()`, `log()`, `call_soon()`.
+- **CLI commands are plain functions** wrapped by `@json_command`, which prints the result
+  as JSON and turns any `MiunlockError` into `{"error": ...}` with exit status 1.
 
 ## Request flow
 

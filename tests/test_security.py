@@ -15,7 +15,7 @@ from unittest import mock
 
 import requests
 
-from miunlock import api, log, mcp
+from miunlock import api, log, mcp, xiaomi
 from miunlock.auth import browser, requester, store
 from miunlock.auth.redact import mask_id, redact_response
 from miunlock.hints import explain
@@ -217,7 +217,7 @@ class UnlockGateTests(unittest.TestCase):
             guard = mock.patch.object(api.fastboot, name, side_effect=AssertionError("fastboot was reached"))
             guard.start()
             self.addCleanup(guard.stop)
-        send = mock.patch.object(api, "_send", side_effect=AssertionError("network was reached"))
+        send = mock.patch.object(xiaomi, "_send", side_effect=AssertionError("network was reached"))
         send.start()
         self.addCleanup(send.stop)
 

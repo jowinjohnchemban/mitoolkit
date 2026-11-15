@@ -51,11 +51,22 @@ Returns the Xiaomi data center for the account: `"Singapore"`, `"China"`,
 `"India"`, `"Russia"` or `"Europe"`. These select the unlock server
 (see [architecture](architecture.md)).
 
-### `get_device_codename(fastboot_cmd=None) -> str`
+### `get_device_codename(wait=True) -> str`
 
 Returns the device codename, for example `"example"`. The device must be in fastboot
-mode. If no device is connected this waits for one. `fastboot_cmd` is the path to
-a `fastboot` binary; when omitted it is found or downloaded.
+mode. With `wait=True` it waits for one to be connected; with `wait=False` it raises
+`UnlockError` at once if there is none.
+
+### Lower-level building blocks
+
+- `miunlock.xiaomi.UnlockServer(service, zone)`: `device_clear(product)` and
+  `unlock_data(product, device_token)`, the two requests to Xiaomi's unlock server.
+- `miunlock.adb.Phone(serial=None)`: `info()`, `reboot_to_bootloader()`, `packages()`,
+  `uninstall_for_user(pkg)`, `restore_for_user(pkg)`, `backup(dest, sets)`.
+- `miunlock.fastboot`: `devices()`, `info()`, `get_product()`, `get_token()`,
+  `stage_and_unlock(data)`, `reboot()`, on the backend for this system.
+
+All of them raise subclasses of `miunlock.errors.MiunlockError`.
 
 ### `check_unlock_eligibility(passtoken, zone=None) -> dict`
 

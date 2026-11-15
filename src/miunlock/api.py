@@ -24,37 +24,27 @@ changes, both this file and unlock.py need updating -- see CHANGES.md.
 """
 from __future__ import annotations
 
-import hashlib
-import random
-from typing import Optional
+from contextlib import contextmanager
+from typing import Iterator, Optional
 
 from miunlock import adb, fastboot, log
-from miunlock.auth.redact import redact_response
 from miunlock.auth import get_passtoken, get_service, get_region, get_dataCenterZone
-from miunlock.utils import _send
-
-DOMAIN_BY_ZONE = {
-    "Singapore": "https://unlock.update.intl.miui.com",
-    "China": "https://unlock.update.miui.com",
-    "India": "https://in-unlock.update.intl.miui.com",
-    "Russia": "https://ru-unlock.update.intl.miui.com",
-    "Europe": "https://eu-unlock.update.intl.miui.com",
-}
-
-_EUROPE_CODES = {
-    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "EL",
-    "HU", "IS", "IE", "IT", "LV", "LI", "LT", "LU", "MT", "NL", "NO", "PL",
-    "PT", "RO", "SK", "SI", "ES", "SE", "UK",
-}
-REGION_TO_ZONE = {"CN": "China", "IN": "India", "RU": "Russia",
-                   **{c: "Europe" for c in _EUROPE_CODES}}
-
+from miunlock.auth.redact import redact_response
+from miunlock.errors import MiunlockError, UnlockError
+from miunlock.xiaomi import DOMAIN_BY_ZONE, REGION_TO_ZONE, UnlockServer, zone_for_region  # noqa: F401 re-exported
 
 _log = log.get("api")
 
 
-class UnlockError(Exception):
-    """Raised for any rejected or failed step. str(e) is human-readable."""
+@contextmanager
+def _as_unlock_error() -> Iterator[None]:
+    """Every failure leaves this module as an UnlockError with a readable message."""
+    try:
+        yield
+    except UnlockError:
+        raise
+    except MiunlockError as err:
+        raise UnlockError(str(err)) from None
 
 
 def login(login_method: str = "1", silent_if_cached: bool = True) -> dict:
@@ -84,7 +74,7 @@ def get_account_zone(passtoken: dict) -> str:
     """Returns one of DOMAIN_BY_ZONE's keys for this account."""
     region = get_region(passtoken)
     if region:
-        return REGION_TO_ZONE.get(region, "Singapore")
+        return zone_for_region(region)
     zone = get_dataCenterZone(passtoken["userId"])
     if not zone:
         raise UnlockError("Could not determine the account's dataCenterZone.")
@@ -94,12 +84,17 @@ def get_account_zone(passtoken: dict) -> str:
 def get_device_codename(wait: bool = True) -> str:
     """The codename of the phone in fastboot mode. With wait=True (default) it waits for
     one to be connected; with wait=False it fails at once if there is none."""
-    try:
+    with _as_unlock_error():
         if not wait and not any(d["accessible"] for d in fastboot.devices()):
             raise UnlockError("No phone in fastboot mode is connected.")
         return fastboot.get_product(wait=wait)
-    except fastboot.FastbootError as err:
-        raise UnlockError(str(err)) from None
+
+
+def _service(passtoken: dict) -> dict:
+    service = get_service(passtoken, {"sid": "unlockApi"})
+    if service is None:
+        raise UnlockError("Could not establish a service session.")
+    return service
 
 
 def check_unlock_eligibility(passtoken: dict, zone: Optional[str] = None) -> dict:
@@ -112,29 +107,14 @@ def check_unlock_eligibility(passtoken: dict, zone: Optional[str] = None) -> dic
     Returns a dict with at least {"eligible": bool}. On rejection,
     includes "code" and "description" straight from Xiaomi -- e.g. the
     20031 ("add your account in Mi Unlock status") or 20036 ("wait 168
-    hours") responses documented in CHANGES.md.
+    hours") responses documented in docs/error-codes.md.
     """
-    service = get_service(passtoken, {"sid": "unlockApi"})
-    if service is None:
-        raise UnlockError("Could not establish a service session.")
+    service = _service(passtoken)
     zone = zone or get_account_zone(passtoken)
-    domain = DOMAIN_BY_ZONE[zone]
-
     product = get_device_codename()
+    with _as_unlock_error():
+        clear = UnlockServer(service, zone).device_clear(product)
 
-    ssecurity = service["servicedata"]["ssecurity"]
-    cookies = service["cookies"]
-
-    r = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=16))
-    nonce_resp = _send("/api/v2/nonce", {"r": r}, domain, ssecurity, cookies)
-    if "error" in nonce_resp or nonce_resp.get("code") != 0:
-        raise UnlockError(str(nonce_resp.get("error") or redact_response(nonce_resp)))
-
-    clear = _send(
-        "/api/v2/unlock/device/clear",
-        {"appId": "1", "data": {"product": product}, "nonce": nonce_resp["nonce"]},
-        domain, ssecurity, cookies,
-    )
     if "error" in clear:
         _log.warning("check: transport error for product=%s zone=%s", product, zone)
         return {"eligible": False, "product": product, "zone": zone, "error": clear["error"]}
@@ -145,7 +125,6 @@ def check_unlock_eligibility(passtoken: dict, zone: Optional[str] = None) -> dic
             "code": clear.get("code"), "description": clear.get("descEN") or redact_response(clear),
         }
     _log.info("check: eligible product=%s zone=%s wipes_data=%s", product, zone, bool(clear.get("cleanOrNot")))
-
     return {
         "eligible": True,
         "product": product,
@@ -180,7 +159,6 @@ def perform_unlock(passtoken: dict, eligibility: dict, *, confirm_wipe: bool) ->
             "eligibility dict is not marked eligible -- call "
             "check_unlock_eligibility() first and check its result."
         )
-
     service = eligibility.get("_service")
     if service is None:
         raise UnlockError(
@@ -189,53 +167,18 @@ def perform_unlock(passtoken: dict, eligibility: dict, *, confirm_wipe: bool) ->
             "check_unlock_eligibility(), not a hand-built one."
         )
 
-    zone = eligibility["zone"]
-    domain = DOMAIN_BY_ZONE[zone]
-    product = eligibility["product"]
-    ssecurity = service["servicedata"]["ssecurity"]
-    cookies = service["cookies"]
-    device_id = service["servicedata"]["deviceId"]
-
+    zone, product = eligibility["zone"], eligibility["product"]
     _log.warning("unlock: confirmed by caller, starting for product=%s zone=%s", product, zone)
-    try:
-        device_token = fastboot.get_token()
-    except fastboot.FastbootError as err:
-        raise UnlockError(str(err)) from None
-
-    data = {
-        "clientId": "2",
-        "clientVersion": "7.6.727.43",
-        "deviceInfo": {"boardVersion": "", "deviceName": "", "product": product, "socId": ""},
-        "deviceToken": device_token,
-        "language": "en",
-        "operate": "unlock",
-        "pcId": hashlib.md5(device_id.encode()).hexdigest(),
-        "region": "",
-        "uid": cookies.get("userId"),
-    }
-
-    r = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=16))
-    nonce_resp = _send("/api/v2/nonce", {"r": r}, domain, ssecurity, cookies)
-    if "error" in nonce_resp or nonce_resp.get("code") != 0:
-        raise UnlockError(str(nonce_resp.get("error") or redact_response(nonce_resp)))
-
-    unlock_result = _send(
-        "/api/v3/ahaUnlock", {"appId": "1", "data": data, "nonce": nonce_resp["nonce"]},
-        domain, ssecurity, cookies,
-    )
-    if "error" in unlock_result:
-        raise UnlockError(str(unlock_result["error"]))
-    if unlock_result.get("code") != 0:
-        raise UnlockError(str(unlock_result.get("descEN") or redact_response(unlock_result)))
-
-    # Sent straight from memory over USB; it is never written to disk.
-    try:
-        fastboot.stage_and_unlock(bytes.fromhex(unlock_result["encryptData"]))
-    except fastboot.FastbootError as err:
-        _log.error("unlock: fastboot failed: %s", str(err)[:300])
-        raise UnlockError(str(err)) from None
+    with _as_unlock_error():
+        server = UnlockServer(service, zone)
+        data = server.unlock_data(product, fastboot.get_token())
+        try:
+            # Sent straight from memory over USB; it is never written to disk.
+            fastboot.stage_and_unlock(data)
+        except fastboot.FastbootError as err:
+            _log.error("unlock: fastboot failed: %s", str(err)[:300])
+            raise
     _log.warning("unlock: fastboot reported success for product=%s", product)
-
     return {"success": True, "product": product}
 
 
@@ -248,7 +191,7 @@ def list_devices() -> dict:
     Read-only; it never changes anything on the phone.
     """
     android = []
-    try:
+    with _as_unlock_error():
         for dev in adb.devices():
             if dev["state"] == "device":
                 try:
@@ -256,12 +199,7 @@ def list_devices() -> dict:
                 except adb.AdbError as err:
                     dev["error"] = str(err)
             android.append(dev)
-    except adb.AdbError as err:
-        raise UnlockError(str(err)) from None
-    try:
         found = fastboot.devices()
-    except fastboot.FastbootError as err:
-        raise UnlockError(str(err)) from None
     return {"android": android,
             "fastboot": [d["serial"] for d in found if d["accessible"]],
             "fastboot_no_access": [d["serial"] for d in found if not d["accessible"]]}
@@ -273,9 +211,7 @@ def reboot_to_fastboot(serial: Optional[str] = None) -> dict:
     Needs USB debugging on and the computer authorised on the phone. This only
     restarts the phone; it does not erase anything and does not unlock it.
     """
-    try:
+    with _as_unlock_error():
         adb.reboot_to_bootloader(serial)
-    except adb.AdbError as err:
-        raise UnlockError(str(err)) from None
     _log.info("rebooted a phone to fastboot through adb")
     return {"success": True}

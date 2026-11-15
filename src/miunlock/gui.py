@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import ctypes
 import io
-import datetime
 import queue
 import subprocess
 import sys
@@ -23,28 +22,21 @@ import time
 import tkinter as tk
 import webbrowser
 from pathlib import Path
-from tkinter import font as tkfont
-from tkinter import filedialog, messagebox, ttk
+from tkinter import messagebox, ttk
 from typing import Callable, Optional
 
-from miunlock import __version__, adb, api, bloat, drivers, fastboot, guide, log, usbio
+from miunlock import __version__, adb, api, drivers, fastboot, log, usbio
 from miunlock.auth import store
+from miunlock.errors import MiunlockError
 from miunlock.auth.redact import mask_id
 from miunlock.hints import explain
 from miunlock.system import NO_WINDOW
 
-REPO = "https://github.com/jowinjohnchemban/miunlock"
-DOCS = REPO + "/blob/main/docs/"
-
-GREEN = "#1a7f37"
-RED = "#b3261e"
-AMBER = "#9a5b00"
-MUTED = "#5f6368"
-ORANGE_DOT = "#e8710a"
-ACCENT = "#e8590c"
-WARN_BG = "#fff4ce"
-WARN_FG = "#5c4400"
-BORDER = "#d0d0d0"
+from miunlock.ui.apps_dialog import AppManagerDialog
+from miunlock.ui.backup_dialog import BackupDialog
+from miunlock.ui.guide_window import GuideWindow
+from miunlock.ui.theme import (ACCENT, AMBER, DOCS, GREEN, LOCKED, MUTED, ORANGE_DOT, RED, REPO,
+                               WARN_BG, WARN_FG, Fonts)
 
 
 class _LogStream(io.TextIOBase):
@@ -92,6 +84,7 @@ class App:
         self.android: Optional[dict] = None  # phone seen by adb while running Android
         self._info: dict = {}
         self._fbinfo: dict = {}
+        self._guide: Optional[GuideWindow] = None
         self._none_since: Optional[float] = time.time()  # when we last started seeing no phone
         self.fb_info: Optional[dict] = None
         self._wrap_labels: list[ttk.Label] = []
@@ -106,14 +99,9 @@ class App:
 
     # ------------------------------------------------------------------ look
     def _style(self):
-        base = tkfont.nametofont("TkDefaultFont")
-        self.f_base = base
-        self.f_bold = base.copy()
-        self.f_bold.configure(weight="bold")
-        self.f_title = base.copy()
-        self.f_title.configure(size=base.cget("size") + 8, weight="bold")
-        self.f_small = base.copy()
-        self.f_small.configure(size=max(base.cget("size") - 1, 8))
+        self.fonts = Fonts()
+        self.f_base, self.f_bold, self.f_title, self.f_small = (
+            self.fonts.base, self.fonts.bold, self.fonts.title, self.fonts.small)
 
         s = ttk.Style()
         if "vista" in s.theme_names():
@@ -214,7 +202,7 @@ class App:
             bg=WARN_BG, fg=WARN_FG, font=self.f_bold, anchor="w",
         ).pack(side="left")
         link = tk.Label(banner, text="Open the guide (F1)", bg=WARN_BG, fg=WARN_FG, cursor="hand2", font=self.f_base)
-        link.configure(font=tkfont.Font(font=self.f_base, underline=True))
+        link.configure(font=self.fonts.link)
         link.pack(side="right")
         link.bind("<Button-1>", lambda _e: self._open_guide())
 
@@ -343,6 +331,19 @@ class App:
         self.details.delete("1.0", "end")
         self.details.configure(state="disabled")
 
+    # ---- public interface used by the windows in miunlock.ui
+    def run(self, work: Callable[[], object], done: Callable[[str, object], None], text: str) -> None:
+        """Run work() on a thread, then done(status, result) on the UI thread."""
+        self._run(work, done, text)
+
+    def log(self, text: str) -> None:
+        """Add a line to Details. Safe from any thread."""
+        self._log(text)
+
+    def call_soon(self, fn: Callable, *args) -> None:
+        """Run fn(*args) on the UI thread. Safe from any thread."""
+        self.q.put(("call", fn, args))
+
     def _log(self, text: str):
         self.q.put(("log", text))
 
@@ -382,7 +383,7 @@ class App:
         def target():
             try:
                 self.q.put(("done", done, "ok", work()))
-            except api.UnlockError as err:
+            except MiunlockError as err:
                 self.q.put(("done", done, "error", str(err)))
             except Exception as err:  # never let a worker thread kill the window
                 self.q.put(("done", done, "error", f"Unexpected error: {err}"))
@@ -401,8 +402,8 @@ class App:
                     done(status, payload)
                 elif kind == "fastboot":
                     self._fastboot_ready(*rest)
-                elif kind == "backup":
-                    self._backup_progress(rest[0])
+                elif kind == "call":
+                    rest[0](*rest[1])
                 elif kind == "device":
                     self._device_seen(rest[0], rest[1] if len(rest) > 1 else None,
                                       rest[2] if len(rest) > 2 else None)
@@ -439,8 +440,8 @@ class App:
         # badges: green = done, orange = do this next, grey = not yet
         self.n1.configure(bg=GREEN if logged else ACCENT)
         done2 = bool(self.eligibility and self.eligibility.get("eligible"))
-        self.n2.configure(bg=GREEN if done2 else (ACCENT if logged else "#9aa0a6"))
-        self.n3.configure(bg=GREEN if self.unlocked else (ACCENT if ready else "#9aa0a6"))
+        self.n2.configure(bg=GREEN if done2 else (ACCENT if logged else LOCKED))
+        self.n3.configure(bg=GREEN if self.unlocked else (ACCENT if ready else LOCKED))
 
         # step 3
         on = "normal" if ready else "disabled"
@@ -854,346 +855,21 @@ class App:
             except Exception as err:
                 self._log(f"Could not open the folder: {err}")
 
-    # ------------------------------------------------------------------ backup
+    # ----------------------------------------------------------------- windows
     def _backup_dialog(self):
-        serial = (self.android or {}).get("serial")
-        if not serial:
-            return
-        win = tk.Toplevel(self.root)
-        win.title("Back up files from the phone")
-        win.transient(self.root)
-        win.resizable(False, False)
-        body = ttk.Frame(win, padding=16)
-        body.pack(fill="both", expand=True)
-        ttk.Label(body, text="Copy files from the phone to this computer", font=self.f_bold).pack(anchor="w")
-        ttk.Label(body, foreground=MUTED, justify="left", text=(
-            "Nothing on the phone is changed or deleted. Keep the screen unlocked and allow file\n"
-            "access if the phone asks. App data, contacts, SMS and chats are not covered: use\n"
-            "Mi Cloud, Google or each app's own backup for those (see the guide).")).pack(anchor="w", pady=(2, 10))
+        if self.android and self.android.get("state") == "device":
+            BackupDialog(self, self.android["serial"], self.android.get("model") or "")
 
-        vars_ = {}
-        for key, (label, _folders) in adb.BACKUP_SETS.items():
-            v = tk.BooleanVar(value=key in ("photos", "documents"))
-            vars_[key] = v
-            ttk.Checkbutton(body, text=label, variable=v).pack(anchor="w")
-
-        name = (self.android.get("model") or "phone").replace(" ", "-")
-        default = Path.home() / "miunlock-backup" / f"{name}-{datetime.date.today().isoformat()}"
-        dest_var = tk.StringVar(value=str(default))
-        row = ttk.Frame(body)
-        row.pack(fill="x", pady=(12, 0))
-        ttk.Label(row, text="Save to:").pack(side="left")
-        ttk.Entry(row, textvariable=dest_var, width=48).pack(side="left", padx=6, fill="x", expand=True)
-        ttk.Button(row, text="Browse...", command=lambda: dest_var.set(
-            filedialog.askdirectory(parent=win, initialdir=str(Path.home())) or dest_var.get())).pack(side="left")
-
-        self._bk_label = ttk.Label(body, text="", foreground=MUTED, wraplength=520, justify="left")
-        self._bk_label.pack(anchor="w", pady=(10, 0))
-        bar = ttk.Progressbar(body, mode="indeterminate")
-        buttons = ttk.Frame(body)
-        buttons.pack(fill="x", pady=(12, 0))
-        cancel_event = threading.Event()
-        self._bk_cancel = cancel_event
-        start = ttk.Button(buttons, text="Start backup", style="Primary.TButton")
-        close = ttk.Button(buttons, text="Close", command=lambda: (cancel_event.set(), win.destroy()))
-        close.pack(side="right")
-        start.pack(side="right", padx=6)
-
-        def begin():
-            chosen = [k for k, v in vars_.items() if v.get()]
-            if not chosen:
-                messagebox.showinfo("Back up", "Tick at least one thing to copy.", parent=win)
-                return
-            cancel_event.clear()
-            start.configure(state="disabled")
-            bar.pack(fill="x", pady=(8, 0))
-            bar.start(12)
-            dest = dest_var.get().strip()
-
-            def work():
-                return adb.backup_files(serial, dest, chosen, self._bk_log, cancel_event)
-
-            def done(status, result):
-                bar.stop()
-                bar.pack_forget()
-                start.configure(state="normal")
-                if status == "error":
-                    msg = f"Backup did not finish: {result}"
-                elif result.get("cancelled"):
-                    msg = f"Cancelled. Files copied so far are in {result['dest']}"
-                else:
-                    msg = (f"Done. {result['files']} files ({result['bytes'] / 1e6:.1f} MB) from "
-                           f"{len(result['copied'])} folder(s) saved to {result['dest']}")
-                    if result.get("failed_files"):
-                        msg += f". {result['failed_files']} file(s) could not be read"
-                    if result["skipped"]:
-                        msg += f"  (not found or failed: {', '.join(result['skipped'])})"
-                self._bk_label.configure(text=msg, foreground=RED if status == "error" else GREEN)
-                self._log(msg)
-
-            self._run(work, done, "Backing up files from the phone...")
-
-        start.configure(command=begin)
-
-    # ------------------------------------------------------------ app manager
     def _apps_dialog(self):
-        serial = (self.android or {}).get("serial")
-        if not serial:
-            return
-        win = tk.Toplevel(self.root)
-        win.title("Manage apps")
-        win.geometry("900x600")
-        win.minsize(640, 400)
-        win.transient(self.root)
-        body = ttk.Frame(win, padding=12)
-        body.pack(fill="both", expand=True)
-
-        tk.Label(body, bg=WARN_BG, fg=WARN_FG, justify="left", anchor="w", padx=10, pady=6, wraplength=840,
-                 text="Tick the apps to remove, then click Remove ticked. Preinstalled apps are only removed "
-                      "for your user and can be restored here. Unlocking the bootloader resets the phone and "
-                      "brings them all back, so debloat after unlocking, or if you are not unlocking."
-                 ).pack(fill="x")
-
-        bar = ttk.Frame(body)
-        bar.pack(fill="x", pady=(10, 6))
-        ttk.Label(bar, text="Show:").pack(side="left")
-        view_var = tk.StringVar(value="Known bloat")
-        view = ttk.Combobox(bar, textvariable=view_var, state="readonly", width=24,
-                            values=["Known bloat", "All preinstalled", "Installed by you", "Removed (restorable)", "Everything"])
-        view.pack(side="left", padx=6)
-        ttk.Label(bar, text="Search:").pack(side="left", padx=(12, 0))
-        search_var = tk.StringVar()
-        ttk.Entry(bar, textvariable=search_var, width=28).pack(side="left", padx=6)
-        count_lbl = ttk.Label(bar, text="Loading apps from the phone...", foreground=MUTED)
-        count_lbl.pack(side="right")
-
-        table = ttk.Frame(body)
-        table.pack(fill="both", expand=True)
-        cols = ("mark", "name", "package", "rating", "status", "note")
-        tree = ttk.Treeview(table, columns=cols, show="headings", selectmode="browse")
-        for col, title, width, stretch in (("mark", "", 34, False), ("name", "App", 170, False),
-                                           ("package", "Package", 250, True), ("rating", "Rating", 100, False),
-                                           ("status", "Status", 90, False), ("note", "Note", 260, True)):
-            tree.heading(col, text=title)
-            tree.column(col, width=width, stretch=stretch, anchor="center" if col == "mark" else "w")
-        ysb = ttk.Scrollbar(table, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=ysb.set)
-        ysb.pack(side="right", fill="y")
-        tree.pack(side="left", fill="both", expand=True)
-        for tag, colour in (("recommended", GREEN), ("advanced", AMBER), ("avoid", RED), ("unknown", MUTED)):
-            tree.tag_configure(tag, foreground=colour)
-
-        status_lbl = ttk.Label(body, text="", foreground=MUTED, wraplength=840, justify="left")
-        status_lbl.pack(fill="x", pady=(6, 0))
-        buttons = ttk.Frame(body)
-        buttons.pack(fill="x", pady=(8, 0))
-
-        apps: list = []
-        marked: set = set()
-
-        def label(app) -> tuple:
-            name, rating, note = bloat.describe(app["package"], app["system"])
-            status = "Removed" if not app["installed"] else ("Disabled" if app["disabled"] else "Installed")
-            return name, rating, note, status
-
-        def shown(app) -> bool:
-            name, rating, _note, _status = label(app)
-            v = view_var.get()
-            if v == "Known bloat" and not (app["package"] in bloat.KNOWN and rating != "avoid" and app["installed"]):
-                return False
-            if v == "All preinstalled" and not (app["system"] and app["installed"]):
-                return False
-            if v == "Installed by you" and app["system"]:
-                return False
-            if v == "Removed (restorable)" and app["installed"]:
-                return False
-            q = search_var.get().strip().lower()
-            return not q or q in app["package"].lower() or q in name.lower()
-
-        def fill(*_):
-            tree.delete(*tree.get_children())
-            order = {r: i for i, r in enumerate(bloat.RATINGS)}
-            rows = [a for a in apps if shown(a)]
-            rows.sort(key=lambda a: (order[label(a)[1]], a["package"]))
-            for a in rows:
-                name, rating, note, status = label(a)
-                tree.insert("", "end", iid=a["package"], tags=(rating,),
-                            values=("\u2611" if a["package"] in marked else "\u2610", name, a["package"],
-                                    rating.capitalize(), status, note))
-            count_lbl.configure(text=f"{len(rows)} shown, {len(marked)} ticked")
-
-        def toggle_row(row):
-            if not row:
-                return
-            marked.symmetric_difference_update({row})
-            tree.set(row, "mark", "\u2611" if row in marked else "\u2610")
-            count_lbl.configure(text=f"{len(tree.get_children())} shown, {len(marked)} ticked")
-
-        tree.bind("<Button-1>", lambda e: toggle_row(tree.identify_row(e.y)))
-        tree.bind("<space>", lambda _e: toggle_row(tree.focus()))
-        view.bind("<<ComboboxSelected>>", fill)
-        search_var.trace_add("write", fill)
-
-        def tick_recommended():
-            for a in apps:
-                if a["installed"] and bloat.describe(a["package"], a["system"])[1] == "recommended":
-                    marked.add(a["package"])
-            fill()
-
-        def act(restore: bool):
-            chosen = sorted(marked)
-            by_pkg = {a["package"]: a for a in apps}
-            if restore:
-                chosen = [p for p in chosen if not by_pkg[p]["installed"]]
-            else:
-                chosen = [p for p in chosen if by_pkg[p]["installed"]]
-            if not chosen:
-                messagebox.showinfo("Manage apps", "Tick at least one "
-                                    + ("removed app to restore." if restore else "installed app to remove."), parent=win)
-                return
-            if not restore:
-                risky = [p for p in chosen if bloat.describe(p, by_pkg[p]["system"])[1] in ("avoid", "advanced", "unknown")]
-                yours = [p for p in chosen if not by_pkg[p]["system"]]
-                text = f"Remove {len(chosen)} app(s) for your user?"
-                if risky:
-                    text += ("\n\nThese can affect the phone or the unlock:\n  " + "\n  ".join(risky[:12])
-                             + ("\n  ..." if len(risky) > 12 else ""))
-                if yours:
-                    text += f"\n\n{len(yours)} of them were installed by you and will be uninstalled, not just hidden."
-                if not messagebox.askyesno("Remove apps", text, default="no" if risky else "yes",
-                                           icon="warning" if risky else "question", parent=win):
-                    return
-
-            def work():
-                done_ok, failed = [], []
-                for pkg in chosen:
-                    try:
-                        (adb.restore_for_user if restore else adb.uninstall_for_user)(pkg, serial)
-                        done_ok.append(pkg)
-                        self._log(("Restored " if restore else "Removed ") + pkg)
-                    except adb.AdbError as err:
-                        failed.append(pkg)
-                        self._log(f"Could not {'restore' if restore else 'remove'} {pkg}: {err}")
-                return done_ok, failed, adb.list_packages(serial)
-
-            def done(status, result):
-                if status == "error":
-                    status_lbl.configure(text=str(result), foreground=RED)
-                    return
-                ok, failed, fresh = result
-                apps[:] = fresh
-                marked.difference_update(ok)
-                fill()
-                verb = "Restored" if restore else "Removed"
-                status_lbl.configure(
-                    text=f"{verb} {len(ok)} app(s)." + (f" {len(failed)} failed: {', '.join(failed[:6])}" if failed else ""),
-                    foreground=RED if failed else GREEN)
-
-            self._run(work, done, ("Restoring" if restore else "Removing") + " apps...")
-
-        ttk.Button(buttons, text="Tick recommended", command=tick_recommended).pack(side="left")
-        ttk.Button(buttons, text="Clear ticks", command=lambda: (marked.clear(), fill())).pack(side="left", padx=6)
-        ttk.Button(buttons, text="Close", command=win.destroy).pack(side="right")
-        ttk.Button(buttons, text="Restore ticked", command=lambda: act(True)).pack(side="right", padx=6)
-        ttk.Button(buttons, text="Remove ticked", style="Primary.TButton", command=lambda: act(False)).pack(side="right")
-
-        def loaded(status, result):
-            if status == "error":
-                count_lbl.configure(text="")
-                status_lbl.configure(text=f"Could not read the app list: {result}", foreground=RED)
-                return
-            apps[:] = result
-            fill()
-
-        self._run(lambda: adb.list_packages(serial), loaded, "Reading the app list from the phone...")
-
-    def _bk_log(self, text: str):
-        self.q.put(("log", text))
-        self.q.put(("backup", text))
-
-    def _backup_progress(self, text: str):
-        try:
-            if getattr(self, "_bk_label", None) is not None and self._bk_label.winfo_exists():
-                self._bk_label.configure(text=text, foreground=MUTED)
-        except tk.TclError:
-            pass
+        if self.android and self.android.get("state") == "device":
+            AppManagerDialog(self, self.android["serial"])
 
     def _open_guide(self):
-        """Offline step-by-step guide in its own window; one copy at a time."""
-        win = getattr(self, "_guide_win", None)
-        if win is not None and win.winfo_exists():
-            win.deiconify()
-            win.lift()
-            win.focus_force()
-            return
-        win = self._guide_win = tk.Toplevel(self.root)
-        win.title("miunlock guide")
-        win.geometry("760x520")
-        win.minsize(520, 340)
-        win.transient(self.root)
-        win.bind("<Escape>", lambda _e: win.destroy())
-
-        body = ttk.Frame(win, padding=10)
-        body.pack(fill="both", expand=True)
-        side = tk.Listbox(body, width=30, exportselection=False, activestyle="none",
-                          borderwidth=0, highlightthickness=1, highlightbackground=BORDER)
-        side.pack(side="left", fill="y")
-        right = ttk.Frame(body)
-        right.pack(side="left", fill="both", expand=True, padx=(10, 0))
-        sbar = ttk.Scrollbar(right)
-        sbar.pack(side="right", fill="y")
-        text = tk.Text(right, wrap="word", padx=14, pady=10, borderwidth=0, highlightthickness=0,
-                       font=self.f_base, yscrollcommand=sbar.set, cursor="arrow", spacing3=6)
-        text.pack(side="left", fill="both", expand=True)
-        sbar.configure(command=text.yview)
-        text.tag_configure("h", font=self.f_title, spacing3=10)
-        text.tag_configure("b", lmargin1=18, lmargin2=36)
-        text.tag_configure("w", background=WARN_BG, foreground=WARN_FG, font=self.f_bold,
-                           lmargin1=8, lmargin2=8, rmargin=8, spacing1=4, spacing3=10)
-
-        def show(index: int):
-            title, blocks = guide.TOPICS[index]
-            text.configure(state="normal")
-            text.delete("1.0", "end")
-            text.insert("end", title + "\n", "h")
-            for kind, content in blocks:
-                if kind == "b":
-                    text.insert("end", "\u2022  " + content + "\n", "b")
-                elif kind == "w":
-                    text.insert("end", "\u26a0  " + content + "\n", "w")
-                else:
-                    text.insert("end", content + "\n")
-            text.configure(state="disabled")
-            text.yview_moveto(0)
-
-        for title, _ in guide.TOPICS:
-            side.insert("end", "  " + title)
-
-        def pick(i: int):
-            side.selection_clear(0, "end")
-            side.selection_set(i)
-            side.see(i)
-            show(i)
-
-        def on_pick(_e=None):
-            sel = side.curselection()
-            if sel:
-                show(sel[0])
-
-        def step(delta: int):
-            sel = side.curselection()
-            pick(min(max((sel[0] if sel else 0) + delta, 0), len(guide.TOPICS) - 1))
-
-        side.bind("<<ListboxSelect>>", on_pick)
-        pick(0)
-
-        nav = ttk.Frame(win, padding=(10, 0, 10, 10))
-        nav.pack(fill="x")
-        ttk.Button(nav, text="Close", command=win.destroy).pack(side="right")
-        ttk.Button(nav, text="Next \u25b6", command=lambda: step(1)).pack(side="right", padx=6)
-        ttk.Button(nav, text="\u25c0 Back", command=lambda: step(-1)).pack(side="right")
-        ttk.Button(nav, text="Open full guide in browser",
-                   command=lambda: webbrowser.open(DOCS + "unlock-guide.md")).pack(side="left")
+        """One guide window at a time."""
+        if self._guide is not None and self._guide.alive():
+            self._guide.focus()
+        else:
+            self._guide = GuideWindow(self)
 
     def _about(self):
         messagebox.showinfo(

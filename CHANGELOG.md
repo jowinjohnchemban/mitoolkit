@@ -33,6 +33,12 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
 
 ### Changed
 
+- Code structure: the Xiaomi request sequence lives once in `xiaomi.UnlockServer` (used by
+  both the API and the interactive flow); fastboot has a `Backend` interface with USB and
+  Termux implementations; `adb.Phone` wraps a connected phone; GUI windows are classes in
+  `miunlock.ui`; every expected error derives from `MiunlockError`; CLI commands share one
+  JSON wrapper. Behaviour is unchanged.
+
 - The Windows program is built without a console, so opening the GUI no longer flashes a
   command window. Command-line use still prints to the terminal that started it.
 - Updated the unlock guide and usage docs for the GUI.

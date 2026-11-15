@@ -2,6 +2,9 @@
 it to fastboot, copy files off it, and manage preinstalled apps.
 
 Everything goes through miunlock's own adb client (adb_usb); no adb program is needed.
+``Phone`` is the object to use; the module-level functions are short forms of it, kept for
+the CLI, API and MCP.
+
 The only commands that change the phone are the reboot and, when you choose them in the
 app manager, uninstalling or restoring apps for your user (``pm uninstall --user 0`` /
 ``cmd package install-existing``). Nothing runs as root, installs software or deletes
@@ -16,6 +19,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 from miunlock import adb_usb, usbio
+from miunlock.adb_usb import AdbError  # noqa: F401 (the one adb error type, re-exported)
 from miunlock.system import IS_TERMUX
 
 _PROPS = {
@@ -43,36 +47,20 @@ BACKUP_SETS = {
 _PACKAGE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$")
 
 
-class AdbError(Exception):
-    """str(e) is human-readable."""
-
-
 def _check() -> None:
     if IS_TERMUX:
         raise AdbError("adb features are not available on Termux.")
-    if not usbio.available():
-        try:
-            usbio.backend()
-        except usbio.UsbError as err:
-            raise AdbError(str(err)) from None
-
-
-def _dev(serial: Optional[str]) -> adb_usb.AdbDevice:
-    _check()
     try:
-        return adb_usb.get(serial)
-    except (adb_usb.AdbError, usbio.UsbError) as err:
+        usbio.backend()
+    except usbio.UsbError as err:
         raise AdbError(str(err)) from None
 
 
-def _shell(serial: Optional[str], command: str, timeout_ms: int = 60000) -> str:
-    dev = _dev(serial)
-    try:
-        return dev.shell(command, timeout_ms)
-    except (adb_usb.AdbError, usbio.UsbError) as err:
-        if dev.state == "offline":
-            adb_usb.forget(dev.serial)
-        raise AdbError(str(err)) from None
+def _valid(package: str) -> str:
+    """Package names go into a shell command, so only real package names are accepted."""
+    if not _PACKAGE.match(package):
+        raise AdbError(f"Not a valid package name: {package!r}")
+    return package
 
 
 def devices() -> List[Dict[str, str]]:
@@ -86,163 +74,216 @@ def devices() -> List[Dict[str, str]]:
         raise AdbError(str(err)) from None
 
 
+class Phone:
+    """A phone running Android with USB debugging allowed."""
+
+    def __init__(self, serial: Optional[str] = None):
+        _check()
+        try:
+            self._dev = adb_usb.get(serial)
+        except usbio.UsbError as err:
+            raise AdbError(str(err)) from None
+        self.serial = self._dev.serial
+
+    # ----------------------------------------------------------------- basics
+    def shell(self, command: str, timeout_ms: int = 60000) -> str:
+        try:
+            return self._dev.shell(command, timeout_ms)
+        except (AdbError, usbio.UsbError) as err:
+            if self._dev.state == "offline":
+                adb_usb.forget(self.serial)
+            raise AdbError(str(err)) from None
+
+    def info(self) -> Dict[str, object]:
+        """Non-sensitive details: model, codename, Android and MIUI/HyperOS version, security
+        patch, whether the bootloader is locked, battery level."""
+        props: Dict[str, str] = {}
+        for line in self.shell("getprop").splitlines():
+            m = re.match(r"\[(.+?)\]: \[(.*)\]", line.strip())
+            if m:
+                props[m.group(1)] = m.group(2)
+        info: Dict[str, object] = {key: (props.get(prop) or None) for key, prop in _PROPS.items()}
+        flag = info.pop("bootloader_locked")
+        info["bootloader_locked"] = None if flag is None else flag == "1"
+        info["battery"] = self.battery()
+        return info
+
+    def battery(self) -> Optional[int]:
+        try:
+            for line in self.shell("dumpsys battery").splitlines():
+                if line.strip().startswith("level:"):
+                    return int(line.split(":", 1)[1])
+        except (AdbError, ValueError):
+            pass
+        return None
+
+    def reboot_to_bootloader(self) -> None:
+        """Reboot into fastboot mode. It does not erase anything."""
+        try:
+            self._dev.reboot("bootloader")
+        except usbio.UsbError as err:
+            raise AdbError(str(err)) from None
+        finally:
+            adb_usb.forget(self.serial)
+
+    def sync(self) -> adb_usb.SyncSession:
+        """adb's file-transfer session (stat, list, receive)."""
+        try:
+            return self._dev.sync()
+        except usbio.UsbError as err:
+            raise AdbError(str(err)) from None
+
+    # ------------------------------------------------------------------- apps
+    def _packages(self, flags: str = "") -> set:
+        out = self.shell(f"pm list packages {flags}".strip())
+        return {line.split(":", 1)[1].strip() for line in out.splitlines() if line.startswith("package:")}
+
+    def user_apps(self) -> List[str]:
+        """Package names of the apps you installed (not the preinstalled ones)."""
+        return sorted(self._packages("-3"))
+
+    def packages(self) -> List[Dict[str, object]]:
+        """Every app, including preinstalled ones removed for your user:
+        [{"package", "system", "installed", "disabled"}]."""
+        every, installed = self._packages("-u"), self._packages()
+        system, disabled = self._packages("-s -u"), self._packages("-d")
+        return [{"package": p, "system": p in system, "installed": p in installed, "disabled": p in disabled}
+                for p in sorted(every)]
+
+    def uninstall_for_user(self, package: str) -> str:
+        """Remove an app for your user only (``pm uninstall -k --user 0``). A preinstalled app
+        stays on the system partition and can be restored; an app you installed yourself is
+        removed and has to be installed again from the store."""
+        out = self.shell(f"pm uninstall -k --user 0 {_valid(package)}").strip()
+        if "Success" not in out:
+            raise AdbError(out or "The phone did not confirm the removal.")
+        return out
+
+    def restore_for_user(self, package: str) -> str:
+        """Bring back a preinstalled app removed with uninstall_for_user."""
+        pkg = _valid(package)
+        out = self.shell(f"cmd package install-existing {pkg}").strip()
+        if "installed" not in out.lower():
+            out = self.shell(f"pm install-existing {pkg}").strip()
+        if "installed" not in out.lower():
+            raise AdbError(out or "The phone did not confirm the restore.")
+        return out
+
+    # ----------------------------------------------------------------- backup
+    def backup(self, dest: str, sets: List[str], log: Callable[[str], None] = lambda _t: None,
+               cancel: Optional[threading.Event] = None) -> Dict[str, object]:
+        """Copy the chosen folders to ``dest``, plus a list of installed apps. Read-only for
+        the phone. Returns {"copied", "skipped", "files", "bytes", "failed_files", "dest",
+        "cancelled"}. Raises AdbError if nothing could be copied."""
+        return _Backup(self, Path(dest).expanduser(), sets, log, cancel).run()
+
+
+class _Backup:
+    """One backup run: walks the chosen folders over adb sync and copies every file."""
+
+    def __init__(self, phone: Phone, target: Path, sets: List[str], log: Callable[[str], None],
+                 cancel: Optional[threading.Event]):
+        unknown = [k for k in sets if k not in BACKUP_SETS]
+        if unknown:
+            raise AdbError(f"Unknown backup choice: {', '.join(unknown)}")
+        self.phone, self.target, self.log, self.cancel = phone, target, log, cancel
+        # "everything" already contains the other folders; do not copy them twice.
+        self.wanted = ["/sdcard"] if "everything" in sets else [p for k in sets for p in BACKUP_SETS[k][1]]
+        self.copied: List[str] = []
+        self.skipped: List[str] = []
+        self.files = self.bytes = self.failed = 0
+        self.cancelled = False
+
+    def _stop(self) -> bool:
+        if self.cancel is not None and self.cancel.is_set():
+            self.cancelled = True
+        return self.cancelled
+
+    def _folder(self, sync: adb_usb.SyncSession, remote: str) -> None:
+        try:
+            mode, _size, _mtime = sync.stat(remote.rstrip("/") + "/")
+        except AdbError:
+            mode = 0
+        if mode == 0:
+            self.skipped.append(remote)  # not on this phone
+            return
+        self.log(f"Copying {remote} ...")
+        root = remote.rstrip("/")
+        base = self.target / root.rsplit("/", 1)[-1]
+        for path, _mode, _size, mtime in sync.walk(remote):
+            if self._stop():
+                return
+            parts = [p for p in path[len(root) + 1:].split("/") if p not in ("", ".", "..")]
+            local = base.joinpath(*parts)
+            local.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                self.bytes += sync.recv(path, local, self.cancel)
+                os.utime(local, (mtime, mtime))
+                self.files += 1
+                if self.files % 50 == 0:
+                    self.log(f"{self.files} files, {self.bytes / 1e6:.0f} MB copied ...")
+            except AdbError as err:
+                if self._stop():
+                    return
+                self.failed += 1
+                if self.failed <= 20:
+                    self.log(f"Skipped {path}: {err}")
+        self.copied.append(remote)
+
+    def _save_app_list(self) -> None:
+        try:
+            apps = self.phone.user_apps()
+            (self.target / "installed-apps.txt").write_text("\n".join(apps) + "\n", encoding="utf-8")
+            self.log(f"Saved the list of {len(apps)} installed apps.")
+        except (AdbError, OSError):
+            pass
+
+    def run(self) -> Dict[str, object]:
+        self.target.mkdir(parents=True, exist_ok=True)
+        try:
+            sync = self.phone.sync()
+            for remote in self.wanted:
+                if self._stop():
+                    break
+                self._folder(sync, remote)
+            sync.close()
+        except (AdbError, usbio.UsbError) as err:
+            raise AdbError(f"Backup stopped: {err}. Files copied so far are in {self.target}") from None
+        self._save_app_list()
+        self.log(f"{self.files} files, {self.bytes / 1e6:.1f} MB copied"
+                 + (f", {self.failed} skipped." if self.failed else "."))
+        if not self.copied and not self.cancelled:
+            raise AdbError("Nothing was copied. Is the phone unlocked and file access allowed?")
+        return {"copied": self.copied, "skipped": self.skipped, "files": self.files, "bytes": self.bytes,
+                "failed_files": self.failed, "dest": str(self.target), "cancelled": self.cancelled}
+
+
+# ------------------------------------------------- short forms of Phone methods
 def device_info(serial: Optional[str] = None) -> Dict[str, object]:
-    """Non-sensitive details: model, codename, Android and MIUI/HyperOS version, security
-    patch, whether the bootloader is locked, battery level."""
-    props: Dict[str, str] = {}
-    for line in _shell(serial, "getprop").splitlines():
-        m = re.match(r"\[(.+?)\]: \[(.*)\]", line.strip())
-        if m:
-            props[m.group(1)] = m.group(2)
-    info: Dict[str, object] = {key: (props.get(prop) or None) for key, prop in _PROPS.items()}
-    flag = info.pop("bootloader_locked")
-    info["bootloader_locked"] = None if flag is None else flag == "1"
-    info["battery"] = None
-    try:
-        for line in _shell(serial, "dumpsys battery").splitlines():
-            if line.strip().startswith("level:"):
-                info["battery"] = int(line.split(":", 1)[1])
-                break
-    except (AdbError, ValueError):
-        pass
-    return info
+    return Phone(serial).info()
 
 
 def reboot_to_bootloader(serial: Optional[str] = None) -> None:
-    """Reboot a phone running Android into fastboot mode. It does not erase anything."""
-    dev = _dev(serial)
-    try:
-        dev.reboot("bootloader")
-    except (adb_usb.AdbError, usbio.UsbError) as err:
-        raise AdbError(str(err)) from None
-    finally:
-        adb_usb.forget(dev.serial)
-
-
-# --------------------------------------------------------------------- apps
-def _packages(serial: Optional[str], flags: str) -> set:
-    out = _shell(serial, f"pm list packages {flags}".strip())
-    return {line.split(":", 1)[1].strip() for line in out.splitlines() if line.startswith("package:")}
+    Phone(serial).reboot_to_bootloader()
 
 
 def list_user_apps(serial: Optional[str] = None) -> List[str]:
-    """Package names of the apps you installed (not the preinstalled ones)."""
-    return sorted(_packages(serial, "-3"))
+    return Phone(serial).user_apps()
 
 
 def list_packages(serial: Optional[str] = None) -> List[Dict[str, object]]:
-    """Every app on the phone, including preinstalled ones removed for your user:
-    [{"package", "system", "installed", "disabled"}]."""
-    every = _packages(serial, "-u")
-    installed = _packages(serial, "")
-    system = _packages(serial, "-s -u")
-    disabled = _packages(serial, "-d")
-    return [{"package": p, "system": p in system, "installed": p in installed, "disabled": p in disabled}
-            for p in sorted(every)]
-
-
-def _valid(package: str) -> str:
-    if not _PACKAGE.match(package):
-        raise AdbError(f"Not a valid package name: {package!r}")
-    return package
+    return Phone(serial).packages()
 
 
 def uninstall_for_user(package: str, serial: Optional[str] = None) -> str:
-    """Remove an app for your user only (``pm uninstall -k --user 0``). A preinstalled app
-    stays on the system partition and can be restored; an app you installed yourself is
-    removed and has to be installed again from the store."""
-    out = _shell(serial, f"pm uninstall -k --user 0 {_valid(package)}").strip()
-    if "Success" not in out:
-        raise AdbError(out or "The phone did not confirm the removal.")
-    return out
+    return Phone(serial).uninstall_for_user(package)
 
 
 def restore_for_user(package: str, serial: Optional[str] = None) -> str:
-    """Bring back a preinstalled app removed with uninstall_for_user."""
-    pkg = _valid(package)
-    out = _shell(serial, f"cmd package install-existing {pkg}").strip()
-    if "installed" not in out.lower():
-        out = _shell(serial, f"pm install-existing {pkg}").strip()
-    if "installed" not in out.lower():
-        raise AdbError(out or "The phone did not confirm the restore.")
-    return out
+    return Phone(serial).restore_for_user(package)
 
 
-# -------------------------------------------------------------------- backup
-def backup_files(
-    serial: Optional[str],
-    dest: str,
-    sets: List[str],
-    log: Callable[[str], None] = lambda _t: None,
-    cancel: Optional[threading.Event] = None,
-) -> Dict[str, object]:
-    """Copy the chosen folders from the phone to ``dest``, plus a list of installed apps.
-    Read-only for the phone. Returns {"copied", "skipped", "files", "bytes", "dest",
-    "cancelled"}. Raises AdbError if nothing could be copied."""
-    unknown = [k for k in sets if k not in BACKUP_SETS]
-    if unknown:
-        raise AdbError(f"Unknown backup choice: {', '.join(unknown)}")
-    dev = _dev(serial)
-    target = Path(dest).expanduser()
-    target.mkdir(parents=True, exist_ok=True)
-
-    # "everything" already contains the other folders; do not copy them twice.
-    wanted = ["/sdcard"] if "everything" in sets else [p for k in sets for p in BACKUP_SETS[k][1]]
-    copied: List[str] = []
-    skipped: List[str] = []
-    failed_files = 0
-    files = total = 0
-    cancelled = False
-    try:
-        sync = dev.sync()
-        for remote in wanted:
-            if cancel is not None and cancel.is_set():
-                cancelled = True
-                break
-            try:
-                mode, _size, _mtime = sync.stat(remote.rstrip("/") + "/")
-            except adb_usb.AdbError:
-                mode = 0
-            if mode == 0:
-                skipped.append(remote)  # not on this phone
-                continue
-            log(f"Copying {remote} ...")
-            base = target / remote.rstrip("/").rsplit("/", 1)[-1]
-            for path, _mode, size, mtime in sync.walk(remote):
-                if cancel is not None and cancel.is_set():
-                    cancelled = True
-                    break
-                rel = path[len(remote.rstrip("/")) + 1:]
-                local = base.joinpath(*[part for part in rel.split("/") if part not in ("", ".", "..")])
-                local.parent.mkdir(parents=True, exist_ok=True)
-                try:
-                    total += sync.recv(path, local, cancel)
-                    os.utime(local, (mtime, mtime))
-                    files += 1
-                    if files % 50 == 0:
-                        log(f"{files} files, {total / 1e6:.0f} MB copied ...")
-                except adb_usb.AdbError as err:
-                    if cancel is not None and cancel.is_set():
-                        cancelled = True
-                        break
-                    failed_files += 1
-                    if failed_files <= 20:
-                        log(f"Skipped {path}: {err}")
-            if cancelled:
-                break
-            copied.append(remote)
-        sync.close()
-    except (adb_usb.AdbError, usbio.UsbError) as err:
-        raise AdbError(f"Backup stopped: {err}. Files copied so far are in {target}") from None
-
-    try:
-        apps = list_user_apps(dev.serial)
-        (target / "installed-apps.txt").write_text("\n".join(apps) + "\n", encoding="utf-8")
-        log(f"Saved the list of {len(apps)} installed apps.")
-    except (AdbError, OSError):
-        pass
-    log(f"{files} files, {total / 1e6:.1f} MB copied" + (f", {failed_files} skipped." if failed_files else "."))
-    if not copied and not cancelled:
-        raise AdbError("Nothing was copied. Is the phone unlocked and file access allowed?")
-    return {"copied": copied, "skipped": skipped, "files": files, "bytes": total,
-            "failed_files": failed_files, "dest": str(target), "cancelled": cancelled}
+def backup_files(serial: Optional[str], dest: str, sets: List[str],
+                 log: Callable[[str], None] = lambda _t: None,
+                 cancel: Optional[threading.Event] = None) -> Dict[str, object]:
+    return Phone(serial).backup(dest, sets, log, cancel)

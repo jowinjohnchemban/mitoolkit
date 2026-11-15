@@ -1,70 +1,16 @@
 import argparse
+import functools
 import json
 import sys
 
-from miunlock.auth import get_passtoken, get_service, get_region, get_dataCenterZone
-
-from miunlock.unlock import unlock_device
-from miunlock import fastboot
-from miunlock.system import console, GREEN, WHITE, ORANGE
-from miunlock import api, log, __version__
+from miunlock import __version__, adb, api, bloat, drivers, log
+from miunlock.errors import MiunlockError
+from miunlock.unlock import InteractiveUnlock
 
 
 def interactive_main():
-    """The original interactive flow. Unchanged behavior: run `miunlock`
-    with no arguments and this is exactly what runs, same as always."""
-
-    try:
-        fastboot.ready()
-    except fastboot.FastbootError as err:
-        print(err, file=sys.stderr)
-        raise SystemExit(1)
-
-    param = {"sid": 'unlockApi'}
-    param["checkSafeAddress"] = True
-
-    passToken = get_passtoken(param)
-    if passToken is None:
-        raise SystemExit(1)
-
-    service = get_service(passToken, param)
-    if service is None:
-        raise SystemExit(1)
-
-    region = get_region(passToken)
-    if region is None:
-        userId = passToken['userId']
-        Zone = get_dataCenterZone(userId)
-    else:
-        console.print(f"\n[{GREEN}]Account Region: {region}[/]")
-        if region == "CN":
-            Zone = "China"
-        elif region == "IN":
-            Zone = "India"
-        elif region == "RU":
-            Zone = "Russia"
-        elif region in {"AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "EL", "HU", "IS", "IE", "IT", "LV", "LI", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "UK"}:
-            Zone = "Europe"
-        else:
-            Zone = "Singapore"
-
-    if Zone is None:
-        Zone = get_dataCenterZone()
-    else:
-        console.print(f"\n[{GREEN}]dataCenterZone: {Zone}[/]")
-        user_input = console.input(f"\n[{WHITE}](Enter to continue, [{ORANGE}]m[/] to change dataCenterZone) > [/]").strip().lower()
-        if user_input == "m":
-            Zone = get_dataCenterZone()
-
-    domain = {
-        "Singapore": "https://unlock.update.intl.miui.com",
-        "China": "https://unlock.update.miui.com",
-        "India": "https://in-unlock.update.intl.miui.com",
-        "Russia": "https://ru-unlock.update.intl.miui.com",
-        "Europe": "https://eu-unlock.update.intl.miui.com",
-    }.get(Zone)
-
-    unlock_device(domain, service)
+    """The interactive command-line flow (prompts between the steps)."""
+    InteractiveUnlock().run()
 
 
 # ---------------------------------------------------------------------------
@@ -74,133 +20,129 @@ def interactive_main():
 # without --confirm-wipe passed explicitly on the command line, every time.
 # ---------------------------------------------------------------------------
 
+class _Failed(Exception):
+    """Print this result as JSON and exit with status 1."""
+
+    def __init__(self, result):
+        super().__init__()
+        self.result = result
+
+
 def _print_json(obj):
     print(json.dumps(obj, indent=2, default=str))
 
 
-def _cmd_login(args):
-    try:
-        token = api.login(login_method=args.method, silent_if_cached=not args.force)
-        _print_json({"logged_in": True, "userId": token["userId"]})
-    except api.UnlockError as e:
-        _print_json({"logged_in": False, "error": str(e)})
-        sys.exit(1)
-
-
-def _cmd_devices(args):
-    try:
-        _print_json(api.list_devices())
-    except api.UnlockError as e:
-        _print_json({"error": str(e)})
-        sys.exit(1)
-
-
-def _cmd_reboot_fastboot(args):
-    try:
-        _print_json(api.reboot_to_fastboot(args.serial))
-    except api.UnlockError as e:
-        _print_json({"success": False, "error": str(e)})
-        sys.exit(1)
-
-
-def _cmd_backup(args):
-    from miunlock import adb
-    sets = [s.strip() for s in args.only.split(",") if s.strip()]
-    try:
-        result = adb.backup_files(args.serial, args.dest, sets, log=lambda t: print(t, file=sys.stderr))
-        _print_json(result)
-    except adb.AdbError as e:
-        _print_json({"copied": [], "error": str(e)})
-        sys.exit(1)
-
-
-def _cmd_apps(args):
-    from miunlock import adb, bloat
-    try:
-        if args.action == "list":
-            out = []
-            for app in adb.list_packages(args.serial):
-                name, rating, note = bloat.describe(app["package"], app["system"])
-                if args.known and app["package"] not in bloat.KNOWN:
-                    continue
-                out.append({**app, "name": name, "rating": rating, "note": note})
-            _print_json(out)
-            return
-        if not args.packages:
-            raise adb.AdbError("Name at least one package.")
-        fn = adb.uninstall_for_user if args.action == "remove" else adb.restore_for_user
-        results = {}
-        for pkg in args.packages:
+def json_command(**on_error):
+    """Decorator for subcommands: print the returned value as JSON. A MiunlockError prints
+    {**on_error, "error": message} and exits 1; raising _Failed(result) prints result and exits 1."""
+    def wrap(fn):
+        @functools.wraps(fn)
+        def run(args):
             try:
-                fn(pkg, args.serial)
-                results[pkg] = "ok"
-            except adb.AdbError as e:
-                results[pkg] = str(e)
-        _print_json(results)
-        if any(v != "ok" for v in results.values()):
-            sys.exit(1)
-    except adb.AdbError as e:
-        _print_json({"error": str(e)})
-        sys.exit(1)
+                result = fn(args)
+            except _Failed as failed:
+                _print_json(failed.result)
+                sys.exit(1)
+            except MiunlockError as e:
+                _print_json({**on_error, "error": str(e)})
+                sys.exit(1)
+            _print_json(result)
+        return run
+    return wrap
 
 
-def _cmd_install_driver(args):
-    from miunlock import drivers
-    try:
-        _print_json({"installed": True, "message": drivers.install_usb_driver(lambda t: print(t, file=sys.stderr))})
-    except drivers.DriverError as e:
-        _print_json({"installed": False, "error": str(e)})
-        sys.exit(1)
+def _progress(text: str) -> None:
+    print(text, file=sys.stderr)
 
 
-def _cmd_status(args):
-    try:
-        token = api.login(silent_if_cached=True)
-        zone = api.get_account_zone(token)
-        result = {"logged_in": True, "userId": token["userId"], "zone": zone}
+@json_command(logged_in=False)
+def _cmd_login(args):
+    token = api.login(login_method=args.method, silent_if_cached=not args.force)
+    return {"logged_in": True, "userId": token["userId"]}
+
+
+@json_command()
+def _cmd_devices(args):
+    return api.list_devices()
+
+
+@json_command(success=False)
+def _cmd_reboot_fastboot(args):
+    return api.reboot_to_fastboot(args.serial)
+
+
+@json_command(copied=[])
+def _cmd_backup(args):
+    sets = [s.strip() for s in args.only.split(",") if s.strip()]
+    return adb.backup_files(args.serial, args.dest, sets, log=_progress)
+
+
+@json_command()
+def _cmd_apps(args):
+    if args.action == "list":
+        out = []
+        for app in adb.list_packages(args.serial):
+            if args.known and app["package"] not in bloat.KNOWN:
+                continue
+            name, rating, note = bloat.describe(app["package"], app["system"])
+            out.append({**app, "name": name, "rating": rating, "note": note})
+        return out
+    if not args.packages:
+        raise adb.AdbError("Name at least one package.")
+    action = adb.uninstall_for_user if args.action == "remove" else adb.restore_for_user
+    results = {}
+    for pkg in args.packages:
         try:
-            result["device_codename"] = api.get_device_codename()
-        except api.UnlockError as e:
-            result["device_codename"] = None
-            result["device_error"] = str(e) + " (is the phone in fastboot mode?)"
-        _print_json(result)
-    except api.UnlockError as e:
-        _print_json({"logged_in": False, "error": str(e)})
-        sys.exit(1)
+            action(pkg, args.serial)
+            results[pkg] = "ok"
+        except adb.AdbError as e:
+            results[pkg] = str(e)
+    if any(v != "ok" for v in results.values()):
+        raise _Failed(results)
+    return results
 
 
-def _cmd_check(args):
+@json_command(installed=False)
+def _cmd_install_driver(args):
+    return {"installed": True, "message": drivers.install_usb_driver(_progress)}
+
+
+@json_command(logged_in=False)
+def _cmd_status(args):
+    token = api.login(silent_if_cached=True)
+    result = {"logged_in": True, "userId": token["userId"], "zone": api.get_account_zone(token)}
     try:
-        token = api.login(silent_if_cached=True)
-        result = api.check_unlock_eligibility(token)
-        result.pop("_service", None)  # internal, not JSON-serializable, not anyone's business
-        _print_json(result)
+        result["device_codename"] = api.get_device_codename()
     except api.UnlockError as e:
-        _print_json({"eligible": False, "error": str(e)})
-        sys.exit(1)
+        result["device_codename"] = None
+        result["device_error"] = str(e) + " (is the phone in fastboot mode?)"
+    return result
 
 
+def _public(eligibility: dict) -> dict:
+    """The eligibility dict without the internal session (not JSON, not anyone's business)."""
+    return {k: v for k, v in eligibility.items() if not k.startswith("_")}
+
+
+@json_command(eligible=False)
+def _cmd_check(args):
+    return _public(api.check_unlock_eligibility(api.login(silent_if_cached=True)))
+
+
+@json_command(success=False)
 def _cmd_unlock(args):
     if not args.confirm_wipe:
-        _print_json({
+        raise _Failed({
             "success": False,
             "error": "Refusing to unlock: --confirm-wipe was not passed. "
                      "This wipes all data on the device with no undo. "
                      "Re-run with --confirm-wipe only after you mean it.",
         })
-        sys.exit(1)
-    try:
-        token = api.login(silent_if_cached=True)
-        eligibility = api.check_unlock_eligibility(token)
-        if not eligibility.get("eligible"):
-            eligibility.pop("_service", None)
-            _print_json({"success": False, "eligibility": eligibility})
-            sys.exit(1)
-        result = api.perform_unlock(token, eligibility, confirm_wipe=True)
-        _print_json(result)
-    except api.UnlockError as e:
-        _print_json({"success": False, "error": str(e)})
-        sys.exit(1)
+    token = api.login(silent_if_cached=True)
+    eligibility = api.check_unlock_eligibility(token)
+    if not eligibility.get("eligible"):
+        raise _Failed({"success": False, "eligibility": _public(eligibility)})
+    return api.perform_unlock(token, eligibility, confirm_wipe=True)
 
 
 def _start_gui() -> bool:
