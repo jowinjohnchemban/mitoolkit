@@ -8,6 +8,7 @@ phone answers with packets that start with INFO or TEXT (progress, may repeat), 
 """
 from __future__ import annotations
 
+import logging
 from typing import Dict, List, Optional, Tuple
 
 from miunlock import usbio
@@ -74,6 +75,8 @@ class FastbootDevice:
             raise FastbootError(f"Unexpected reply from the phone: {packet[:16]!r}")
 
     def command(self, cmd: str, timeout_ms: int = 10000, info: Optional[List[str]] = None) -> str:
+        logging.getLogger("miunlock.fastboot").debug("fastboot command: %s", cmd.split(":")[0] + (
+            ":" + cmd.split(":", 1)[1][:40] if ":" in cmd and not cmd.startswith("oem") else ""))
         try:
             self._h.write(cmd.encode("ascii"))
         except usbio.UsbError as err:
@@ -122,9 +125,10 @@ class FastbootDevice:
             raise FastbootError(str(err)) from None
         self._reply(30000, None)
 
-    def reboot(self, bootloader: bool = False) -> None:
+    def reboot(self, mode: str = "") -> None:
+        """mode: "" (Android), "recovery" or "bootloader"."""
         try:
-            self.command("reboot-bootloader" if bootloader else "reboot", 5000)
+            self.command({"": "reboot", "recovery": "reboot-recovery", "bootloader": "reboot-bootloader"}[mode], 5000)
         except FastbootError:
             pass  # the phone may drop off USB before it answers
 

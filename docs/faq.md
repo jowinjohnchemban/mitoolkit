@@ -69,9 +69,8 @@ Yes: use the [JSON subcommands](usage.md#command-line) or the
 
 ### Why isn't it on PyPI?
 
-The package on PyPI named `miunlock` is the original project and still contains the
-password-login code this fork removed. Install this fork from the repository so the
-code you run is the code you can read. See [installation](installation.md).
+A package on PyPI named `miunlock` is a different project. Install from this repository so
+the code you run is the code you can read. See [installation](installation.md).
 
 ## Installation and devices
 

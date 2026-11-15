@@ -33,8 +33,6 @@ Out of scope:
   to Xiaomi.
 - Problems that need an attacker who already controls your computer or your
   user account
-- Issues in the original MiUnlockTool or migate that this fork has not changed:
-  report them to [MiForge](https://github.com/MiForge) as well
 
 ## Handling your own data
 

@@ -229,8 +229,6 @@ Handy features:
 - **Phone > Log viewer...** shows the phone's recent system log (logcat), colouring errors and
   warnings, with a level filter, a search box, Refresh, Copy and Save. Read-only. Logs can contain
   personal details, so check them before sharing.
-- **Phone > Reboot to recovery mode / Restart Android / Power off** restart or shut down a running
-  phone after a confirmation. Nothing is erased. (**Reboot to fastboot mode** is the way to unlock.)
 - **Show more** (under the device details) reads everything the phone gives over USB, in sections:
   identity (serial number, IMEI, Android ID, Wi-Fi and Bluetooth address), software, hardware and
   board (chip maker and model, board ID, SKU), boot (last boot reason, boot mode, kernel line),
@@ -261,6 +259,30 @@ Handy features:
     search, and filter to apps, apps and system, or everything. Read-only: nothing can be stopped here.
   Each list has a page to itself, so the window never holds two scrollbars. A **Live** marker shows
   whether readings are arriving; **Pause** freezes them and **Copy snapshot** copies the latest numbers.
+- **Copy details** and **Export...** (top of the Phone section) copy or save the device details, plus the
+  extra details once they are read, as text, CSV (for a spreadsheet) or Markdown (for a bug report). The files
+  contain the serial number and, in the extra details, the IMEI: you choose where they go.
+- **Restart or power off...** (Phone menu, and **Restart phone...** in fastboot mode) is one place to pick
+  Android, recovery mode, fastboot mode or power off. In fastboot mode it offers **Cancel and start Android**
+  and recovery mode, so you can leave without unlocking. Nothing is erased by any of them.
+- **Security check...** takes a colour as soon as a phone is connected, from a quick check that stays on the
+  phone and the computer (patch age, verified boot, encryption, Play Protect). The full check, which asks OSV
+  and looks at apps, replaces it and goes deeper. Green means nothing found, amber review, red needs attention.
+- **Back up files...** can be run again on the same folder: files already there (same size and time) are
+  skipped, every copy is written under a temporary name and checked against the size the phone reported, a
+  failed file is retried, and anything that still fails is listed in `backup-problems.txt` in the backup folder.
+- **Sign out** (Mi Account section, or File menu) deletes the saved session on this computer.
+- **Debug logging** (Help menu, `--debug`, or `MIUNLOCK_DEBUG=1`) adds step-by-step lines to `miunlock.log`:
+  each adb and fastboot request with its timing, scans, connections. Tokens stay hidden. Off by default.
+- **Wireless adb...** (Phone menu) uses the phone over Wi-Fi instead of a cable. With the phone plugged
+  in once, **Turn on Wi-Fi debugging** switches its adb to the network and connects; after that you can
+  unplug it. A phone already set up for wireless debugging can be connected by its address (for example
+  `192.168.1.5`). It needs Google's `adb` (platform-tools) on this computer, because miunlock's own adb
+  speaks USB only, and the phone returns to USB-only when it restarts. **Fastboot and unlocking work over
+  a USB cable only**: the bootloader has no Wi-Fi, so miunlock asks you to plug the phone in before it
+  reboots into fastboot. When a phone is both plugged in and on Wi-Fi, it is listed once, by USB.
+- The window looks for the phone every second, and Live status and Connections show at once when it is
+  unplugged and carry on when it is back. Automatic updates change only the readings, not the text bar.
 - When Xiaomi says to wait, the message includes the date and time to try again.
 
 ## Saved session and log

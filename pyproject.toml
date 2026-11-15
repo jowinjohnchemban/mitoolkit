@@ -2,11 +2,11 @@
 name = "miunlock"
 dynamic = ["version"]
 description = "Retrieve Xiaomi encryptData(token) to unlock bootloader"
-authors = [{name = "offici5l"}]
+authors = [{name = "Jowin John Chemban"}]
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 
-keywords = ["xiaomi", "miunlock", "MiUnlockTool", "bootloader", "unlock", "MIUI", "HyperOS", "Tools"]
+keywords = ["xiaomi", "miunlock", "bootloader", "unlock", "MIUI", "HyperOS", "Tools"]
 
 
 classifiers = [
@@ -18,10 +18,7 @@ classifiers = [
 requires-python = ">=3.9"
 
 dependencies = [
-    # The Xiaomi auth gateway (originally a separate "migate" package) is
-    # merged into miunlock.auth as part of this single codebase (sanitized:
-    # password-login path removed, session file locked down) -- see
-    # docs/safety.md. Its own upstream dependencies are listed here instead.
+    # What the Xiaomi login code in miunlock.auth needs (see docs/safety.md).
     "requests",
     "rich",
     "qrcode",

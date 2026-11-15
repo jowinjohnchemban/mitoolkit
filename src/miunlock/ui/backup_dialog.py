@@ -92,8 +92,11 @@ class BackupDialog(Dialog):
             return f"Cancelled. Files copied so far are in {result['dest']}"
         msg = (f"Done. {result['files']} files ({result['bytes'] / 1e6:.1f} MB) from "
                f"{len(result['copied'])} folder(s) saved to {result['dest']}")
+        if result.get("unchanged"):
+            msg += f". {result['unchanged']} were already there and not copied again"
         if result.get("failed_files"):
-            msg += f". {result['failed_files']} file(s) could not be read"
+            msg += (f". {result['failed_files']} file(s) could not be copied: they are listed in "
+                    "backup-problems.txt; run the backup again to retry them")
         if result["skipped"]:
             msg += f"  (not found or failed: {', '.join(result['skipped'])})"
         return msg

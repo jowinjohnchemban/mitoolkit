@@ -14,7 +14,7 @@ import tkinter as tk
 import webbrowser
 from typing import Callable, List, Optional, Tuple
 
-from miunlock import drivers
+from miunlock import drivers, log
 from miunlock.ui.theme import DOCS, REPO
 
 MAC = sys.platform == "darwin"
@@ -123,12 +123,8 @@ class MenuBar:
         app, m = self.app, self._menu(bar, "&Phone")
         self._add(m, "&Rescan", app._rescan, "F5", "F5", enabled=lambda: self._idle())
         m.add_separator()
-        self._add(m, "Reboot to &fastboot mode", app._to_fastboot,
-                  enabled=lambda: self._idle() and (app.android or {}).get("state") == "device")
-        self._add(m, "Re&start phone", app._reboot, enabled=self._in_fastboot)
-        self._add(m, "Reboot to reco&very mode", lambda: app._restart_android("recovery"), enabled=self._on_android)
-        self._add(m, "Restart A&ndroid", lambda: app._restart_android(""), enabled=self._on_android)
-        self._add(m, "&Power off", app._power_off, enabled=self._on_android)
+        self._add(m, "Re&start or power off...", app._restart_dialog,
+                  enabled=lambda: self._on_android() or self._in_fastboot())
         m.add_separator()
         self._add(m, "&Back up files...", app._backup_dialog, enabled=self._on_android)
         self._add(m, "Manage &apps...", app._apps_dialog, enabled=self._on_android)
@@ -137,7 +133,9 @@ class MenuBar:
         self._add(m, "C&onnections and signal...", app._connect_dialog, enabled=self._on_android)
         self._add(m, "Log v&iewer...", app._log_dialog, enabled=self._on_android)
         m.add_separator()
+        self._add(m, "&Wireless adb...", app._wireless_dialog, enabled=self._idle)
         self._add(m, "Copy device &details", app._copy_device, enabled=lambda: bool(app._device_pairs()))
+        self._add(m, "&Export device details...", app._export_device, enabled=lambda: bool(app._device_pairs()))
         self._add(m, "Stop &Google's adb", app._stop_google_adb,
                   enabled=lambda: self._idle() and bool((app.android or {}).get("adb_running")))
 
@@ -163,5 +161,8 @@ class MenuBar:
             docs.add_command(label=label, command=lambda p=page: webbrowser.open(DOCS + p))
         m.add_cascade(label="Online documentation", menu=docs, **({} if MAC else {"underline": 0}))
         self._add(m, "Report a &problem...", lambda: webbrowser.open(REPO + "/issues"))
+        self.debug_var = tk.BooleanVar(value=log.debug_enabled())
+        m.add_checkbutton(label="Debug logging", variable=self.debug_var, command=lambda: log.set_debug(
+            self.debug_var.get()), **({} if MAC else {"underline": 0}))
         m.add_separator()
         self._add(m, "&About miunlock", app._about)

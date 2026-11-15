@@ -360,6 +360,36 @@ def check_stalkerware(report: Report, phone: adb.Phone, packages: Set[str], log:
                        "it): https://stopstalkerware.org", package=pkg)
 
 
+# ------------------------------------------------------------------ quick check
+def passive(info: Dict[str, object], play_protect: Optional[str] = None,
+            today: Optional[datetime.date] = None) -> Report:
+    """A quick, local look at what the phone already told us: no network, no app scan, nothing changed.
+    It colours the Security check button as soon as a phone is connected; the full check goes deeper.
+    ``info`` is adb.Phone.info(); ``play_protect`` is the value of the package_verifier_enable setting."""
+    today = today or datetime.date.today()
+    area, report = "Quick check", Report()
+    spl = _parse_date(info.get("security_patch"))  # type: ignore[arg-type]
+    if spl is not None:
+        age = _months_between(spl, today)
+        report.checked["security_patch_months"] = age
+        if age >= 12:
+            report.add(HIGH, area, f"Security patch is {age} months old")
+        elif age > 3:
+            report.add(MEDIUM, area, f"Security patch is {age} months old")
+    boot = str(info.get("verified_boot") or "").lower()
+    if boot == "red":
+        report.add(HIGH, area, "Verified boot reports the system was changed")
+    elif boot in ("yellow", "orange"):
+        report.add(MEDIUM, area, "Verified boot is not green (the bootloader is unlocked or a custom system is installed)")
+    elif info.get("bootloader_locked") is False:
+        report.add(MEDIUM, area, "The bootloader is unlocked")
+    if str(info.get("encryption") or "").lower() == "unencrypted":
+        report.add(HIGH, area, "Storage is not encrypted")
+    if play_protect is not None and play_protect.strip() == "0":
+        report.add(HIGH, area, "Google Play Protect is off")
+    return report
+
+
 # ---------------------------------------------------------------------- run
 def run(serial: Optional[str] = None, log: Callable[[str], None] = lambda _t: None,
         today: Optional[datetime.date] = None) -> Report:

@@ -119,7 +119,6 @@ so always check `result["eligible"]`.
 
 ## Stability
 
-This API was added in this fork and is not part of the original MiUnlockTool. It
-is young and may change. Xiaomi can also change its server protocol at any time;
+This API is young and may change. Xiaomi can also change its server protocol at any time;
 `api.py` repeats the request sequence from `unlock.py`, so both files must be
 updated if that happens.

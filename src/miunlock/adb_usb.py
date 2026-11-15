@@ -186,6 +186,15 @@ class AdbDevice:
                 pass  # the phone may restart before it answers
             self.state = "offline"
 
+    def tcpip(self, port: int = 5555) -> None:
+        """Make the phone listen for adb over Wi-Fi on this port (until it restarts)."""
+        self._require()
+        with self._lock:
+            try:
+                self._open(f"tcpip:{int(port)}")
+            except AdbError:
+                pass  # the phone restarts its adb daemon and drops the connection
+
     def _open_stream(self, service: str) -> "_Stream":
         local, remote = self._open(service)
         return _Stream(self, local, remote)
@@ -354,6 +363,7 @@ class SyncSession:
 # adb_server.ServerDevice (through Google's adb server).
 _devices: Dict[str, object] = {}
 _reg_lock = threading.Lock()
+_real_serials: Dict[str, str] = {}      # Wi-Fi address -> the phone's own serial
 
 
 def _scan_server() -> List[Dict[str, str]]:
@@ -374,7 +384,22 @@ def _scan_server() -> List[Dict[str, str]]:
     for serial in list(_devices):
         if serial not in seen:
             _devices.pop(serial)
-    return [{"serial": d["serial"], "state": d["state"], "via": "adb server"} for d in found]
+    # A phone plugged in AND on Wi-Fi shows up twice: keep the USB entry (fastboot needs the cable anyway)
+    wired = {s for s in _devices if ":" not in s}
+    out = []
+    for d in found:
+        dev = _devices[d["serial"]]
+        if dev.wireless and d["state"] == "device" and wired:
+            if d["serial"] not in _real_serials:        # asked once; the entry is recreated every scan
+                try:
+                    _real_serials[d["serial"]] = dev.shell("getprop ro.serialno", 5000).strip()
+                except AdbError:
+                    _real_serials[d["serial"]] = ""
+            if _real_serials[d["serial"]] in wired:
+                _devices.pop(d["serial"], None)
+                continue
+        out.append({"serial": d["serial"], "state": d["state"], "via": "adb server"})
+    return out
 
 
 def _scan_usb() -> List[Dict[str, str]]:

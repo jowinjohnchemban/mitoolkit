@@ -67,12 +67,31 @@ class LiveStatusDialog(Dialog):
         self._scheduled = False
         self.proc_total: Optional[int] = None
         self.sort_key, self.sort_desc = "cpu", True
+        self._gone = False                     # the phone was unplugged (the main window noticed)
         super().__init__(app)
         self._heard = False                    # becomes True when the first reading (or error) arrives
         self._opened = time.monotonic()
         if start:
             threading.Thread(target=self._loop, daemon=True, name="live-status").start()
             self._wait_tick()
+            self._watch_connection()
+
+    def _watch_connection(self) -> None:
+        """The main window notices an unplugged phone within a second; follow it at once instead of
+        waiting for a reading to fail."""
+        if not self.alive():
+            return
+        current = self.app.android
+        present = bool(current) and current.get("serial") == self.serial and current.get("state") == "device"
+        if not present and not self._gone and self._heard:
+            self._gone = True
+            self._badge("● Disconnected", TEXT_RED)
+            self.headline.configure(text=f"{self.name or 'Phone'}: disconnected")
+            self._set_sub("The phone was unplugged. This window continues by itself when it is back.", TEXT_RED)
+        elif present and self._gone:
+            self._gone = False                           # back: the next reading redraws everything
+            self._badge("◌ Reconnecting", AMBER)
+        self.win.after(500, self._watch_connection)
 
     # --------------------------------------------------------------- layout
     def build(self) -> None:
@@ -268,7 +287,7 @@ class LiveStatusDialog(Dialog):
     # -------------------------------------------------------------- sampling
     def _loop(self) -> None:
         """The reading thread: one reading a second, handed to the window through a small queue. After
-        a failure it waits longer (up to 5 s) instead of hammering a phone that isn't answering."""
+        a failure it waits longer (up to 2 s) instead of hammering a phone that isn't answering."""
         mon: Optional[monitor.Monitor] = None
         failures = 0
         while not self.stop.is_set():
@@ -285,7 +304,7 @@ class LiveStatusDialog(Dialog):
                 except Exception as err:  # the phone was unplugged, adb is busy, or it stopped answering
                     mon = None
                     failures += 1
-                    wait = min(5.0, INTERVAL * 2 ** min(failures, 3))
+                    wait = min(2.0, INTERVAL * 2 ** min(failures, 3))      # comes back quickly when replugged
                     self._deliver(None, str(err))
             self.stop.wait(max(0.25, wait - (time.monotonic() - started)))
 
@@ -316,15 +335,20 @@ class LiveStatusDialog(Dialog):
         slow phone never looks like a frozen window. The grey shapes shimmer meanwhile."""
         if not self.alive() or self._heard:
             return
-        seconds = int(time.monotonic() - self._opened)
-        self.live.configure(text="◌ Connecting", foreground=AMBER)
-        if seconds < 8:
-            text = f"Reading the phone for the first time... {seconds} s"
-        else:
-            text = (f"Still waiting for the phone ({seconds} s). Unlock its screen, check the cable, and "
-                    "allow USB debugging if it asks. The window is fine: it keeps trying.")
-        self.sub.configure(text=text, foreground=MUTED)
-        self.win.after(500, self._wait_tick)
+        self._badge("◌ Connecting", AMBER)
+        if time.monotonic() - self._opened >= 8:      # a normal start says nothing more; only a slow one explains
+            self._set_sub("Still waiting for the phone. Unlock its screen, check the cable, and allow USB "
+                          "debugging if it asks. The window is fine: it keeps trying.", MUTED)
+        self.win.after(1000, self._wait_tick)
+
+    def _badge(self, text: str, colour: str) -> None:
+        """The Live / Paused mark in the top bar; set only when it changes, so refreshes cause no redraw."""
+        if self.live.cget("text") != text:
+            self.live.configure(text=text, foreground=colour)
+
+    def _set_sub(self, text: str, colour: str) -> None:
+        if self.sub.cget("text") != text:
+            self.sub.configure(text=text, foreground=colour)
 
     def _update(self, sample: Optional[Dict[str, object]], error: Optional[str], last: bool = True) -> None:
         """Show one reading. When several arrive together every one goes into the graphs, but the
@@ -333,10 +357,11 @@ class LiveStatusDialog(Dialog):
             return
         self._heard = True
         if sample is None:
-            self.live.configure(text="● No answer", foreground=TEXT_RED)
+            if self._gone:
+                return                                   # already said "disconnected"; no error text over it
+            self._badge("● No answer", TEXT_RED)
             self.headline.configure(text=f"{self.name or 'Phone'}: not answering")
-            self.sub.configure(text=(error or "")[:160] or "Check the cable and that USB debugging is allowed.",
-                               foreground=TEXT_RED)
+            self._set_sub((error or "")[:160] or "Check the cable and that USB debugging is allowed.", TEXT_RED)
             return
         self.last = sample
         g = sample.get
@@ -351,7 +376,7 @@ class LiveStatusDialog(Dialog):
             self.gpu.push(g("gpu_pct"), redraw=last)
         if not last:
             return
-        self.live.configure(text="● Live", foreground=GREEN_TEXT)
+        self._badge("● Live", GREEN_TEXT)
         self.g_cpu.set(g("cpu"), f"{max(g('cores_mhz') or [0])} MHz top core" if g("cores_mhz") else "")
         self.g_mem.set(g("mem_pct"), f"{g('mem_used_gb')} of {g('mem_total_gb')} GB" if g("mem_total_gb") else "")
         self.g_bat.set(g("battery_level"), (g("battery_status") or "").lower())
@@ -382,8 +407,8 @@ class LiveStatusDialog(Dialog):
         self.headline.configure(
             text=f"{self.name or 'Phone'}: " + (f"battery {level}%" if level is not None else "running")
             + (f", {status.lower()}" if status else ""))
-        self.sub.configure(text=f"Updated {time.strftime('%H:%M:%S')}. One reading a second; nothing on the "
-                                "phone is changed. Point at a graph to read exact values.", foreground=MUTED)
+        self._set_sub("One reading a second; nothing on the phone is changed. Point at a graph to read "
+                      "exact values.", MUTED)
         facts: List[str] = []
         if g("mem_used_gb") is not None:
             facts.append(f"Memory: {g('mem_used_gb')} of {g('mem_total_gb')} GB in use"
@@ -497,11 +522,11 @@ class LiveStatusDialog(Dialog):
         if self.paused.is_set():
             self.paused.clear()
             self.pause_btn.configure(text="Pause", icon="pause")
-            self.live.configure(text="● Live", foreground=GREEN_TEXT)
+            self._badge("● Live", GREEN_TEXT)
         else:
             self.paused.set()
             self.pause_btn.configure(text="Resume", icon="play")
-            self.live.configure(text="❚❚ Paused", foreground=MUTED)
+            self._badge("❚❚ Paused", MUTED)
 
     def _copy(self) -> None:
         if not self.last:

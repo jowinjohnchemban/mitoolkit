@@ -55,6 +55,22 @@ class LiveDialogTests(unittest.TestCase):
             self.dlg._update(self.mon.sample(), None)
         self.root.update()
 
+    def test_an_unplugged_phone_is_shown_at_once_and_the_bar_stays_quiet_while_live(self):
+        d = self.dlg
+        self.feed(2)
+        sub = d.sub.cget("text")
+        self.feed(2)
+        self.assertEqual(d.sub.cget("text"), sub)                 # repeated readings do not rewrite the bar
+        self.assertNotIn("Updated", sub)
+        self.app.android = None                                   # the main window noticed it is gone
+        d._watch_connection()
+        self.assertEqual(d.live.cget("text"), "● Disconnected")
+        d._update(None, "device offline")                         # a failing read does not overwrite that
+        self.assertEqual(d.live.cget("text"), "● Disconnected")
+        self.app.android = {"serial": "X", "state": "device"}
+        d._watch_connection()
+        self.assertEqual(d.live.cget("text"), "◌ Reconnecting")
+
     def test_samples_fill_gauges_cores_sensors_and_processes(self):
         self.feed(4)
         d = self.dlg

@@ -21,10 +21,10 @@ import time
 import tkinter as tk
 import webbrowser
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 from typing import Callable, List, Optional
 
-from miunlock import __version__, adb, api, details, fastboot, log, memory, usbio, watchdog
+from miunlock import __version__, adb, api, details, export, fastboot, log, memory, security, usbio, watchdog
 from miunlock.auth import store
 from miunlock.auth.redact import mask_id
 from miunlock.errors import MiunlockError
@@ -44,11 +44,11 @@ from miunlock.ui.components.scroll_page import ScrollPage
 from miunlock.ui.components.shapes import page_background
 from miunlock.ui.components.skeleton import Skeleton
 from miunlock.ui.security_dialog import SecurityDialog
-from miunlock.ui.theme import (AMBER, GREEN, MUTED, ORANGE_DOT, RED, REPO, Fonts, apply_theme,
-                               scale_fonts)
+from miunlock.ui.theme import (AMBER, GREEN, MUTED, ORANGE_DOT, RED, Fonts, apply_theme, scale_fonts)
 
 
-INFO_REFRESH_S = 15      # how often the basic phone details (battery, storage, ...) are read again
+POLL_MS = 1000           # how often the window looks for the phone: an unplugged phone shows within a second
+INFO_REFRESH_S = 15     # how often the basic phone details (battery, storage, ...) are read again
 MORE_REFRESH_S = 20      # and the extra details (Wi-Fi, uptime, ...) while Show more is open
 
 
@@ -201,6 +201,7 @@ class App:
         self.login_btn.pack(side="left")
         self.r1 = self._wrap(self.f1_row, "", foreground=MUTED)
         self.r1.pack(side="left", padx=10)
+        self.signout_btn = Button(self.f1_row, text="Sign out", command=self._sign_out)   # shown once signed in
 
         # 2. Phone
         self.f2 = self._section(page, "2. Phone")
@@ -219,13 +220,15 @@ class App:
         self.buttons = ButtonRow(self.f2)
         self.stop_adb_btn = Button(self.buttons, text="Stop Google's adb", primary=True, command=self._stop_google_adb)
         self.driver_btn = Button(self.buttons, text="Driver help", primary=True, command=self._driver_help)
+        self.leave_btn = Button(self.buttons, text="Restart phone...", icon="power", command=self._restart_dialog)
         self.fb_btn = Button(self.buttons, text="Reboot to fastboot", primary=True, icon="power", command=self._to_fastboot)
         self.tool_btns = [Button(self.buttons, text=text, icon=icon, command=cmd) for text, icon, cmd in (
             ("Back up files...", "save", self._backup_dialog), ("Manage apps...", "apps", self._apps_dialog),
             ("Security check...", "shield", self._security_dialog), ("Live status...", "chart", self._live_dialog),
             ("Connections...", "wifi", self._connect_dialog))]
         self.security_btn = self.tool_btns[2]       # takes the colour of the last security check
-        self._security: dict = {}                    # serial -> verdict of the last check
+        self._security: dict = {}                    # serial -> verdict of the last full check
+        self._passive: dict = {}                     # serial -> verdict of the quick check made on connecting
         self.dev_tip = self._wrap(self.f2, "", foreground=AMBER)
         self.details = ttk.Frame(self.f2)
         self.info_box = ttk.Frame(self.details)
@@ -236,6 +239,7 @@ class App:
         self.more_btn.pack(fill="x", pady=(8, 0))
         # Copy details sits at the top of the section, beside Rescan, while there are details to copy
         self.copy_btn = Button(head, text="Copy details", icon="copy", command=self._copy_device)
+        self.export_btn = Button(head, text="Export...", icon="save", command=self._export_device)
 
         # 3. Eligibility
         self.f3 = self._section(page, "3. Eligibility")
@@ -431,13 +435,15 @@ class App:
         self.next_line.configure(text=self._next_step())
         self.f1.configure(text="1. Mi Account" + ("  \u2714 signed in" if logged else ""))
         self.login_btn.configure(state="disabled" if self.busy else "normal")
+        self.signout_btn.configure(state="disabled" if self.busy else "normal")
         # once signed in, only the account line is left: no instructions, no dead button
         if logged != self._f1_logged:  # re-pack only on a change, not on every refresh
             self._f1_logged = logged
-            for widget in (self.f1_note, self.f1_row, self.login_btn):
+            for widget in (self.f1_note, self.f1_row, self.login_btn, self.signout_btn):
                 widget.pack_forget()
             if logged:
                 self.f1_row.pack(fill="x")
+                self.signout_btn.pack(side="right")
                 self.r1.pack_configure(padx=0)
             else:
                 self.f1_note.pack(anchor="w")
@@ -502,7 +508,7 @@ class App:
         except Exception:
             log.get("gui").exception("Looking for the phone failed")
         finally:
-            self.root.after(2000, self._poll_device)      # keep looking whatever happened this time
+            self.root.after(POLL_MS, self._poll_device)   # keep looking whatever happened this time
 
     def _rescan(self):
         """The Rescan button: look again now, even if the last look seems stuck."""
@@ -564,6 +570,7 @@ class App:
                             if serial_ not in self._info or stale:       # battery, storage ... change: re-read
                                 self._info[serial_] = adb.device_info(serial_)
                                 self._info_at[serial_] = time.monotonic()
+                                self._quick_audit(serial_, self._info[serial_])
                             android.update(self._info[serial_])
                 except Exception:
                     android = None
@@ -602,6 +609,8 @@ class App:
         if serial == self.device and android == self.android and fb == self.fb_info:
             return  # nothing changed: no redraw
         was_connected = self.device is not None
+        log.get("gui").debug("Phone state changed: fastboot=%s android=%s", serial,
+                             {k: (android or {}).get(k) for k in ("serial", "state", "model", "reason")})
         self.device, self.android, self.fb_info = serial, android, fb
         self._none_since = None if (serial or android) else (self._none_since or time.time())
         self._render_status()
@@ -632,7 +641,8 @@ class App:
         """(dot colour, headline, what to do, action button or None). Short and plain."""
         android = self.android or {}
         if state == "fastboot":
-            return GREEN, "Phone is in fastboot mode", "Ready to check.", None
+            return GREEN, "Phone is in fastboot mode", "Ready to check. To leave without unlocking, restart it.", \
+                self.leave_btn
         if state == "device":
             name = self._phone_name(android) or "Phone"
             return (ORANGE_DOT, f"{name} is on",
@@ -674,9 +684,11 @@ class App:
         self._show_info(pairs)
         self._show_more()
         self.copy_btn.pack_forget()
+        self.export_btn.pack_forget()
         if pairs:
             self.details.pack(fill="x", padx=(22, 0), pady=(10, 0))
-            self.copy_btn.pack(side="right", anchor="n", padx=(0, 8))   # beside Rescan, at the top
+            self.export_btn.pack(side="right", anchor="n", padx=(0, 8))  # beside Rescan, at the top
+            self.copy_btn.pack(side="right", anchor="n", padx=(0, 8))
 
     def _show_info(self, pairs) -> None:
         for child in self.info_box.winfo_children():
@@ -831,9 +843,44 @@ class App:
             self.root.clipboard_append(text + ("\n\n" + extra if extra else ""))
             self._set_status("Device details copied.")
 
+    def _export_device(self) -> None:
+        """Save the device details (and the extra details, once read) as text, CSV or Markdown."""
+        pairs = [(k, v) for k, v in self._device_pairs() if v not in (None, "")]
+        if not pairs:
+            return
+        types = [(f"{label} (*.{ext})", f"*.{ext}") for ext, label in export.FORMATS.items()]
+        name = export.suggested_name("txt", self._phone_name(self.android or {}) or "phone")
+        path = filedialog.asksaveasfilename(parent=self.root, title="Export device details", initialfile=name,
+                                            defaultextension=".txt", filetypes=types)
+        if not path:
+            return
+        fmt = Path(path).suffix.lstrip(".").lower()
+        fmt = fmt if fmt in export.FORMATS else "txt"
+        try:
+            text = export.render(fmt, pairs, self._more.get(self._device_key(), []))
+            Path(path).write_text(text, encoding="utf-8-sig" if fmt == "csv" else "utf-8", newline="\n")
+        except (OSError, ValueError) as err:
+            messagebox.showerror("Export device details", f"Could not save the file.\n\n{err}")
+            return
+        self._set_status(f"Saved {Path(path).name}")
+        self._log(f"Device details exported to {path}")
+
+    def _wireless_dialog(self) -> None:
+        from miunlock.ui.wireless_dialog import WirelessDialog   # not needed until first opened
+        if getattr(self, "_wireless", None) is not None and self._wireless.alive():
+            self._wireless.focus()
+        else:
+            self._wireless = WirelessDialog(self)
+
     def _to_fastboot(self):
         serial = (self.android or {}).get("serial")
         if not serial:
+            return
+        if ":" in serial:                                  # connected over Wi-Fi
+            messagebox.showinfo(
+                "Connect the USB cable", "This phone is connected over Wi-Fi, and fastboot mode works over a USB "
+                "cable only.\n\nPlug the phone into this computer with a USB cable, then choose this again.")
+            self._log("Fastboot needs a USB cable: this phone is connected over Wi-Fi.")
             return
         self._log("Asking the phone to reboot into fastboot mode (nothing is erased)...")
 
@@ -848,14 +895,36 @@ class App:
 
         self._run(work, done, "Rebooting the phone into fastboot mode...")
 
-    def _restart_android(self, mode: str) -> None:
+    def _restart_dialog(self) -> None:
+        """Restart or power off: pick the mode in one place (works in Android and in fastboot mode)."""
+        if not (self._android_serial() or self.device):
+            return
+        from miunlock.ui.restart_dialog import RestartDialog
+        if getattr(self, "_restart", None) is not None and self._restart.alive():
+            self._restart.focus()
+        else:
+            self._restart = RestartDialog(self)
+
+    def restart_to(self, mode: str) -> None:
+        """Do what the restart dialog chose: "android", "recovery", "fastboot" or "off"."""
+        if self.device:                                           # in fastboot mode: leave it
+            self._reboot("recovery" if mode == "recovery" else "")
+        elif mode == "fastboot":
+            self._to_fastboot()
+        elif mode == "off":
+            self._power_off(confirm=False)
+        else:
+            self._restart_android("recovery" if mode == "recovery" else "", confirm=False)
+
+    def _restart_android(self, mode: str, confirm: bool = True) -> None:
         """Restart a running phone normally ("") or into recovery mode. Nothing is erased."""
         serial = self._android_serial()
         if not serial:
             return
         where = "recovery mode" if mode == "recovery" else "Android"
-        if not messagebox.askyesno("Restart phone", f"Restart the phone into {where}?\n\nNothing is erased. Unsaved "
-                                                    "work on the phone is lost.", default="no"):
+        if confirm and not messagebox.askyesno(
+                "Restart phone", f"Restart the phone into {where}?\n\nNothing is erased. Unsaved work on the "
+                "phone is lost.", default="no"):
             return
         self._log(f"Restarting the phone into {where} (nothing is erased)...")
 
@@ -870,10 +939,10 @@ class App:
 
         self._run(work, done, f"Restarting the phone into {where}...")
 
-    def _power_off(self) -> None:
+    def _power_off(self, confirm: bool = True) -> None:
         serial = self._android_serial()
-        if not serial or not messagebox.askyesno(
-                "Power off", "Shut the phone down?\n\nIt stays off until you press its power button.", default="no"):
+        if not serial or (confirm and not messagebox.askyesno(
+                "Power off", "Shut the phone down?\n\nIt stays off until you press its power button.", default="no")):
             return
         self._log("Powering the phone off...")
 
@@ -1010,14 +1079,19 @@ class App:
         self.reboot_btn.pack(side="left", padx=10)
         self._refresh()
 
-    def _reboot(self):
-        if not self.fastboot:
+    def _reboot(self, mode: str = ""):
+        """Leave fastboot mode: into Android (mode "") or recovery ("recovery"). Erases nothing."""
+        if not self.fastboot or not self.device:
             return
-        try:
-            fastboot.reboot(self.device)
-            self._log("Sent reboot command.")
-        except Exception as err:
-            self._log(f"Reboot failed: {err}")
+        serial, where = self.device, "recovery mode" if mode == "recovery" else "Android"
+        self._log(f"Leaving fastboot mode into {where}...")
+
+        def done(status, result):
+            if status == "error":
+                self._log(f"Could not leave fastboot mode: {result}")
+                messagebox.showerror("Restart phone", str(result))
+
+        self._run(lambda: fastboot.reboot(serial, mode), done, f"Restarting the phone into {where}...")
 
     # ================================================================ menu
     def _sign_out(self):
@@ -1079,8 +1153,22 @@ class App:
         self._security[serial] = verdict
         self._paint_security_button()
 
+    def _quick_audit(self, serial: str, info: dict) -> None:
+        """On a worker thread: the quick, local security look at a phone that has just been read. It sets
+        the button's colour; a full check, when there is one, takes over."""
+        try:
+            setting = adb.Phone(serial).shell("settings get global package_verifier_enable", 8000)
+            verdict = security.passive(info, setting).verdict
+        except Exception as err:
+            log.get("gui").debug("Quick security check failed: %s", err)
+            return
+        if self._passive.get(serial) != verdict:
+            self._passive[serial] = verdict
+            self.q.put(("call", self._paint_security_button, ()))
+
     def _paint_security_button(self) -> None:
-        verdict = self._security.get(self._android_serial() or "", "")
+        serial = self._android_serial() or ""
+        verdict = self._security.get(serial) or self._passive.get(serial, "")
         kind, mark = {"Needs attention": ("danger", " ⚠"), "Some things to review": ("warn", " !")}.get(
             verdict, ("good", " ✔") if verdict else ("normal", ""))
         self.security_btn.configure(text="Security check..." + mark, kind=kind)
@@ -1110,9 +1198,11 @@ class App:
             self._guide = GuideWindow(self)
 
     def _about(self):
-        messagebox.showinfo("About miunlock", f"miunlock {__version__}\n\n"
-                            "A standalone, hardened fork derived from MiUnlockTool and migate by offici5l.\n"
-                            "Apache License 2.0. Not affiliated with Xiaomi.\n\n" + REPO)
+        from miunlock.ui.about_dialog import AboutDialog
+        if getattr(self, "_about_win", None) is not None and self._about_win.alive():
+            self._about_win.focus()
+        else:
+            self._about_win = AboutDialog(self)
 
 
 def _enable_dpi_awareness():
@@ -1124,7 +1214,7 @@ def _enable_dpi_awareness():
 
 
 def main():
-    log.setup()
+    log.setup(True if "--debug" in sys.argv[1:] else None)
     watchdog.install_crash_logging()          # background-thread errors and hard crashes go to the log file
     _enable_dpi_awareness()
     root = tk.Tk()

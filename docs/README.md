@@ -18,8 +18,7 @@
 ## Help
 
 - [FAQ](faq.md)
-- [Upstream changelog](upstream-changelog.md): history of the original MiUnlockTool
 
 Project files in the repository root: [README](../README.md),
 [CHANGELOG](../CHANGELOG.md), [CONTRIBUTING](../CONTRIBUTING.md),
-[SECURITY](../SECURITY.md), [LICENSE](../LICENSE), [NOTICE](../NOTICE).
+[SECURITY](../SECURITY.md), [CREDITS](../CREDITS.md), [LICENSE](../LICENSE), [NOTICE](../NOTICE).

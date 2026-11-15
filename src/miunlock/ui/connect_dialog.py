@@ -45,11 +45,13 @@ class ConnectionsDialog(Dialog):
         self.test_rows: List[tuple] = []
         self._busy = False
         self._testing = False
+        self._present = True                   # the main window still sees this phone
         self._shown_key: Optional[str] = None
         super().__init__(app)
         if start:
             self.refresh()
             self._auto_tick()
+            self._watch_connection()
 
     # ---------------------------------------------------------------- layout
     def build(self) -> None:
@@ -120,11 +122,12 @@ class ConnectionsDialog(Dialog):
     # ---------------------------------------------------------------- reading
     def refresh(self) -> None:
         """Read the phone on a worker thread; show the result when it arrives."""
-        if self._busy or not self.alive():
+        if self._busy or not self.alive() or not self._present:
             return
         self._busy = True
         self.refresh_btn.configure(state="disabled")
-        self.sub.configure(text="Reading the phone...", foreground=MUTED)
+        if self.report is None:                          # automatic updates stay quiet: the bar does not flicker
+            self._set_sub("Reading the phone...", MUTED)
 
         def work() -> None:
             try:
@@ -142,16 +145,35 @@ class ConnectionsDialog(Dialog):
             return
         self.refresh_btn.configure(state="normal")
         if report is None:
-            self.sub.configure(text=f"Could not read the phone: {error}", foreground=RED)
+            self._set_sub(f"Could not read the phone: {error}", RED)
             return
         self.report = report
-        self.sub.configure(text=f"Updated {time.strftime('%H:%M:%S')}. Reading only: nothing on the phone is "
-                                "changed. Contains your network and device names: check before sharing.",
-                           foreground=MUTED)
+        self._set_sub("Reading only: nothing on the phone is changed. Contains your network and device "
+                      "names: check before sharing.", MUTED)
         signals = report["signals"]
         self.wifi_chart.push(signals.get("wifi_dbm"))  # type: ignore[union-attr]
         self.mobile_chart.push(signals.get("mobile_dbm"))  # type: ignore[union-attr]
         self._render(self.tab_var.get())                 # rebuilds the page only if its content changed
+
+    def _set_sub(self, text: str, colour: str) -> None:
+        if self.sub.cget("text") != text:                # set only when it changes
+            self.sub.configure(text=text, foreground=colour)
+        elif str(self.sub.cget("foreground")) != str(colour):
+            self.sub.configure(foreground=colour)
+
+    def _watch_connection(self) -> None:
+        """Say at once when the main window sees the phone go away; it stops reading until it is back."""
+        if not self.alive():
+            return
+        current = self.app.android
+        present = bool(current) and current.get("serial") == self.serial and current.get("state") == "device"
+        if present != self._present:
+            self._present = present
+            if not present:
+                self._set_sub("The phone was unplugged. This window updates again when it is back.", RED)
+            elif not self._busy:
+                self.refresh()
+        self.win.after(500, self._watch_connection)
 
     # --------------------------------------------------------------- auto update
     def _auto_changed(self) -> None:

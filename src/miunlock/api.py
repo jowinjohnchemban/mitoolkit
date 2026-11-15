@@ -5,8 +5,7 @@ Every function here returns plain dicts or raises UnlockError, instead of
 printing to a console or blocking on input() -- with one unavoidable
 exception: logging in for the first time still requires a human to
 complete Xiaomi's own browser or QR login page. That is not a limitation
-to work around; it is the entire reason this fork exists (see CHANGES.md)
--- the account password should never pass through code that isn't
+to work around; it is deliberate: the account password should never pass through code that isn't
 Xiaomi's own login page, automated or not.
 
 The one genuinely destructive action, perform_unlock(), refuses to run

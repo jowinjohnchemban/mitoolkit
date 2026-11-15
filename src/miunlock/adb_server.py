@@ -15,6 +15,7 @@ adb/SERVICES.TXT. Nothing leaves this computer.
 """
 from __future__ import annotations
 
+import logging
 import socket
 import threading
 from typing import Dict, List, Optional
@@ -135,6 +136,68 @@ def devices() -> List[Dict[str, str]]:
     return out
 
 
+def start() -> bool:
+    """Start Google's adb server if it is installed and not running. Wi-Fi connections need it:
+    miunlock's own adb speaks USB only. Returns True when a server is running afterwards."""
+    if running():
+        return True
+    from miunlock import platform_tools
+    from miunlock.system import NO_WINDOW
+    exe = platform_tools.find("adb")
+    if not exe:
+        return False
+    import subprocess
+    try:
+        subprocess.run([exe, "start-server"], capture_output=True, timeout=20, creationflags=NO_WINDOW)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return running()
+
+
+def _host_command(text: str, timeout: float = 15.0) -> str:
+    """Send a "host:" service and return its text answer (connecting can take a few seconds)."""
+    conn = _Conn(timeout=timeout)
+    try:
+        conn.request(text)
+        return conn.read(int(conn.read(4), 16), int(timeout * 1000)).decode("utf-8", "replace").strip()
+    finally:
+        conn.close()
+
+
+def valid_address(text: str) -> Optional[str]:
+    """"192.168.1.5" or "192.168.1.5:5555" as "host:port", or None when it is not an address."""
+    text = text.strip()
+    host, _, port = text.partition(":")
+    parts = host.split(".")
+    if len(parts) != 4 or not all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
+        return None
+    if port and not (port.isdigit() and 1 <= int(port) <= 65535):
+        return None
+    return f"{host}:{port or 5555}"
+
+
+def connect(address: str) -> str:
+    """Connect to a phone over Wi-Fi ("192.168.1.5" or "192.168.1.5:5555"). Needs the phone's wireless
+    adb switched on (see ServerDevice.tcpip) and Google's adb server running. Returns its answer."""
+    target = valid_address(address)
+    if target is None:
+        raise AdbError("That is not an address. Use the phone's Wi-Fi address, like 192.168.1.5.")
+    if not start():
+        raise AdbError("Wi-Fi needs Google's adb (platform-tools), which was not found on this computer.")
+    answer = _host_command(f"host:connect:{target}")
+    logging.getLogger("miunlock.adb").debug("adb server connect %s: %s", target, answer)
+    low = answer.lower()
+    if "connected to" not in low:
+        raise AdbError(answer or "The phone did not answer. Check it is on the same Wi-Fi.")
+    return target
+
+
+def disconnect(address: str) -> None:
+    target = valid_address(address)
+    if target is not None and running():
+        _host_command(f"host:disconnect:{target}")
+
+
 class ServerDevice:
     """A phone reached through Google's adb server. Same interface as adb_usb.AdbDevice
     (serial, state, shell, reboot, sync, close), so adb.Phone works with either."""
@@ -142,6 +205,20 @@ class ServerDevice:
     def __init__(self, serial: str, state: str = "device"):
         self.serial, self.state = serial, state
         self._lock = threading.RLock()
+        self.real_serial: Optional[str] = None      # the phone's own serial (a Wi-Fi entry is named by address)
+
+    @property
+    def wireless(self) -> bool:
+        return ":" in self.serial
+
+    def tcpip(self, port: int = 5555) -> None:
+        """Make the phone listen for adb over Wi-Fi on this port (until it restarts)."""
+        with self._lock:
+            conn = self._service(f"tcpip:{int(port)}")
+            try:
+                conn.read_all(5000)
+            except AdbError:
+                pass
 
     def _service(self, service: str) -> _Conn:
         conn = _Conn()

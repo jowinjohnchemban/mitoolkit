@@ -11,6 +11,7 @@ the current directory. If that folder is not writable, logging to a file is
 skipped and the program carries on.
 """
 import logging
+import os
 import re
 import sys
 from logging.handlers import RotatingFileHandler
@@ -50,11 +51,29 @@ def log_path() -> Optional[Path]:
     return _path
 
 
-def setup(verbose: bool = False) -> Optional[Path]:
-    """Start file logging once. Safe to call repeatedly."""
+def env_debug() -> bool:
+    """True when MIUNLOCK_DEBUG is set to anything but 0/false/off."""
+    return os.environ.get("MIUNLOCK_DEBUG", "").strip().lower() not in ("", "0", "false", "off", "no")
+
+
+def set_debug(on: bool) -> None:
+    """Debug mode: also write what the program does step by step (each adb and fastboot request with how
+    long it took, scans, connections). Secrets are still scrubbed. Off by default: it makes the log larger."""
+    _log.setLevel(logging.DEBUG if on else logging.INFO)
+    _log.info("Debug logging %s", "on" if on else "off")
+
+
+def debug_enabled() -> bool:
+    return _log.isEnabledFor(logging.DEBUG)
+
+
+def setup(verbose: Optional[bool] = None) -> Optional[Path]:
+    """Start file logging once. Safe to call repeatedly. ``verbose`` (debug mode) defaults to the
+    MIUNLOCK_DEBUG environment variable."""
     global _path
     if _path is not None:
         return _path
+    verbose = env_debug() if verbose is None else verbose
     _log.setLevel(logging.DEBUG if verbose else logging.INFO)
     _log.propagate = False
     path = log_dir() / NAME

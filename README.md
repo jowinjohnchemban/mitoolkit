@@ -32,7 +32,9 @@ does **not** bypass the waiting period or any account requirement.
   battery, temperature, network), every thermal sensor, and a task-manager style process list
 - **Connections and signal**: Wi-Fi, mobile network (modem), SIM, Bluetooth and USB, with plain-language
   findings and an optional network test, for debugging Wi-Fi and telecom problems
-- Log viewer (logcat), and restart to recovery / restart / power off for a running phone
+- Log viewer (logcat); one dialog to restart into Android, recovery or fastboot, or power off (and to leave
+  fastboot without unlocking); export device details as text, CSV or Markdown
+- Wireless adb: use the phone over Wi-Fi for everything except fastboot and unlocking (those need a cable)
 - App manager: remove preinstalled bloat for your user, with plain ratings, and restore it
 - Security check: missing Android security fixes (from OSV / Android Security Bulletins),
   Google Play Protect, where apps came from, apps with powerful access, known stalkerware
@@ -100,23 +102,9 @@ See the [usage guide](docs/usage.md), the [AI agent guide](docs/agents.md) and t
 | [Error codes](docs/error-codes.md) | Messages returned by Xiaomi's servers |
 | [How it works](docs/how-it-works.md) | `deviceToken`, `encryptData`, the unlock sequence |
 | [Architecture](docs/architecture.md) | Package layout and request flow |
-| [Upstream changelog](docs/upstream-changelog.md) | History of the original MiUnlockTool |
 
 Project files: [CHANGELOG](CHANGELOG.md) · [CONTRIBUTING](CONTRIBUTING.md) ·
-[SECURITY](SECURITY.md) · [LICENSE](LICENSE) · [NOTICE](NOTICE)
-
-## Project status
-
-This is an independent, standalone fork. It is **derived from** two projects by
-[offici5l](https://github.com/offici5l), and most of the code is theirs:
-
-- [MiForge/MiUnlockTool](https://github.com/MiForge/MiUnlockTool) (Apache-2.0)
-- [MiForge/migate](https://github.com/MiForge/migate) (MIT), now merged in as
-  `miunlock.auth`
-
-This fork adds the changes listed in the [CHANGELOG](CHANGELOG.md): the password
-login path was removed, the saved session file is locked down, and a Python API,
-JSON CLI and GUI were added. If you do not need those, use the original projects.
+[SECURITY](SECURITY.md) · [CREDITS](CREDITS.md) · [LICENSE](LICENSE) · [NOTICE](NOTICE)
 
 ## Contributing
 
@@ -124,7 +112,5 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache License 2.0, see [LICENSE](LICENSE). Code that originated in `migate` is
-MIT-licensed by its author; its notice is kept in [NOTICE](NOTICE).
-
+Apache License 2.0, see [LICENSE](LICENSE); third-party notices are in [NOTICE](NOTICE).
 This project is not affiliated with or endorsed by Xiaomi.

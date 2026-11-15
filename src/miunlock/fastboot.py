@@ -67,8 +67,8 @@ class Backend(ABC):
         """Upload Xiaomi's signed data and run oem unlock. ERASES THE PHONE."""
 
     @abstractmethod
-    def reboot(self, serial: Optional[str] = None) -> None:
-        """Restart the phone normally."""
+    def reboot(self, serial: Optional[str] = None, mode: str = "") -> None:
+        """Restart the phone: normally (mode ""), or into recovery mode ("recovery")."""
 
     def info(self, serial: Optional[str] = None) -> Dict[str, Optional[str]]:
         return {key: self.getvar(var, serial) for key, var in INFO_VARS.items()}
@@ -122,9 +122,9 @@ class UsbBackend(Backend):
             fb.download(data)
             fb.oem("unlock", 120000)
 
-    def reboot(self, serial: Optional[str] = None) -> None:
+    def reboot(self, serial: Optional[str] = None, mode: str = "") -> None:
         with self._open(serial) as fb:
-            fb.reboot()
+            fb.reboot(mode)
 
 
 class ExeBackend(Backend):
@@ -195,9 +195,9 @@ class ExeBackend(Backend):
             if path.exists():
                 path.unlink()
 
-    def reboot(self, serial: Optional[str] = None) -> None:
+    def reboot(self, serial: Optional[str] = None, mode: str = "") -> None:
         try:
-            self._run("reboot", serial=serial, timeout=15)
+            self._run("reboot", *([mode] if mode else []), serial=serial, timeout=15)
         except FastbootError:
             pass
 
@@ -272,8 +272,8 @@ class AutoBackend(Backend):
     def stage_and_unlock(self, data: bytes) -> None:
         self.pick().stage_and_unlock(data)
 
-    def reboot(self, serial: Optional[str] = None) -> None:
-        self.pick(serial).reboot(serial)
+    def reboot(self, serial: Optional[str] = None, mode: str = "") -> None:
+        self.pick(serial).reboot(serial, mode)
 
 
 _backend: Optional[Backend] = None
@@ -348,5 +348,8 @@ def stage_and_unlock(encrypt_data: bytes) -> None:
     backend().stage_and_unlock(encrypt_data)
 
 
-def reboot(serial: Optional[str] = None) -> None:
-    backend().reboot(serial)
+def reboot(serial: Optional[str] = None, mode: str = "") -> None:
+    """Leave fastboot: into Android (mode "") or recovery mode ("recovery"). Erases nothing."""
+    if mode not in ("", "recovery"):
+        raise FastbootError(f"Unknown restart mode: {mode!r}")
+    backend().reboot(serial, mode)

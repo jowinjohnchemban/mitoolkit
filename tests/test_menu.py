@@ -62,8 +62,8 @@ class MenuTests(unittest.TestCase):
 
     def test_idle_with_no_phone(self):
         phone = labels(self.menu("Phone"))
-        for item in ("Back up files...", "Manage apps...", "Security check...", "Reboot to fastboot mode",
-                     "Restart phone", "Stop Google's adb"):
+        for item in ("Back up files...", "Manage apps...", "Security check...", "Restart or power off...",
+                     "Export device details...", "Stop Google's adb"):
             self.assertEqual(phone[item], "disabled", item)
         self.assertEqual(labels(self.menu("Unlock"))["Check eligibility"], "disabled")
         self.assertEqual(labels(self.menu("Unlock"))["Sign in to Mi Account..."], "normal")
@@ -72,8 +72,12 @@ class MenuTests(unittest.TestCase):
     def test_android_phone_enables_tools(self):
         self.app.android = {"serial": "X", "state": "device", "model": "POCO M2 Pro"}
         phone = labels(self.menu("Phone"))
-        for item in ("Back up files...", "Manage apps...", "Security check...", "Reboot to fastboot mode"):
+        for item in ("Back up files...", "Manage apps...", "Security check...", "Restart or power off..."):
             self.assertEqual(phone[item], "normal", item)
+
+    def test_fastboot_phone_can_be_restarted_from_the_menu(self):
+        self.app.device, self.app.fastboot = "FB1", "built-in USB fastboot"
+        self.assertEqual(labels(self.menu("Phone"))["Restart or power off..."], "normal")
 
     def test_signed_in_fastboot_allows_check(self):
         self.app.token, self.app.device = {"userId": "1"}, "FB1"

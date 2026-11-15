@@ -4,8 +4,8 @@
 from this repository.
 
 > [!NOTE]
-> The package named `miunlock` on PyPI is the original upstream project, not this
-> fork. Use the commands below so you get this version.
+> A package named `miunlock` on PyPI is a different project. Use the commands below so you
+> get this one.
 
 ## 1. Install Python
 

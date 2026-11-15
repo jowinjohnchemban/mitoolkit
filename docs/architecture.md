@@ -1,7 +1,7 @@
 # Architecture
 
-`miunlock` is one Python package with a `src/` layout. The Xiaomi login code that
-used to be the separate `migate` library lives inside it as `miunlock.auth`.
+`miunlock` is one Python package with a `src/` layout. The Xiaomi login code lives in
+`miunlock.auth`.
 
 ## Layout
 
@@ -61,7 +61,7 @@ src/miunlock/
 ├── unlock.py          InteractiveUnlock: the prompting command-line flow
 ├── utils.py           request signing, encryption and the HTTP call to Xiaomi
 ├── system.py          platform detection helpers
-└── auth/              Xiaomi account login (formerly migate)
+└── auth/              Xiaomi account login
     ├── config.py          endpoint URLs and console styling
     ├── requester.py       shared HTTP session
     ├── passtoken.py       login flow

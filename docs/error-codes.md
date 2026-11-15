@@ -1,8 +1,8 @@
 # Error codes
 
 Messages and codes returned by Xiaomi's unlock servers, with their usual cause and
-fix. Wording is Xiaomi's and can change. This list comes from the original
-MiUnlockTool reference and is not exhaustive. See also the [FAQ](faq.md).
+fix. Wording is Xiaomi's and can change, and the list is not exhaustive. See also the
+[FAQ](faq.md).
 
 Codes `20031` (account not added in Mi Unlock status) and `20036` (waiting
 period) are the ones you will most likely meet first; both are rejected before any
@@ -112,7 +112,7 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 
 **Cause:** The tool is using an outdated `clientVersion`.
 
-**Solution:** If using the official tool, download the latest version. If using MiUnlockTool, update `clientVersion` to a higher value.
+**Solution:** Update miunlock to the latest version, or if you use Xiaomi's official tool, download its latest version.
 
 ---
 

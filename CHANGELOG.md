@@ -3,13 +3,24 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-The history of the original MiUnlockTool (versions 1.4.8 through 1.7.5)
-is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
-
 ## [Unreleased]
 
 ### Added
 
+- Export device details as text, CSV or Markdown (button and Phone menu), a Sign out button in the Mi
+  Account section, and a Restart or power off dialog (Android, recovery, fastboot, off). In fastboot mode the
+  dialog offers Cancel and start Android, or recovery.
+- A quick, local security look colours the Security check button as soon as a phone connects; the full
+  check takes over once run.
+- Debug logging: `--debug`, `MIUNLOCK_DEBUG=1`, or Help > Debug logging.
+- An About window with version information to copy, and `CREDITS.md`.
+- Backup is resumable and verified: unchanged files are skipped, copies are size-checked and retried, failures
+  are listed in `backup-problems.txt`, and a phone that stops answering ends the run instead of failing every file.
+- Wireless adb (Phone > Wireless adb): switch a plugged-in phone to Wi-Fi debugging and connect, or
+  connect by address, through Google's adb server. Fastboot and unlocking stay USB-only; a phone
+  connected over Wi-Fi is asked to be plugged in before it reboots into fastboot.
+- Unplugging the phone is noticed within a second, and Live status and Connections say so at once. Their
+  top bars no longer rewrite themselves on every automatic update.
 - `miunlock details` and `miunlock connections [--network-test]` commands, and MCP tools
   `device_details` and `connections`, so scripts and agents can use the same readings. Agents are not
   shown what identifies the phone or its owner (serial number, IMEI, addresses, network and device
@@ -139,8 +150,7 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
 
 ## [1.8.0] - 2026-11-15
 
-First release of this fork. It starts from MiUnlockTool 1.7.5 and migate 1.1.11,
-both by offici5l.
+First release. See [CREDITS](CREDITS.md) for where it started.
 
 ### Added
 
@@ -160,7 +170,7 @@ both by offici5l.
   CLI and API, and a confirmation dialog in the GUI.
 - `login_method` option on `get_passtoken` to choose browser or QR login without a
   prompt.
-- `NOTICE` file with attribution and the MIT notice for migate-derived code.
+- `NOTICE` file with the third-party license notice.
 - Documentation rewritten into `docs/` with an index.
 - `miunlock --version`.
 - Release builds: Windows, Linux and macOS executables (`miunlock` and
@@ -170,23 +180,19 @@ both by offici5l.
 
 ### Changed
 
-- migate is merged into the package as `miunlock.auth`; `import migate` no longer
-  works. There is now a single package and no external git dependency.
-- The saved session moved from `~/.migatesession` to `~/.miunlocksession`.
+- The Xiaomi login code is part of the package as `miunlock.auth`: a single package and no
+  external git dependency.
+- The saved session is `~/.miunlocksession`.
 - The session file is restricted to the current user after it is written.
 - Installation is from this repository, not PyPI.
-- The version number lives in one place, `miunlock.__version__`, and starts at
-  1.8.0 (upstream was at 1.7.5).
+- The version number lives in one place, `miunlock.__version__`.
 - Minimum Python raised to 3.9, which the build backend requires.
 - Running `miunlock` with no arguments behaves as before.
 
 ### Removed
 
-- Upstream's manual "Publish to PyPI" workflow; this fork is not published on PyPI.
-- Password ("Terminal") login and its two-factor helpers (`login/terminal.py`,
-  `verify.py`, `sendcode.py`, `verifycode.py`). Only browser and QR login remain.
-  The old code sent an unsalted MD5 of the account password to Xiaomi's login
-  endpoint.
+- Password ("Terminal") login and its two-factor helpers. Only browser and QR login remain:
+  a password login would send an unsalted MD5 of the account password to Xiaomi's login endpoint.
 
 ### Security
 

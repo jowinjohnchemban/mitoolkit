@@ -12,14 +12,18 @@ your files.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 import threading
+import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 from miunlock import adb_usb, usbio
 from miunlock.adb_usb import AdbError  # noqa: F401 (the one adb error type, re-exported)
+
+_debug = logging.getLogger("miunlock.adb")     # written only in debug mode
 
 _PROPS = {
     "model": "ro.product.model",
@@ -98,9 +102,15 @@ class Phone:
 
     # ----------------------------------------------------------------- basics
     def shell(self, command: str, timeout_ms: int = 60000) -> str:
+        started = time.monotonic()
         try:
-            return self._dev.shell(command, timeout_ms)
+            out = self._dev.shell(command, timeout_ms)
+            _debug.debug("shell %s: %s (%d bytes, %.0f ms)", self.serial, command[:100], len(out),
+                         1000 * (time.monotonic() - started))
+            return out
         except (AdbError, usbio.UsbError) as err:
+            _debug.debug("shell %s: %s failed after %.0f ms: %s", self.serial, command[:100],
+                         1000 * (time.monotonic() - started), err)
             if self._dev.state == "offline":
                 adb_usb.forget(self.serial)
             raise AdbError(str(err)) from None
@@ -157,6 +167,9 @@ class Phone:
 
     def reboot_to_bootloader(self) -> None:
         """Reboot into fastboot mode. It does not erase anything."""
+        if self.wireless:
+            raise AdbError("Fastboot mode works over a USB cable only. Connect the phone with a USB cable "
+                           "first (a Wi-Fi connection cannot follow it into fastboot).")
         try:
             self._dev.reboot("bootloader")
         except usbio.UsbError as err:
@@ -194,6 +207,48 @@ class Phone:
         """How miunlock reaches the phone: "adb server" (Google's) or "usb" (built in)."""
         from miunlock.adb_server import ServerDevice
         return "adb server" if isinstance(self._dev, ServerDevice) else "usb"
+
+    @property
+    def wireless(self) -> bool:
+        """True when the phone is reached over Wi-Fi (its serial is an address like 192.168.1.5:5555)."""
+        return ":" in self.serial
+
+    def wifi_address(self) -> Optional[str]:
+        """The phone's address on Wi-Fi (for example 192.168.1.5), or None when it is not on Wi-Fi."""
+        for command in ("ip -f inet addr show wlan0", "ip route get 1.1.1.1"):
+            try:
+                out = self.shell(command, 8000)
+            except AdbError:
+                continue
+            m = re.search(r"inet (\d+\.\d+\.\d+\.\d+)", out) or re.search(r"src (\d+\.\d+\.\d+\.\d+)", out)
+            if m:
+                return m.group(1)
+        return None
+
+    def enable_wireless(self, port: int = 5555) -> str:
+        """Let this computer reach the phone over Wi-Fi: switch the phone's adb to listen on a network
+        port and connect to it. Returns "address:port". The phone goes back to USB-only when it restarts."""
+        from miunlock import adb_server
+        address = self.wifi_address()
+        if not address:
+            raise AdbError("The phone is not on Wi-Fi. Connect it to the same network as this computer.")
+        if not hasattr(self._dev, "tcpip"):
+            raise AdbError("This connection cannot switch the phone to Wi-Fi.")
+        if not adb_server.start():
+            raise AdbError("Wi-Fi needs Google's adb (platform-tools), which was not found on this computer.")
+        try:
+            self._dev.tcpip(port)
+        except usbio.UsbError as err:
+            raise AdbError(str(err)) from None
+        import time
+        last = ""
+        for _ in range(6):                               # the phone restarts its adb daemon first
+            time.sleep(1.0)
+            try:
+                return adb_server.connect(f"{address}:{port}")
+            except AdbError as err:
+                last = str(err)
+        raise AdbError(last or "The phone did not accept the Wi-Fi connection.")
 
     def sync(self) -> adb_usb.SyncSession:
         """adb's file-transfer session (stat, list, receive)."""
@@ -260,7 +315,9 @@ class _Backup:
         self.wanted = ["/sdcard"] if "everything" in sets else [p for k in sets for p in BACKUP_SETS[k][1]]
         self.copied: List[str] = []
         self.skipped: List[str] = []
-        self.files = self.bytes = self.failed = 0
+        self.files = self.bytes = self.failed = self.unchanged = 0
+        self.failures: List[str] = []
+        self.in_a_row = 0                  # files that failed one after another
         self.cancelled = False
 
     def _stop(self) -> bool:
@@ -279,25 +336,62 @@ class _Backup:
         self.log(f"Copying {remote} ...")
         root = remote.rstrip("/")
         base = self.target / root.rsplit("/", 1)[-1]
-        for path, _mode, _size, mtime in sync.walk(remote):
+        for path, _mode, size, mtime in sync.walk(remote):
             if self._stop():
                 return
             parts = [p for p in path[len(root) + 1:].split("/") if p not in ("", ".", "..")]
             local = base.joinpath(*parts)
             local.parent.mkdir(parents=True, exist_ok=True)
+            if self._unchanged(local, size, mtime):          # copied by an earlier run: a backup can be resumed
+                self.unchanged += 1
+                continue
             try:
-                self.bytes += sync.recv(path, local, self.cancel)
-                os.utime(local, (mtime, mtime))
+                self.bytes += self._copy(sync, path, local, size, mtime)
                 self.files += 1
+                self.in_a_row = 0
                 if self.files % 50 == 0:
                     self.log(f"{self.files} files, {self.bytes / 1e6:.0f} MB copied ...")
             except AdbError as err:
                 if self._stop():
                     return
                 self.failed += 1
+                self.in_a_row += 1
+                self.failures.append(f"{path}: {err}")
                 if self.failed <= 20:
                     self.log(f"Skipped {path}: {err}")
+                if self.in_a_row >= 6:                       # unplugged or locked: stop instead of failing every file
+                    raise AdbError("The phone stopped answering")
         self.copied.append(remote)
+
+    @staticmethod
+    def _unchanged(local: Path, size: int, mtime: int) -> bool:
+        """Already here with the same size and modification time (the copy keeps the phone's time)."""
+        try:
+            st = local.stat()
+        except OSError:
+            return False
+        return st.st_size == size and abs(st.st_mtime - mtime) <= 2
+
+    def _copy(self, sync: adb_usb.SyncSession, path: str, local: Path, size: int, mtime: int) -> int:
+        """One file, safely: written to a temporary name and moved into place only when complete, checked
+        against the size the phone reported, and tried up to three times (a busy phone or a dropped
+        transfer is usually fine the second time)."""
+        last: Optional[AdbError] = None
+        for attempt in range(3):
+            try:
+                written = sync.recv(path, local, self.cancel)
+                if written != size:
+                    local.unlink(missing_ok=True)
+                    raise AdbError(f"received {written} of {size} bytes")
+                os.utime(local, (mtime, mtime))
+                return written
+            except AdbError as err:
+                last = err
+                if self._stop():
+                    raise
+                if attempt < 2:
+                    time.sleep(0.5)
+        raise last or AdbError("The file could not be copied.")
 
     def _save_app_list(self) -> None:
         try:
@@ -319,12 +413,27 @@ class _Backup:
         except (AdbError, usbio.UsbError) as err:
             raise AdbError(f"Backup stopped: {err}. Files copied so far are in {self.target}") from None
         self._save_app_list()
+        self._save_report()
         self.log(f"{self.files} files, {self.bytes / 1e6:.1f} MB copied"
-                 + (f", {self.failed} skipped." if self.failed else "."))
+                 + (f", {self.unchanged} already there" if self.unchanged else "")
+                 + (f", {self.failed} could not be copied." if self.failed else "."))
         if not self.copied and not self.cancelled:
             raise AdbError("Nothing was copied. Is the phone unlocked and file access allowed?")
         return {"copied": self.copied, "skipped": self.skipped, "files": self.files, "bytes": self.bytes,
-                "failed_files": self.failed, "dest": str(self.target), "cancelled": self.cancelled}
+                "unchanged": self.unchanged, "failed_files": self.failed, "dest": str(self.target),
+                "cancelled": self.cancelled}
+
+    def _save_report(self) -> None:
+        """Files that could not be copied, listed in the backup folder, so nothing fails silently."""
+        report = self.target / "backup-problems.txt"
+        try:
+            if self.failures:
+                report.write_text("Files that could not be copied (run the backup again to retry them):\n\n"
+                                  + "\n".join(self.failures) + "\n", encoding="utf-8")
+            else:
+                report.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 # ------------------------------------------------- short forms of Phone methods

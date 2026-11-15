@@ -217,10 +217,12 @@ def _attach_console():
 
 
 def main():
+    debug = "--debug" in sys.argv[1:]
+    sys.argv = [a for a in sys.argv if a != "--debug"]       # a flag for every mode, not for the parser
     argv = sys.argv[1:]
     if "--gui" not in argv and (argv or "--cli" in argv):
         _attach_console()  # command-line use needs a console; the GUI must not have one
-    log.setup()
+    log.setup(True if debug else None)
     # One program, two modes: the GUI by default, the command line with --cli
     # (a subcommand such as `check` also means command line).
     args = sys.argv[1:]
@@ -248,6 +250,8 @@ def main():
     parser.add_argument("--gui", action="store_true", help="Open the graphical app (the default when run with no arguments).")
     parser.add_argument("--mcp", action="store_true", help="Let an AI agent control the program over MCP (stdin/stdout). Cannot unlock.")
     parser.add_argument("--version", action="version", version=f"miunlock {__version__}")
+    parser.add_argument("--debug", action="store_true", help="Write step-by-step debug details to miunlock.log "
+                        "(also: set MIUNLOCK_DEBUG=1, or Help > Debug logging in the app). Secrets stay hidden.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_login = sub.add_parser("login", help="Log in (or reuse a saved session) and print account info as JSON.")

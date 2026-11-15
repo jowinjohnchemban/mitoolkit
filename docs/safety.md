@@ -1,8 +1,7 @@
 # Safety model
 
 This page explains what `miunlock` protects, what it deliberately does not do, and
-what you are still responsible for. It also lists how this fork differs from the
-original projects on security.
+what you are still responsible for.
 
 ## What can go wrong
 
@@ -46,14 +45,11 @@ Login opens Xiaomi's real login page in your browser, or prints a QR code to sca
 The password is typed into Xiaomi's page and never passes through this program.
 Always check the address bar says `account.xiaomi.com` before entering anything.
 
-### Password login was removed
+### No password login
 
-The original `migate` library also offered a "Terminal" login that read your
-password in the console, computed an unsalted MD5 hash of it, and sent that to
-Xiaomi's login endpoint. That mirrors Xiaomi's own legacy login protocol, but an
-unsalted MD5 is equivalent to the password if it is ever intercepted or logged.
-This fork deletes that code (`login/terminal.py` and its 2FA helpers) rather than
-disabling it, so it cannot run.
+There is no login that reads your password in the console: such a login would send an
+unsalted MD5 of it, which is as good as the password if it is ever intercepted or logged.
+That code is not part of this program, so it cannot run.
 
 ### Saved session
 
@@ -103,7 +99,7 @@ only `https` links (or the local captcha page) are opened.
 
 ## Network activity
 
-In the code reviewed when this fork was made, requests go only to:
+In the code as reviewed, requests go only to:
 
 | Destination | Purpose |
 |---|---|
@@ -131,30 +127,24 @@ project, has been removed.
 
 ## What was reviewed, and its limits
 
-Every Python file in the original MiUnlockTool and migate was read when this fork
-was created, looking for network destinations, credential handling and unsafe
-subprocess use. The `fastboot` calls use fixed argument lists, not a shell, so
-there is no shell-injection path.
+The source was read for network destinations, credential handling and unsafe
+subprocess use. Subprocess calls use fixed argument lists, not a shell, so there is no
+shell-injection path.
 
-This was a source review by the fork's maintainers, not an independent security
-audit, and it covered the code as it was at that time. Review changes before you
-trust new versions.
+This was a source review by the maintainers, not an independent security audit, and it
+covered the code as it was at that time. Review changes before you trust new versions.
 
 ## Things to know
 
 - **Request signing.** Requests to Xiaomi are signed with a key embedded in the
-  code. It is Xiaomi's client signing scheme, not a secret that protects you, and
-  the original project uses the same one.
+  code. It is Xiaomi's client signing scheme, not a secret that protects you.
 - **Client version string.** `unlock.py` and `api.py` send `clientVersion`
   `7.6.727.43`. It is an identity string Xiaomi's server expects, not this tool's
   version.
-- **Upstream report.** The original project's issue tracker has an unverified
-  report of a password leak during Xiaomi's own two-factor step. Login happens on
-  Xiaomi's page, which this project cannot change, so verify the page URL and
-  consider changing your password afterwards.
+- **Login happens on Xiaomi's page**, which this project cannot change: verify the page
+  URL, and consider changing your password if you doubt it.
 - **Not on PyPI.** Install from this repository so the code you run is the code
-  you can read. The unpatched upstream package on PyPI still contains the
-  password-login path.
+  you can read. A package of the same name on PyPI is a different project.
 
 ## Reporting a problem
 

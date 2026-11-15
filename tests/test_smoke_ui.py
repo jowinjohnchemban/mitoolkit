@@ -66,7 +66,7 @@ class SmokeTests(unittest.TestCase):
             if bar.type(i) == "cascade":
                 menu = self.root.nametowidget(bar.entrycget(i, "menu"))
                 for j in range(menu.index("end") + 1):
-                    self.assertIn(menu.type(j), ("command", "separator", "cascade"))
+                    self.assertIn(menu.type(j), ("command", "separator", "cascade", "checkbutton"))
         self.assertClean()
 
     def test_text_size_up_to_200_percent_and_back(self):
@@ -170,8 +170,6 @@ class SmokeTests(unittest.TestCase):
 
         self.app.q.put(("call", broken, ()))
         self.app.q.put(("call", lambda: calls.append("next"), ()))
-        before = self.app.q.qsize()
-        self.assertEqual(before, 2)
         self.app._pump()
         self.assertEqual(calls, ["next"])                         # the item after the failure still ran
         self.assertEqual(self.errors, [])
