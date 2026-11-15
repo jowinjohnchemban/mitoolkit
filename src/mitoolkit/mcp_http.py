@@ -39,6 +39,7 @@ APPROVAL: Dict[str, str] = {
 Approve = Callable[[str, dict], bool]
 OnCall = Callable[[str], None]
 OnClient = Callable[[str], None]
+OnDone = Callable[[str, Any, bool], None]        # (tool, its result as data, whether it failed)
 
 
 def client_name(params: Any) -> str:
@@ -68,13 +69,13 @@ def _declined() -> dict:
 
 class McpHttpServer:
     def __init__(self, approve: Optional[Approve] = None, on_call: Optional[OnCall] = None, port: int = 0,
-                 on_client: Optional[OnClient] = None):
+                 on_client: Optional[OnClient] = None, on_done: Optional[OnDone] = None):
         """``approve(tool, arguments)`` is asked for the tools in APPROVAL and must answer True to let one run (no
         ``approve`` means none of them run). ``on_call(tool)`` hears about every call, ``on_client(name)`` about an agent
         saying who it is when it connects. ``port`` 0 lets the system pick."""
         self.token = secrets.token_urlsafe(32)
         self.client = ""                      # the name the last agent that connected gave itself
-        self._approve, self._on_call, self._on_client = approve, on_call, on_client
+        self._approve, self._on_call, self._on_client, self._on_done = approve, on_call, on_client, on_done
         self._lock = threading.Lock()
         self._httpd = ThreadingHTTPServer((HOST, port), self._handler())
         self.port = self._httpd.server_address[1]
@@ -133,7 +134,24 @@ class McpHttpServer:
                 if not allowed:
                     return {"jsonrpc": "2.0", "id": msg.get("id"), "result": _declined()}
         with self._lock:
-            return mcp.handle(msg)
+            reply = mcp.handle(msg)
+        if msg.get("method") == "tools/call" and self._on_done is not None and isinstance(reply, dict):
+            self._tell_done(str((msg.get("params") or {}).get("name", "")), reply)
+        return reply
+
+    def _tell_done(self, tool: str, reply: dict) -> None:
+        """Tell the app a tool finished, with its result as data, so the window can show what changed."""
+        result = reply.get("result") if isinstance(reply.get("result"), dict) else {}
+        failed = bool(result.get("isError")) or "error" in reply
+        try:
+            data = json.loads(result["content"][0]["text"])
+        except (KeyError, IndexError, TypeError, ValueError):
+            data = None
+        try:
+            self._on_done(tool, data, failed)
+        except Exception as err:               # the window failing to update must never fail the agent's call
+            # the tool's name comes from the agent: it is not written to the log
+            log.get("mcp").error("updating the window after a tool call failed: %s", type(err).__name__)
 
     def _handler(self):
         server = self

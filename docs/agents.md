@@ -39,6 +39,11 @@ claude mcp add --transport http mitoolkit http://127.0.0.1:PORT/mcp --header "Au
 - It is off until switched on and stops when switched off or when the app closes. The token changes every time.
 - The tools are the same as below. Those that change something (`reboot_to_fastboot`) or use the saved session
   (`login`) show a question in the app, with the agent's name, and run only if the person answers Allow. No answer is a no.
+- The window follows what an agent does. While a tool runs the status bar says what it is doing ("Claude Code is
+  running the security check") with the progress bar, and says when it is done. A device or reboot call makes the window
+  look at the phone again at once, and a security check colours the Security Check button, as if you had run it.
+  Xiaomi's eligibility answer is deliberately not copied into step 3: unlocking is a person's decision, so you press
+  Check Eligibility yourself.
 - The status bar on the right shows the agent's name in green while it is connected, amber while it waits for an
   answer, and "AI agent connection on" when none is using it. The Activity log lists every tool an agent used.
 - Requests without the token, from another site (a browser page), or with another host name are refused.
