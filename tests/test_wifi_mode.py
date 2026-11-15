@@ -1,7 +1,6 @@
 """Wireless mode: the USB / Wireless switch, finding phones on the network, pairing by QR code, and clear errors."""
 import logging
 import os
-import re
 import sys
 import threading
 import unittest
