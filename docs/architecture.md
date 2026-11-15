@@ -44,8 +44,9 @@ src/mitoolkit/
 ├── xiaomi.py          UnlockServer: the requests to Xiaomi's unlock server, shared
 ├── errors.py          MitoolkitError, the base of every expected error
 ├── adb.py             Phone: details, reboot, backup, app manager (+ short functions)
-├── adb_usb.py         built-in adb client (USB protocol, auth, shell, sync)
-├── adb_server.py      adb through Google's adb server, when one is running
+├── adb_core.py        what both adb paths share: the adb error and the file-transfer session
+├── adb_usb.py         built-in adb client (USB protocol, auth, shell)
+├── adb_server.py      adb through Google's adb server, when one is running (Wi-Fi, pairing)
 ├── platform_tools.py  finds Google's adb/fastboot if already installed (never downloads)
 ├── adbkey.py          adb RSA key (~/.android/adbkey), pure Python
 ├── fastboot.py        Backend interface; UsbBackend, ExeBackend, AutoBackend

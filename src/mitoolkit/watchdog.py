@@ -43,7 +43,7 @@ def call_with_timeout(fn: Callable[[], T], seconds: float, what: str = "the phon
     def run() -> None:
         try:
             box["value"] = fn()
-        except BaseException as err:  # handed to the caller below, with its own traceback
+        except (Exception, SystemExit, KeyboardInterrupt) as err:  # handed to the caller below, with its traceback
             box["error"] = err
 
     worker = threading.Thread(target=run, daemon=True, name=f"call:{what}")

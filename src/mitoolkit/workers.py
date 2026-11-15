@@ -18,12 +18,15 @@ from typing import Any, Callable, List, Optional, Tuple
 from mitoolkit import log
 
 
+Callback = Callable[[Any, Optional[BaseException]], None]
+Job = Tuple[Callable[[], Any], Callback]                       # what to run, and who to tell
+Done = Tuple[Callback, Any, Optional[BaseException]]           # who to tell, the result, the error
+
+
 class BackgroundPool:
     def __init__(self, workers: int = 2, name: str = "worker", max_waiting: int = 64):
-        self._jobs: "queue.Queue[Tuple[Callable[[], Any], Callable[[Any, Optional[BaseException]], None]]]" = \
-            queue.Queue(maxsize=max_waiting)
-        self._done: "queue.Queue[Tuple[Callable[[Any, Optional[BaseException]], None], Any, Optional[BaseException]]]" = \
-            queue.Queue()
+        self._jobs: queue.Queue[Job] = queue.Queue(maxsize=max_waiting)
+        self._done: queue.Queue[Done] = queue.Queue()
         self._threads: List[threading.Thread] = []
         for i in range(max(1, workers)):
             t = threading.Thread(target=self._work, daemon=True, name=f"{name}-{i + 1}")
