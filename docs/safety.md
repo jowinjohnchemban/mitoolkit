@@ -111,9 +111,9 @@ In the code reviewed when this fork was made, requests go only to:
 | `unlock.update.miui.com`, `unlock.update.intl.miui.com`, `in-/ru-/eu-unlock.update.intl.miui.com` | Unlock service, chosen by account region |
 | `dl.google.com` | Google's USB driver for Windows, only when you choose *Install Google USB driver* |
 
-No analytics or telemetry calls were found. On Android (Termux) only, the original
-code additionally downloads a GPG key and an install script from the third-party
-`nohajc/termux-adb` project and runs it; this path is not used on other systems.
+No analytics or telemetry calls were found. The original code's Android (Termux) path,
+which downloaded and ran an install script from the third-party `nohajc/termux-adb`
+project, has been removed.
 
 ## What was reviewed, and its limits
 

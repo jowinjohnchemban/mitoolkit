@@ -1,28 +1,20 @@
 """
 Talking to a phone in fastboot mode.
 
-Two interchangeable backends implement the same interface (``Backend``):
+``Backend`` is what the rest of miunlock needs from fastboot; ``UsbBackend`` implements it
+with miunlock's own USB client (fastboot_usb), so no fastboot program is needed. Another
+transport (for example an Android app's USB host API) would be a new Backend subclass.
 
-- ``UsbBackend`` on Windows, macOS and Linux: miunlock's own USB client (fastboot_usb).
-  No fastboot program is downloaded or needed.
-- ``TermuxBackend`` on Android (Termux): an Android app cannot open USB devices directly,
-  so the termux fastboot command is used, set up by termux.py.
-
-The module-level functions use whichever backend fits this system.
+The module-level functions use the backend for this system.
 """
 from __future__ import annotations
 
-import os
-import subprocess
-import tempfile
 import time
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Dict, List, Optional
 
 from miunlock import fastboot_usb, usbio
 from miunlock.fastboot_usb import FastbootError  # noqa: F401 (the one fastboot error type, re-exported)
-from miunlock.system import IS_TERMUX, NO_WINDOW
 
 # Read-only variables shown as device details.
 INFO_VARS = {
@@ -112,61 +104,6 @@ class UsbBackend(Backend):
             fb.reboot()
 
 
-class TermuxBackend(Backend):
-    name = "termux fastboot"
-
-    def __init__(self):
-        self._cmd: Optional[str] = None
-
-    @property
-    def cmd(self) -> str:
-        if self._cmd is None:
-            from miunlock.termux import setup_fastboot
-            self._cmd = setup_fastboot()
-        return self._cmd
-
-    def _run(self, *args: str, timeout: Optional[int] = 60) -> subprocess.CompletedProcess:
-        return subprocess.run([self.cmd, *args], capture_output=True, text=True, timeout=timeout)
-
-    def ready(self) -> None:
-        _ = self.cmd
-
-    def devices(self) -> List[Dict[str, object]]:
-        out = self._run("devices", timeout=15).stdout
-        return [{"serial": ln.split()[0], "accessible": True}
-                for ln in out.splitlines() if len(ln.split()) >= 2 and ln.split()[1] == "fastboot"]
-
-    def getvar(self, name: str, serial: Optional[str] = None) -> Optional[str]:
-        from miunlock.commands import CheckB
-        value = CheckB(self.cmd, name, "getvar", name)
-        return value if isinstance(value, str) and value else None
-
-    def token(self) -> Optional[str]:
-        from miunlock.commands import get_device_token
-        token = get_device_token(self.cmd)
-        if isinstance(token, dict):
-            raise FastbootError(token["error"])
-        return token
-
-    def stage_and_unlock(self, data: bytes) -> None:
-        # The fastboot command needs a file: private, unpredictable name, deleted at once.
-        fd, name = tempfile.mkstemp(prefix="miunlock-", suffix=".encryptData")
-        path = Path(name)
-        try:
-            with os.fdopen(fd, "wb") as f:
-                f.write(data)
-            for args in (["stage", str(path)], ["oem", "unlock"]):
-                done = self._run(*args, timeout=None)
-                if done.returncode != 0:
-                    raise FastbootError((done.stderr or done.stdout).strip() or "fastboot failed")
-        finally:
-            if path.exists():
-                path.unlink()
-
-    def reboot(self, serial: Optional[str] = None) -> None:
-        subprocess.run([self.cmd, "reboot"], capture_output=True, timeout=15, creationflags=NO_WINDOW)
-
-
 _backend: Optional[Backend] = None
 
 
@@ -174,7 +111,7 @@ def backend() -> Backend:
     """The backend for this system (created once)."""
     global _backend
     if _backend is None:
-        _backend = TermuxBackend() if IS_TERMUX else UsbBackend()
+        _backend = UsbBackend()
     return _backend
 
 
@@ -212,7 +149,7 @@ def wait_for_device(say: bool = True, timeout: Optional[float] = None) -> None:
 
 def get_product(wait: bool = True) -> str:
     """The phone's codename (getvar product)."""
-    if wait and not IS_TERMUX:  # termux fastboot waits by itself
+    if wait:
         wait_for_device()
     product = backend().getvar("product")
     if not product:

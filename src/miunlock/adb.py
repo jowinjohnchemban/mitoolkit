@@ -20,7 +20,6 @@ from typing import Callable, Dict, List, Optional
 
 from miunlock import adb_usb, usbio
 from miunlock.adb_usb import AdbError  # noqa: F401 (the one adb error type, re-exported)
-from miunlock.system import IS_TERMUX
 
 _PROPS = {
     "model": "ro.product.model",
@@ -48,8 +47,6 @@ _PACKAGE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$")
 
 
 def _check() -> None:
-    if IS_TERMUX:
-        raise AdbError("adb features are not available on Termux.")
     try:
         usbio.backend()
     except usbio.UsbError as err:

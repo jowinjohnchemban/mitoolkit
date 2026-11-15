@@ -68,17 +68,22 @@ class UnlockServerTests(unittest.TestCase):
 
 
 class FastbootBackendTests(unittest.TestCase):
-    def test_backend_matches_platform(self):
-        with mock.patch.object(fastboot, "_backend", None), mock.patch.object(fastboot, "IS_TERMUX", False):
+    def test_default_backend_is_usb(self):
+        with mock.patch.object(fastboot, "_backend", None):
             self.assertIsInstance(fastboot.backend(), fastboot.UsbBackend)
-        with mock.patch.object(fastboot, "_backend", None), mock.patch.object(fastboot, "IS_TERMUX", True):
-            self.assertIsInstance(fastboot.backend(), fastboot.TermuxBackend)
+
+    def test_android_is_refused_with_a_clear_message(self):
+        import miunlock.system
+        with mock.patch.object(usbio, "_backend", None), mock.patch.object(miunlock.system, "IS_ANDROID", True):
+            with self.assertRaises(usbio.UsbUnavailable) as ctx:
+                usbio.backend()
+        self.assertIn("computer", str(ctx.exception))
 
     def test_module_functions_use_the_backend(self):
         fake = mock.Mock(spec=fastboot.Backend)
         fake.getvar.return_value = "garnet"
         fake.token.return_value = "TOK"
-        with mock.patch.object(fastboot, "_backend", fake), mock.patch.object(fastboot, "IS_TERMUX", True):
+        with mock.patch.object(fastboot, "_backend", fake), mock.patch.object(fastboot, "wait_for_device"):
             self.assertEqual(fastboot.get_product(), "garnet")
             self.assertEqual(fastboot.get_token(), "TOK")
             fastboot.stage_and_unlock(b"x")

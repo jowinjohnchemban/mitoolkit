@@ -21,7 +21,7 @@ does **not** bypass the waiting period or any account requirement.
 
 ## Features
 
-- Works on Windows, macOS, Linux and Android (Termux)
+- Works on Windows, macOS and Linux
 - One program, three ways to drive it: a GUI (default), a command line (`--cli`, JSON output)
   and an AI-agent interface (`--mcp`)
 - Built-in adb and fastboot (no platform-tools): see your phone, show its details, reboot it
@@ -50,7 +50,7 @@ pip install git+https://github.com/jowinjohnchemban/miunlock.git
 This project is not published on PyPI; install from source as shown. Prebuilt
 Windows, Linux and macOS programs are on the
 [Releases page](https://github.com/jowinjohnchemban/miunlock/releases/latest).
-Full instructions, including virtual environments and Termux, are in the
+Full instructions, including virtual environments and USB drivers, are in the
 [installation guide](docs/installation.md).
 
 ## Quick start
@@ -79,7 +79,7 @@ See the [usage guide](docs/usage.md), the [AI agent guide](docs/agents.md) and t
 
 | Page | Contents |
 |---|---|
-| [Installation](docs/installation.md) | Python, virtual environments, Termux |
+| [Installation](docs/installation.md) | Python, virtual environments, USB drivers |
 | [Unlock guide](docs/unlock-guide.md) | Step-by-step process on the device |
 | [Usage](docs/usage.md) | Interactive mode, CLI, GUI, session handling |
 | [AI agents](docs/agents.md) | Control and read miunlock from an agent over MCP |

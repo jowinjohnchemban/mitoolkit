@@ -101,36 +101,11 @@ The first time adb connects, the phone asks *Allow USB debugging?*. `miunlock` u
 key file as Google's adb (`~/.android/adbkey`), creating it if needed, so a computer you
 already allowed is recognised.
 
-## Android (Termux)
+## Android
 
-Install both apps from the same source, for example from GitHub:
-
-- [Termux](https://github.com/termux/termux-app/releases/latest)
-- [Termux:API](https://github.com/termux/termux-api/releases/latest)
-
-Then either run the helper script:
-
-```sh
-curl -sS https://raw.githubusercontent.com/jowinjohnchemban/miunlock/main/.install | bash
-```
-
-or install by hand:
-
-```sh
-pkg install python-pip
-pip install git+https://github.com/jowinjohnchemban/miunlock.git
-```
-
-The first time you run `miunlock` it installs
-[termux-fastboot](https://github.com/nohajc/termux-adb) from the third-party
-`nohajc/termux-adb` project, which downloads and runs its install script. You can do
-that yourself first:
-
-```sh
-curl -s https://raw.githubusercontent.com/nohajc/termux-adb/master/install.sh | bash
-```
-
-Read scripts before piping them to a shell, including `.install` here.
+Running `miunlock` on an Android phone (for example in Termux, to unlock another phone over
+OTG) is not supported: Android apps cannot open USB devices directly. Connect the phone to
+a computer instead.
 
 ## Prebuilt executables
 

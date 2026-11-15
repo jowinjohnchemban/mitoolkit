@@ -23,7 +23,7 @@ src/miunlock/
 ├── adb.py             Phone: details, reboot, backup, app manager (+ short functions)
 ├── adb_usb.py         built-in adb client (USB protocol, auth, shell, sync)
 ├── adbkey.py          adb RSA key (~/.android/adbkey), pure Python
-├── fastboot.py        Backend interface; UsbBackend and TermuxBackend
+├── fastboot.py        Backend interface; UsbBackend
 ├── fastboot_usb.py    built-in fastboot client (USB protocol)
 ├── usbio.py           USB access through pyusb + libusb
 ├── drivers.py         Google USB driver installer (Windows)
@@ -33,10 +33,8 @@ src/miunlock/
 ├── hints.py           plain-English explanations of Xiaomi error codes
 ├── assets/logo.png    window icon
 ├── unlock.py          InteractiveUnlock: the prompting command-line flow
-├── commands.py        Termux only: fastboot queries through the fastboot command
 ├── utils.py           request signing, encryption and the HTTP call to Xiaomi
 ├── system.py          platform detection helpers
-├── termux.py          Android (Termux) fastboot setup
 └── auth/              Xiaomi account login (formerly migate)
     ├── config.py          endpoint URLs and console styling
     ├── requester.py       shared HTTP session
@@ -55,10 +53,11 @@ src/miunlock/
 - **One implementation per job.** The requests to Xiaomi live only in
   `xiaomi.UnlockServer`; `api.py` (non-interactive) and `unlock.InteractiveUnlock` (prompts)
   both use it. Region-to-zone mapping is `xiaomi.zone_for_region`.
-- **Interfaces over branches.** `fastboot.Backend` has two implementations,
-  `UsbBackend` (built-in USB client) and `TermuxBackend` (termux fastboot command); the rest
-  of the program calls `fastboot.get_product()`, `get_token()`, `stage_and_unlock()`
-  without knowing which one runs.
+- **Interfaces over branches.** `fastboot.Backend` is what the program needs from
+  fastboot; `UsbBackend` implements it with the built-in USB client. The rest of the
+  program calls `fastboot.get_product()`, `get_token()`, `stage_and_unlock()` without
+  knowing the transport, so another one (such as an Android app's USB host API) can be
+  added as a new subclass.
 - **Objects for things with state.** `adb.Phone` wraps one connected phone;
   `adb_usb.AdbDevice` and `fastboot_usb.FastbootDevice` wrap the USB sessions;
   `adbkey.Key` is the RSA key. Module-level functions in `adb.py` are one-line short forms
@@ -97,8 +96,7 @@ download (stage) encryptData  ──►  oem unlock
 ```
 
 The fastboot steps are miunlock's own USB client (`fastboot_usb.py`); `encryptData` goes
-from memory straight to the phone and is never written to disk. On Termux the termux
-`fastboot` command is used instead, because Android apps cannot open USB devices directly.
+from memory straight to the phone and is never written to disk.
 
 ## Built-in adb and fastboot
 

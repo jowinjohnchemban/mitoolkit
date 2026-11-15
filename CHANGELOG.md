@@ -15,7 +15,7 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
   codename, bootloader state and version, and active slot).
 - Built-in adb and fastboot: miunlock speaks both USB protocols itself (pyusb + libusb),
   checked against AOSP's sources. Google's platform-tools are no longer downloaded. adb uses
-  the same `~/.android/adbkey` as Google's adb. Termux keeps using its own fastboot.
+  the same `~/.android/adbkey` as Google's adb.
 - App manager (debloat): **Manage apps...** in the GUI and `miunlock apps list|remove|restore`
   list every app with a rating from a curated Xiaomi bloat list, remove ticked apps for your
   user (`pm uninstall --user 0`) and restore them.
@@ -31,11 +31,17 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
 - GUI: scrollable page with a scrollbar and mouse wheel, Copy and Clear for the details
   panel, step badges that show what to do next, Ctrl+Q to quit.
 
+### Removed
+
+- Android (Termux) support, including `.install` and the code that downloaded and ran the
+  third-party `nohajc/termux-adb` install script. Run miunlock on a computer; on Android it
+  now says so instead of failing.
+
 ### Changed
 
 - Code structure: the Xiaomi request sequence lives once in `xiaomi.UnlockServer` (used by
-  both the API and the interactive flow); fastboot has a `Backend` interface with USB and
-  Termux implementations; `adb.Phone` wraps a connected phone; GUI windows are classes in
+  both the API and the interactive flow); fastboot has a `Backend` interface (implemented
+  over USB); `adb.Phone` wraps a connected phone; GUI windows are classes in
   `miunlock.ui`; every expected error derives from `MiunlockError`; CLI commands share one
   JSON wrapper. Behaviour is unchanged.
 

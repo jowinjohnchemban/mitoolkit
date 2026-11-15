@@ -81,7 +81,6 @@ Python 3.9 or newer.
 
 ### Why is my device not detected?
 
-- On Android (Termux), make sure the phone supports OTG and that it is enabled.
 - On Windows, the device should appear in Device Manager without a warning icon.
   Install the drivers if it does not:
   - Easiest: in the GUI choose *File > Install Google USB driver*, or run

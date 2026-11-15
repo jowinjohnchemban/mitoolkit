@@ -33,6 +33,10 @@ def backend():
     global _backend
     if _backend is not None:
         return _backend
+    from miunlock.system import IS_ANDROID
+    if IS_ANDROID:
+        raise UsbUnavailable("miunlock runs on a computer (Windows, macOS or Linux). Running it on an "
+                             "Android phone is not supported: connect the phone to a computer instead.")
     try:
         import usb.core  # noqa: F401
         import usb.backend.libusb1 as libusb1

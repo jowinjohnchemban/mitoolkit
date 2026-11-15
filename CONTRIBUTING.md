@@ -34,7 +34,7 @@ touches credentials, logging or the unlock confirmation.
 
 **Code**
 
-- Keep changes working on Windows, macOS, Linux and Termux.
+- Keep changes working on Windows, macOS and Linux.
 - Keep it clean and concise, and prefer small files over large ones.
 - Do not add dependencies without a good reason.
 - `src/miunlock/unlock.py` and `src/miunlock/api.py` repeat the same request
