@@ -64,12 +64,12 @@ class LiveDialogTests(unittest.TestCase):
         self.assertNotIn("Updated", sub)
         self.app.android = None                                   # the main window noticed it is gone
         d._watch_connection()
-        self.assertEqual(d.live.cget("text"), "● Disconnected")
+        self.assertEqual(d.live.cget("text"), "Disconnected")
         d._update(None, "device offline")                         # a failing read does not overwrite that
-        self.assertEqual(d.live.cget("text"), "● Disconnected")
+        self.assertEqual(d.live.cget("text"), "Disconnected")
         self.app.android = {"serial": "X", "state": "device"}
         d._watch_connection()
-        self.assertEqual(d.live.cget("text"), "◌ Reconnecting")
+        self.assertEqual(d.live.cget("text"), "Reconnecting")
 
     def test_samples_fill_gauges_cores_sensors_and_processes(self):
         self.feed(4)
@@ -77,7 +77,7 @@ class LiveDialogTests(unittest.TestCase):
         self.assertEqual(d.g_gpu.state_text, "Normal")           # GPU gauge appeared with its word
         self.assertIn(d.g_gpu, d._gauge_order)
         self.assertEqual(len(d.core_cells), 2)
-        self.assertEqual(d.live.cget("text"), "● Live")
+        self.assertEqual(d.live.cget("text"), "Live")
         # the lists are built when their tab opens, from the latest reading
         self.assertFalse(d.sensor_tree.get_children())
         d.tab_var.set("sensors")
@@ -105,8 +105,8 @@ class LiveDialogTests(unittest.TestCase):
         self.assertEqual(dict(TABS)["processor"], "SoC")
         d = self.dlg
         self.feed(3)
-        self.assertIn("41 °C normal", d.s_cpu.caption)                  # the phone's cpu sensor
-        self.assertIn("52 °C warm", d.s_gpu.caption)                    # the phone's GPU sensor
+        self.assertIn("41 °C, Normal", d.s_cpu.caption)                  # the phone's cpu sensor
+        self.assertIn("52 °C, Warm", d.s_gpu.caption)                    # the phone's GPU sensor
         self.assertNotIn("°C", d.s_ram.caption)                         # no memory sensor on this phone: nothing made up
         self.assertIsNotNone(d.s_ram.percent)
 
@@ -114,7 +114,7 @@ class LiveDialogTests(unittest.TestCase):
         d = self.dlg
         d.tab_var.set("processor")
         d._show_tab()
-        d.s_gpu.set_unavailable("No load reading", "46 °C normal")
+        d.s_gpu.set_unavailable("No load reading", "46 °C, Normal")
         self.root.update()
         self.assertFalse(d.s_gpu.loading)
         self.assertEqual(d.s_gpu.state_text, "No load reading")
@@ -175,7 +175,7 @@ class LiveDialogTests(unittest.TestCase):
         self.assertIn("Paused", d.live.cget("text"))
         d._toggle_pause()
         d._update(None, "boom")
-        self.assertIn("No answer", d.live.cget("text"))
+        self.assertIn("No Answer", d.live.cget("text"))
 
     def test_gauge_levels_use_a_word_as_well_as_colour(self):
         from mitoolkit.ui.components.charts import Gauge

@@ -16,6 +16,7 @@ from typing import Any, Dict
 from mitoolkit import __version__, api, log
 
 PROTOCOL = "2024-11-05"
+SUPPORTED = ("2025-06-18", "2025-03-26", PROTOCOL)       # versions of the protocol this server can speak
 _SCHEMA_NONE = {"type": "object", "properties": {}}
 
 
@@ -136,7 +137,8 @@ def handle(msg: dict) -> Any:
     if ident is None:
         return None
     if method == "initialize":
-        result: Any = {"protocolVersion": PROTOCOL, "capabilities": {"tools": {}},
+        asked = (msg.get("params") or {}).get("protocolVersion") if isinstance(msg.get("params"), dict) else None
+        result: Any = {"protocolVersion": asked if asked in SUPPORTED else PROTOCOL, "capabilities": {"tools": {}},
                        "serverInfo": {"name": "mitoolkit", "version": __version__}}
     elif method == "ping":
         result = {}

@@ -33,7 +33,7 @@ MARKS = {diagnostics.OK: ("✔", GREEN_TEXT, "OK"), diagnostics.WARN: ("⚠", AM
 
 
 class ConnectionsDialog(Dialog):
-    title = "Connections and signal"
+    title = "Connections and Signal"
     size = "960x740"
     min_size = (680, 460)
     padding = 0
@@ -61,11 +61,11 @@ class ConnectionsDialog(Dialog):
         head.pack(fill="x")
         ttk.Label(head, text=f"{self.name or 'Phone'}: connections and signal", font=f.heading).pack(side="left")
         Button(head, text="Copy", icon="copy", command=self.copy).pack(side="right")
-        self.test_btn = Button(head, text="Network test", icon="wifi", command=self.run_test)
+        self.test_btn = Button(head, text="Network Test", icon="wifi", command=self.run_test)
         self.test_btn.pack(side="right", padx=(0, 8))
         self.refresh_btn = Button(head, text="Refresh", icon="refresh", command=self.refresh)
         self.refresh_btn.pack(side="right", padx=(0, 8))
-        self.sub = ttk.Label(top, text="Reading the phone...", foreground=MUTED)
+        self.sub = ttk.Label(top, text="Reading the phone", foreground=MUTED)
         self.sub.pack(anchor="w", pady=(2, 8))
         row = ttk.Frame(top)
         row.pack(fill="x")
@@ -126,7 +126,7 @@ class ConnectionsDialog(Dialog):
         self._busy = True
         self.refresh_btn.configure(state="disabled")
         if self.report is None:                          # automatic updates stay quiet: the bar does not flicker
-            self._set_sub("Reading the phone...", MUTED)
+            self._set_sub("Reading the phone", MUTED)
 
         def work() -> None:
             try:
@@ -251,7 +251,7 @@ class ConnectionsDialog(Dialog):
         if self._testing or self.report is None:
             return
         self._testing = True
-        self.test_btn.configure(state="disabled", text="Testing...")
+        self.test_btn.configure(state="disabled", text="Testing")
         gateway = str(self.report.get("gateway") or "")       # the Wi-Fi router (the carrier's gateway never answers)
 
         def work() -> None:
@@ -268,8 +268,8 @@ class ConnectionsDialog(Dialog):
         self._testing = False
         if not self.alive():
             return
-        self.test_btn.configure(state="normal", text="Network test")
-        self.test_rows = rows if rows is not None else [("Network test", f"Could not run: {error}", diagnostics.BAD)]
+        self.test_btn.configure(state="normal", text="Network Test")
+        self.test_rows = rows if rows is not None else [("Network Test", f"Could not run: {error}", diagnostics.BAD)]
         self.tab_var.set("summary")
         self._shown_key = None
         self._show_tab()

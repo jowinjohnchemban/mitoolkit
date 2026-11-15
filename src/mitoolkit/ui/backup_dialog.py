@@ -14,7 +14,7 @@ from mitoolkit.ui.theme import GREEN, MUTED, RED
 
 
 class BackupDialog(Dialog):
-    title = "Back up files from the phone"
+    title = "Back Up Files from the Phone"
     resizable = False
     padding = 16
 
@@ -43,7 +43,7 @@ class BackupDialog(Dialog):
         row.pack(fill="x", pady=(12, 0))
         ttk.Label(row, text="Save to:").pack(side="left")
         ttk.Entry(row, textvariable=self.dest, width=48).pack(side="left", padx=6, fill="x", expand=True)
-        Button(row, text="Browse...", command=self._browse).pack(side="left")
+        Button(row, text="Browse", command=self._browse).pack(side="left")
 
         self.status = ttk.Label(body, text="", foreground=MUTED, wraplength=520, justify="left")
         self.status.pack(anchor="w", pady=(10, 0))
@@ -51,7 +51,7 @@ class BackupDialog(Dialog):
         buttons = ttk.Frame(body)
         buttons.pack(fill="x", pady=(12, 0))
         Button(buttons, text="Close", command=self.close).pack(side="right")
-        self.start_btn = Button(buttons, text="Start backup", primary=True, command=self.start)
+        self.start_btn = Button(buttons, text="Start Backup", primary=True, command=self.start)
         self.start_btn.pack(side="right", padx=6)
         self.win.after(50, self.start_btn.focus_set)  # keyboard users start here
 
@@ -76,7 +76,7 @@ class BackupDialog(Dialog):
     def start(self) -> None:
         chosen = [k for k, v in self.choices.items() if v.get()]
         if not chosen:
-            messagebox.showinfo("Back up", "Tick at least one thing to copy.", parent=self.win)
+            messagebox.showinfo("Back Up", "Tick at least one thing to copy.", parent=self.win)
             return
         self.cancel.clear()
         self.start_btn.configure(state="disabled")
@@ -84,7 +84,7 @@ class BackupDialog(Dialog):
         self.bar.start(12)
         dest = self.dest.get().strip()
         self.app.run(lambda: adb.backup_files(self.serial, dest, chosen, self.progress, self.cancel),
-                     self._done, "Backing up files from the phone...")
+                     self._done, "Backing up files from the phone")
 
     @staticmethod
     def summary(result: dict) -> str:

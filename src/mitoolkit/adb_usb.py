@@ -299,10 +299,10 @@ def _scan_server() -> List[Dict[str, str]]:
     # A phone plugged in AND on Wi-Fi shows up twice: keep the USB entry (fastboot needs the cable anyway)
     wired = {s for s in _devices if not is_wireless(s)}
     out = []
-    wired = [d["serial"] for d in found if not is_wireless(d["serial"])]
-    places = adb_server.usb_locations() if wired else {}
-    if wired and not any(serial in places for serial in wired):
-        places.update(_lone_location(wired))          # adb's list does not always say which port a phone is on
+    cable = [d["serial"] for d in found if not is_wireless(d["serial"])]
+    places = adb_server.usb_locations() if cable else {}
+    if cable and not any(serial in places for serial in cable):
+        places.update(_lone_location(cable))          # adb's list does not always say which port a phone is on
     for d in found:
         dev = _devices[d["serial"]]
         if dev.wireless and d["state"] == "device" and wired:

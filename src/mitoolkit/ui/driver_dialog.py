@@ -10,7 +10,7 @@ from mitoolkit.ui.theme import MUTED
 
 
 class DriverHelpDialog(Dialog):
-    title = "USB driver for Windows"
+    title = "USB Driver for Windows"
     resizable = False
     padding = 16
 
@@ -30,7 +30,7 @@ class DriverHelpDialog(Dialog):
 
         buttons = ttk.Frame(body)
         buttons.pack(fill="x", pady=(14, 0))
-        Button(buttons, text="Open Google's download page", primary=True,
+        Button(buttons, text="Open Google's Download Page", primary=True,
                command=drivers.open_download_page).pack(side="left")
         Button(buttons, text="Open Device Manager", command=self._device_manager).pack(side="left", padx=6)
         Button(buttons, text="Close", command=self.close).pack(side="right")

@@ -11,18 +11,18 @@ from mitoolkit.ui.theme import MUTED
 
 ANDROID_CHOICES = (
     ("android", "Android", "Restart normally."),
-    ("recovery", "Recovery mode", "For updates, a factory reset from the phone, or a custom recovery."),
-    ("fastboot", "Fastboot mode", "Needed to unlock. Works over a USB cable only."),
-    ("off", "Power off", "It stays off until you press the power button."),
+    ("recovery", "Recovery Mode", "For updates, a factory reset from the phone, or a custom recovery."),
+    ("fastboot", "Fastboot Mode", "Needed to unlock. Works over a USB cable only."),
+    ("off", "Power Off", "It stays off until you press the power button."),
 )
 FASTBOOT_CHOICES = (
-    ("android", "Cancel and start Android", "Leave fastboot mode and start normally. Nothing is changed."),
-    ("recovery", "Recovery mode", "Leave fastboot mode and start recovery."),
+    ("android", "Cancel and Start Android", "Leave fastboot mode and start normally. Nothing is changed."),
+    ("recovery", "Recovery Mode", "Leave fastboot mode and start recovery."),
 )
 
 
 class RestartDialog(Dialog):
-    title = "Restart phone"
+    title = "Restart Phone"
     resizable = False
     padding = 16
 
@@ -54,7 +54,7 @@ class RestartDialog(Dialog):
         self._label()
 
     def _label(self) -> None:
-        self.go.configure(text="Power off" if self.choice.get() == "off" else "Restart")
+        self.go.configure(text="Power Off" if self.choice.get() == "off" else "Restart")
 
     def _go(self) -> None:
         mode = self.choice.get()

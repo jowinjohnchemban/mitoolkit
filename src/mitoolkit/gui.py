@@ -18,6 +18,7 @@ import queue
 import sys
 import threading
 import time
+from collections import deque
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -50,6 +51,7 @@ from mitoolkit.ui.theme import (AMBER, GREEN, MUTED, ORANGE_DOT, RED, Fonts, app
 
 POLL_MS = 1000           # how often the window looks for the phone: an unplugged phone shows within a second
 WIFI_PROBE_S = 12       # in Wireless mode: how often the network is searched for phones
+AGENT_CONNECTED_S = 120  # the status bar says an AI agent is connected for this long after it last used a tool
 INFO_REFRESH_S = 15     # how often the basic phone details (battery, storage, ...) are read again
 MORE_REFRESH_S = 20      # and the extra details (Wi-Fi, uptime, ...) while Show more is open
 
@@ -103,6 +105,11 @@ class App:
         self._wifi_probing = False
         self._wifi_probe_at = 0.0
         self._fb_links: dict = {}               # fastboot serial -> how it is plugged in (for the footer)
+        self._agent = None                      # the MCP server for AI agents, while it is on (see mcp_http.py)
+        self._agent_win = None
+        self._agent_calls: deque = deque(maxlen=20)       # (time, tool) of what agents used, newest last
+        self._agent_last = -1e9                           # when an agent last connected or used a tool (monotonic seconds)
+        self._agent_asking = False                        # an agent is waiting for the person to answer a question
         self._shown_layout = None               # what the Phone section holds now (see _render_status)
         self._info_names: tuple = ()            # the labels of the details grid, and its value cells
         self._info_cells: list = []
@@ -186,6 +193,15 @@ class App:
         self.last_activity.pack(side="left", padx=(12, 0), fill="x", expand=True)
         self.link_info = ttk.Label(bar, text="", foreground=MUTED)     # how the phone is connected: its USB port or Wi-Fi address
         self.link_info.pack(side="right", padx=(12, 0))
+        # Left of it, while the AI agent connection is on (MCP in the app): a dot and the agent's name. Green when an
+        # agent is connected, amber while it waits for the person's answer, grey while the connection just waits.
+        self.agent_box = ttk.Frame(bar)
+        self.agent_dot = tk.Canvas(self.agent_box, width=10, height=10, highlightthickness=0, borderwidth=0,
+                                   bg=page_background(bar))
+        self.agent_dot.pack(side="left", padx=(0, 5))
+        self._agent_dot_item = self.agent_dot.create_oval(1, 1, 9, 9, fill=MUTED, outline="")
+        self.agent_info = ttk.Label(self.agent_box, text="", foreground=MUTED)
+        self.agent_info.pack(side="left")
 
     def _wrap(self, parent, text="", **kw) -> ttk.Label:
         lab = ttk.Label(parent, text=text, justify="left", wraplength=600, **kw)
@@ -200,7 +216,7 @@ class App:
     def _build(self, page) -> None:
         self.next_line = self._wrap(page, "", font=self.fonts.heading)
         self.next_line.pack(anchor="w", pady=(0, 2))
-        self._wrap(page, "Unlocking erases all data on the phone and can't be undone. Step 2 has a Back up files "
+        self._wrap(page, "Unlocking erases all data on the phone and can't be undone. Step 2 has a Back Up Files "
                          "button: use it first.", foreground=MUTED).pack(anchor="w", pady=(0, 10))
 
         # 1. Mi Account
@@ -210,11 +226,11 @@ class App:
         self.f1_note.pack(anchor="w")
         self.f1_row = ttk.Frame(self.f1)
         self.f1_row.pack(fill="x", pady=(8, 0))
-        self.login_btn = Button(self.f1_row, text="Sign in", icon="user", command=self._login)
+        self.login_btn = Button(self.f1_row, text="Sign In", icon="user", command=self._login)
         self.login_btn.pack(side="left")
         self.r1 = self._wrap(self.f1_row, "", foreground=MUTED)
         self.r1.pack(side="left", padx=10)
-        self.signout_btn = Button(self.f1_row, text="Sign out", command=self._sign_out)   # shown once signed in
+        self.signout_btn = Button(self.f1_row, text="Sign Out", command=self._sign_out)   # shown once signed in
 
         # 2. Phone
         self.f2 = self._section(page, "2. Phone")
@@ -230,23 +246,23 @@ class App:
         self.link.pack(side="right", padx=(10, 6))
         self.dev_dot = tk.Label(head, text="\u25cf", fg=MUTED, bg=self.bg, font=self.f_base)
         self.dev_dot.pack(side="left")
-        self.dev_text = ttk.Label(head, text="Looking for a phone...", font=self.f_bold, justify="left")
+        self.dev_text = ttk.Label(head, text="Looking for a phone", font=self.f_bold, justify="left")
         self.dev_text.pack(side="left", padx=6, fill="x")
         self.dev_detail = self._wrap(self.f2, "", foreground=MUTED)
         self.dev_detail.pack(anchor="w", padx=(22, 0), pady=(2, 0))
         # One aligned row of equal-width buttons: the main action first (bold), then the tools
         # that work while the phone runs Android.
         self.buttons = ButtonRow(self.f2)
-        self.stop_adb_btn = Button(self.buttons, text="Stop Google's adb", primary=True, command=self._stop_google_adb)
-        self.driver_btn = Button(self.buttons, text="Driver help", primary=True, command=self._driver_help)
-        self.leave_btn = Button(self.buttons, text="Restart phone...", icon="power", command=self._restart_dialog)
-        self.wifi_btn = Button(self.buttons, text="Pair or connect...", primary=True, icon="wifi",
+        self.stop_adb_btn = Button(self.buttons, text="Stop Google's ADB", primary=True, command=self._stop_google_adb)
+        self.driver_btn = Button(self.buttons, text="Driver Help", primary=True, command=self._driver_help)
+        self.leave_btn = Button(self.buttons, text="Restart Phone", icon="power", command=self._restart_dialog)
+        self.wifi_btn = Button(self.buttons, text="Pair or Connect", primary=True, icon="wifi",
                                command=self._wireless_dialog)
-        self.fb_btn = Button(self.buttons, text="Reboot to fastboot", primary=True, icon="power", command=self._to_fastboot)
+        self.fb_btn = Button(self.buttons, text="Reboot to Fastboot", primary=True, icon="power", command=self._to_fastboot)
         self.tool_btns = [Button(self.buttons, text=text, icon=icon, command=cmd) for text, icon, cmd in (
-            ("Back up files...", "save", self._backup_dialog), ("Manage apps...", "apps", self._apps_dialog),
-            ("Security check...", "shield", self._security_dialog), ("Live status...", "chart", self._live_dialog),
-            ("Connections...", "wifi", self._connect_dialog))]
+            ("Back Up Files", "save", self._backup_dialog), ("Manage Apps", "apps", self._apps_dialog),
+            ("Security Check", "shield", self._security_dialog), ("Live Status", "chart", self._live_dialog),
+            ("Connections", "wifi", self._connect_dialog))]
         self.security_btn = self.tool_btns[2]       # takes the colour of the last security check
         self._security: dict = {}                    # serial -> verdict of the last full check
         self._passive: dict = {}                     # serial -> verdict of the quick check made on connecting
@@ -254,21 +270,21 @@ class App:
         self.details = ttk.Frame(self.f2)
         self.info_box = ttk.Frame(self.details)
         self.info_box.pack(fill="x")
-        self.more_box = ttk.Frame(self.details)  # "Show more": filled on demand
-        # "Show more" is an expander bar (a flat, full-width row with a chevron), not a button
-        self.more_btn = Button(self.details, text="Show more", icon="down", kind="flat", command=self._toggle_more)
+        self.more_box = ttk.Frame(self.details)  # "Show More": filled on demand
+        # "Show More" is an expander bar (a flat, full-width row with a chevron), not a button
+        self.more_btn = Button(self.details, text="Show More", icon="down", kind="flat", command=self._toggle_more)
         self.more_btn.pack(fill="x", pady=(8, 0))
         # Copy details sits at the top of the section, beside Rescan, while there are details to copy
-        self.copy_btn = Button(head, text="Copy details", icon="copy", kind="quiet", compact=True,
+        self.copy_btn = Button(head, text="Copy Details", icon="copy", kind="quiet", compact=True,
                                command=self._copy_device)
-        self.export_btn = Button(head, text="Export details...", icon="save", kind="quiet", compact=True,
+        self.export_btn = Button(head, text="Export Details", icon="save", kind="quiet", compact=True,
                                  command=self._export_device)
 
         # 3. Eligibility
         self.f3 = self._section(page, "3. Eligibility")
         row2 = ttk.Frame(self.f3)
         row2.pack(fill="x")
-        self.check_btn = Button(row2, text="Check eligibility", command=self._check)
+        self.check_btn = Button(row2, text="Check Eligibility", command=self._check)
         self.check_btn.pack(side="left")
         self.check_hint = self._wrap(row2, "", foreground=MUTED)
         self.check_hint.pack(side="left", padx=10)
@@ -295,9 +311,9 @@ class App:
         self.name_entry.pack(side="left", padx=8)
         row3 = ttk.Frame(self.f4)
         row3.pack(fill="x", pady=(10, 0))
-        self.unlock_btn = Button(row3, text="Erase phone and unlock", icon="lock", kind="danger", command=self._unlock)
+        self.unlock_btn = Button(row3, text="Erase Phone and Unlock", icon="lock", kind="danger", command=self._unlock)
         self.unlock_btn.pack(side="left")
-        self.reboot_btn = Button(row3, text="Restart phone", command=self._reboot)
+        self.reboot_btn = Button(row3, text="Restart Phone", command=self._reboot)
         self.r3 = self._wrap(self.f4, "")
 
     def _bindings(self) -> None:
@@ -441,15 +457,15 @@ class App:
         if self.unlocked:
             return "Done. The bootloader is unlocked."
         if self.token is None:
-            return "Step 1: sign in to your Mi Account."
+            return "Step 1: Sign in to your Mi Account."
         state = self._state()
         if self.eligibility and self.eligibility.get("eligible"):
-            return "Step 4: confirm, then unlock."
+            return "Step 4: Confirm, then unlock."
         if state == "fastboot":
-            return "Step 3: check eligibility."
+            return "Step 3: Check eligibility."
         if state == "device":
-            return "Step 2: restart the phone into fastboot mode."
-        return "Step 2: connect your phone."
+            return "Step 2: Restart the phone into fastboot mode."
+        return "Step 2: Connect your phone."
 
     def _refresh(self):
         logged = self.token is not None
@@ -536,7 +552,7 @@ class App:
     def _rescan(self):
         """The Rescan button: look again now, even if the last look seems stuck."""
         if not self.fastboot:
-            self._set_status("USB access is not ready yet; trying again...")
+            self._set_status("USB access is not ready yet; trying again.")
             self._prepare_fastboot()
             return
         if self.busy:
@@ -544,14 +560,14 @@ class App:
             return
         if self._polling:
             if time.monotonic() - self._scan_started < 15:
-                self._set_status("Already looking for the phone...")
+                self._set_status("Already looking for the phone.")
                 return
             self._polling = False                          # the last look took far too long: start over
             self._log("The last look took too long; looking again.")
         self._info.clear()                                 # read the phone's details afresh
         self._fbinfo.clear()
         self._wifi_probe_at = 0.0                          # and, in Wireless mode, search the network again now
-        self._set_status("Looking for the phone...")
+        self._set_status("Looking for the phone")
         self._scan()
 
     def _update_tip(self):
@@ -633,7 +649,7 @@ class App:
         self._log("Looking for phones on Wi-Fi." if mode == "wifi" else "Looking for phones on the cable (USB mode).")
         if mode == "usb":
             threading.Thread(target=adb_server.stop_started, daemon=True, name="adb-release").start()
-        self._set_status("Looking for the phone...")
+        self._set_status("Looking for the phone")
         self._polling = False
         self._scan()
 
@@ -713,11 +729,11 @@ class App:
         """The footer's right side: how the phone is connected. A cable phone shows its USB port (bus and port, like
         1-3), a Wi-Fi phone its address and port, a phone in fastboot its USB port and the mode."""
         if self.device:
-            return f"{self._fb_links.get(self.device, 'USB')} · fastboot"
+            return f"{self._fb_links.get(self.device, 'USB')}, fastboot"
         return (self.android or {}).get("link", "")
 
     def _device_seen(self, serial: Optional[str], android: Optional[dict] = None, fb: Optional[dict] = None):
-        if self.status.cget("text") == "Looking for the phone...":   # a Rescan finished
+        if self.status.cget("text") == "Looking for the phone":   # a Rescan finished
             self._set_status("Ready.")
         if serial == self.device and android == self.android and fb == self.fb_info:
             return  # nothing changed: no redraw
@@ -781,7 +797,7 @@ class App:
                     "It has not been paired with this computer yet. Pair it once with a QR code or the code on "
                     "its Wireless debugging screen.", self.wifi_btn)
         if state == "wifi-search":
-            return (MUTED, "Looking for phones on Wi-Fi...",
+            return (MUTED, "Looking for phones on Wi-Fi",
                     "On the phone: Settings > Developer options > Wireless debugging, switched on, on the same "
                     "Wi-Fi as this computer. A new phone is paired once, with a QR code or a code.", self.wifi_btn)
         if state == "wifi-no-adb":
@@ -909,7 +925,7 @@ class App:
         """Show or hide the extra details; fetch them the first time. Hiding only hides: the rows stay
         built, so Show less is instant and Show more again is too (building them is the slow part)."""
         key = self._device_key()
-        text, icon, state = ("Show less" if self._more_open else "Show more", "up" if self._more_open else "down",
+        text, icon, state = ("Show Less" if self._more_open else "Show More", "up" if self._more_open else "down",
                              "normal" if key else "disabled")
         if (self.more_btn.cget("text"), self.more_btn.cget("state")) != (text, state) or self._more_icon != icon:
             self._more_icon = icon                         # only when it changed: a refresh must not repaint it
@@ -975,7 +991,7 @@ class App:
 
     def _read_more(self, key) -> None:
         mode, serial = key
-        self._log("Reading all details from the phone (read-only)...")
+        self._log("Reading all details from the phone (read-only).")
 
         def work():
             return adb.more_details(serial) if mode == "android" else details.fastboot_details(serial)
@@ -984,12 +1000,12 @@ class App:
             if status == "error":
                 self._more_open = False
                 self._log(f"Could not read more details: {result}")
-                messagebox.showerror("Show more", str(result))
+                messagebox.showerror("Show More", str(result))
             else:
                 self._more[key] = result
             self._show_more()
 
-        self._run(work, done, "Reading details from the phone...")
+        self._run(work, done, "Reading details from the phone")
 
     def _copy_device(self):
         pairs = [(k, v) for k, v in self._device_pairs() if v not in (None, "")]
@@ -1029,6 +1045,103 @@ class App:
         else:
             self._wireless = WirelessDialog(self)
 
+    # ------------------------------------------------------------------------------- AI agents (MCP in the app)
+    def _agent_dialog(self) -> None:
+        from mitoolkit.ui.agent_dialog import AgentDialog
+        if self._agent_win is not None and self._agent_win.alive():
+            self._agent_win.focus()
+        else:
+            self._agent_win = AgentDialog(self)
+
+    def agent_start(self):
+        """Let an AI agent connect to this window (see mcp_http.py). Returns the server; a second call returns the same."""
+        from mitoolkit import mcp_http                       # not loaded until an agent is allowed in
+        if self._agent is None:
+            self._agent = mcp_http.McpHttpServer(approve=self._agent_approve, on_call=self._agent_called,
+                                                 on_client=self._agent_met).start()
+            self._log("AI agent connection is on. Agents can read and check; they cannot unlock.")
+            self._agent_tick()
+        return self._agent
+
+    def agent_stop(self) -> None:
+        if self._agent is not None:
+            server, self._agent = self._agent, None
+            server.stop()
+            self._log("AI agent connection is off.")
+        self._agent_status()
+
+    def _agent_called(self, tool: str) -> None:
+        """An agent used a tool (called on the server's thread): the Activity log and the window's list say which."""
+        self._agent_calls.append((time.strftime("%H:%M:%S"), tool))
+        self._agent_last = time.monotonic()
+        self._log(f"{self._agent_name()} used {tool}.")
+        self.call_soon(self._agent_status)
+
+    def _agent_met(self, name: str) -> None:
+        """An agent said who it is when it connected (called on the server's thread)."""
+        self._agent_last = time.monotonic()
+        self._log(f"{name or 'An AI agent'} connected.")
+        self.call_soon(self._agent_status)
+
+    def _agent_name(self) -> str:
+        return (self._agent.client if self._agent is not None else "") or "An AI agent"
+
+    def _agent_status(self) -> None:
+        """The right of the status bar: nothing while the connection is off; while it is on, a dot and words. Green and
+        the agent's name for a couple of minutes after it connected or last used a tool, amber while it waits for
+        the person's answer, grey ("on") while no agent is using it."""
+        try:
+            if self._agent is None:
+                self._agent_asking = False
+                self.agent_box.pack_forget()
+                self.agent_info.configure(text="")
+                return
+            name = (self._agent.client or "AI agent")
+            if self._agent_asking:
+                text, colour = f"{name} is waiting for your answer", AMBER
+            elif time.monotonic() - self._agent_last < AGENT_CONNECTED_S:
+                text, colour = f"{name} connected", GREEN
+            else:
+                text, colour = "AI agent connection on", MUTED
+            self.agent_info.configure(text=text, foreground=colour)
+            self.agent_dot.itemconfigure(self._agent_dot_item, fill=colour)
+            if not self.agent_box.winfo_manager():
+                self.agent_box.pack(side="right", padx=(12, 0))      # packed after the link text: left of it
+        except tk.TclError:
+            pass                                             # the window is closing
+
+    def _agent_tick(self) -> None:
+        """While the connection is on, let "connected" fade back to "on" when the agent goes quiet."""
+        self._agent_status()
+        if self._agent is not None:
+            self.root.after(5000, self._agent_tick)
+
+    def _agent_approve(self, tool: str, arguments: dict) -> bool:
+        """An agent asks for something that changes the phone or uses the saved sign-in: ask the person, in the window,
+        and wait for the answer (one minute at most; no answer is a no). Called on the server's thread."""
+        from mitoolkit import mcp_http
+        what = mcp_http.APPROVAL.get(tool, tool)
+        who = self._agent_name()
+        answer: list = []
+        done = threading.Event()
+
+        def ask() -> None:
+            self.root.deiconify()
+            self.root.lift()
+            try:
+                answer.append(messagebox.askyesno("AI agent request", f"{who} wants to {what}.\n\nAllow it?",
+                                                  icon="question", default="no", parent=self.root))
+            finally:
+                self._agent_asking = False
+                self._agent_status()
+                done.set()
+        self._agent_asking = True                            # the status bar turns amber until the person answers
+        self.call_soon(self._agent_status)
+        self.call_soon(ask)
+        allowed = done.wait(60) and bool(answer and answer[0])
+        self._agent_asking = False
+        return allowed
+
     def _to_fastboot(self):
         serial = (self.android or {}).get("serial")
         if not serial:
@@ -1039,7 +1152,7 @@ class App:
                 "cable only.\n\nPlug the phone into this computer with a USB cable, then choose this again.")
             self._log("Fastboot needs a USB cable: this phone is connected over Wi-Fi.")
             return
-        self._log("Asking the phone to reboot into fastboot mode (nothing is erased)...")
+        self._log("Asking the phone to reboot into fastboot mode (nothing is erased).")
 
         def work():
             adb.reboot_to_bootloader(serial)
@@ -1048,9 +1161,9 @@ class App:
         def done(status, result):
             if status == "error":
                 self._log(f"Could not reboot to fastboot: {result}")
-                messagebox.showerror("Reboot to fastboot", str(result))
+                messagebox.showerror("Reboot to Fastboot", str(result))
 
-        self._run(work, done, "Rebooting the phone into fastboot mode...")
+        self._run(work, done, "Rebooting the phone into fastboot mode")
 
     def _restart_dialog(self) -> None:
         """Restart or power off: pick the mode in one place (works in Android and in fastboot mode)."""
@@ -1080,10 +1193,10 @@ class App:
             return
         where = "recovery mode" if mode == "recovery" else "Android"
         if confirm and not messagebox.askyesno(
-                "Restart phone", f"Restart the phone into {where}?\n\nNothing is erased. Unsaved work on the "
+                "Restart Phone", f"Restart the phone into {where}?\n\nNothing is erased. Unsaved work on the "
                 "phone is lost.", default="no"):
             return
-        self._log(f"Restarting the phone into {where} (nothing is erased)...")
+        self._log(f"Restarting the phone into {where} (nothing is erased).")
 
         def work():
             adb.reboot(mode, serial)
@@ -1092,16 +1205,16 @@ class App:
         def done(status, result):
             if status == "error":
                 self._log(f"Could not restart: {result}")
-                messagebox.showerror("Restart phone", str(result))
+                messagebox.showerror("Restart Phone", str(result))
 
-        self._run(work, done, f"Restarting the phone into {where}...")
+        self._run(work, done, f"Restarting the phone into {where}")
 
     def _power_off(self, confirm: bool = True) -> None:
         serial = self._android_serial()
         if not serial or (confirm and not messagebox.askyesno(
-                "Power off", "Shut the phone down?\n\nIt stays off until you press its power button.", default="no")):
+                "Power Off", "Shut the phone down?\n\nIt stays off until you press its power button.", default="no")):
             return
-        self._log("Powering the phone off...")
+        self._log("Powering the phone off")
 
         def work():
             adb.power_off(serial)
@@ -1110,9 +1223,9 @@ class App:
         def done(status, result):
             if status == "error":
                 self._log(f"Could not power off: {result}")
-                messagebox.showerror("Power off", str(result))
+                messagebox.showerror("Power Off", str(result))
 
-        self._run(work, done, "Powering the phone off...")
+        self._run(work, done, "Powering the phone off")
 
     def _connect_dialog(self) -> None:
         if not self._android_serial():
@@ -1134,14 +1247,14 @@ class App:
 
     # =============================================================== step 1
     def _login(self):
-        self._log("Signing in...")
-        self.r1.configure(text="Finish signing in in your browser...")
+        self._log("Signing in.")
+        self.r1.configure(text="Finish signing in in your browser.")
 
         def work():
             token = api.login(login_method="1", silent_if_cached=True)
             return token, api.get_account_zone(token)
 
-        self._run(work, self._login_done, "Waiting for sign-in in your browser...")
+        self._run(work, self._login_done, "Waiting for sign-in in your browser")
 
     def _login_done(self, status: str, result):
         if status == "error":
@@ -1150,7 +1263,7 @@ class App:
             return
         self.token, self.zone = result
         who = mask_id(self.token["userId"])  # masked so screenshots don't expose the account ID
-        self.r1.configure(text=f"Account {who} · data center: {self.zone}", foreground=MUTED)
+        self.r1.configure(text=f"Account {who}, data center: {self.zone}", foreground=MUTED)
         self._log(f"Signed in as {who} ({self.zone})")
         self._refresh()
 
@@ -1169,9 +1282,9 @@ class App:
         self._show_check("", "", "", MUTED)
         self.check_skel = Skeleton(self.f3, rows=3, widths=(0.4, 0.75, 0.55), label="Asking Xiaomi")
         self.check_skel.pack(fill="x", pady=(10, 0))
-        self._log("Checking eligibility with Xiaomi...")
+        self._log("Checking eligibility with Xiaomi")
         self._run(lambda: api.check_unlock_eligibility(self.token, self.zone), self._check_done,
-                  "Asking Xiaomi if this phone can be unlocked...")
+                  "Asking Xiaomi if this phone can be unlocked")
 
     def _check_done(self, status: str, result):
         if self.check_skel is not None:
@@ -1186,7 +1299,7 @@ class App:
         if result.get("eligible"):
             self.eligibility = result
             wipe = result.get("will_wipe_data")
-            body = (f"Phone: {result['product']} · data center: {result['zone']}\n"
+            body = (f"Phone: {result['product']}, data center: {result['zone']}\n"
                     + ("This will ERASE all data on the phone." if wipe else "Xiaomi says this unlock will not erase data."))
             notice = result.get("notice")
             self._show_check("Ready to unlock", body, f"Xiaomi's notice: {notice}" if notice else "", GREEN)
@@ -1218,10 +1331,10 @@ class App:
                 and self.name_var.get().strip().lower() == str(self.eligibility["product"]).lower()):
             return
         self._set_r3("", MUTED)
-        self._log("Unlocking... do not unplug the phone.")
+        self._log("Unlocking. Do not unplug the phone.")
         elig = self.eligibility
         self._run(lambda: api.perform_unlock(self.token, elig, confirm_wipe=True),
-                  self._unlock_done, "Unlocking. Keep the phone connected...")
+                  self._unlock_done, "Unlocking. Keep the phone connected")
 
     def _unlock_done(self, status: str, result):
         if status == "error":
@@ -1231,7 +1344,7 @@ class App:
         self.unlocked = True
         self._fbinfo.clear()
         self._set_r3("Bootloader unlocked. The phone is resetting; the first start can take several "
-                     "minutes. If it stays on the fastboot screen, use Restart phone.", GREEN)
+                     "minutes. If it stays on the fastboot screen, use Restart Phone.", GREEN)
         self._log(f"Unlock finished: {result}")
         self.reboot_btn.pack(side="left", padx=10)
         self._refresh()
@@ -1241,20 +1354,20 @@ class App:
         if not self.fastboot or not self.device:
             return
         serial, where = self.device, "recovery mode" if mode == "recovery" else "Android"
-        self._log(f"Leaving fastboot mode into {where}...")
+        self._log(f"Leaving fastboot mode into {where}.")
 
         def done(status, result):
             if status == "error":
                 self._log(f"Could not leave fastboot mode: {result}")
-                messagebox.showerror("Restart phone", str(result))
+                messagebox.showerror("Restart Phone", str(result))
 
-        self._run(lambda: fastboot.reboot(serial, mode), done, f"Restarting the phone into {where}...")
+        self._run(lambda: fastboot.reboot(serial, mode), done, f"Restarting the phone into {where}")
 
     # ================================================================ menu
     def _sign_out(self):
         folder = Path.home() / ".mitoolkitsession"
         if not messagebox.askyesno(
-                "Sign out", f"This deletes the saved session folder:\n\n{folder}\n\nIt does not end the session "
+                "Sign Out", f"This deletes the saved session folder:\n\n{folder}\n\nIt does not end the session "
                 "on Xiaomi's side. Check your signed-in devices on your Mi Account afterwards.\n\nDelete it?",
                 default="no"):
             return
@@ -1267,7 +1380,7 @@ class App:
 
     def _stop_google_adb(self):
         if not messagebox.askyesno(
-                "Stop Google's adb", "Google's adb server is running and holding the phone, so MiToolkit can't "
+                "Stop Google's ADB", "Google's adb server is running and holding the phone, so MiToolkit can't "
                 "use it.\n\nStop it now? It starts again by itself the next time you use adb. If it was started "
                 "with administrator rights, the system asks for your permission first."):
             return
@@ -1278,7 +1391,7 @@ class App:
             self._scan()
 
         from mitoolkit import doctor
-        self._run(lambda: doctor.with_admin("stop-adb"), done, "Stopping Google's adb...")
+        self._run(lambda: doctor.with_admin("stop-adb"), done, "Stopping Google's adb")
 
     def _driver_help(self):
         DriverHelpDialog(self)
@@ -1316,7 +1429,7 @@ class App:
         verdict = self._security.get(serial) or self._passive.get(serial, "")
         kind, mark = {"Needs attention": ("danger", " ⚠"), "Some things to review": ("warn", " !")}.get(
             verdict, ("good", " ✔") if verdict else ("normal", ""))
-        self.security_btn.configure(text="Security check..." + mark, kind=kind)
+        self.security_btn.configure(text="Security Check" + mark, kind=kind)
         self.buttons.relayout()
 
     def _security_dialog(self):

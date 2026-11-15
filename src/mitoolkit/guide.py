@@ -20,7 +20,7 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
     ]),
     ("Back up your data", [
         ("p", "The unlock erases the phone, so copy what matters first. Use several of these:"),
-        ("b", "Back up files... (step 2, while the phone is on and USB debugging is allowed): copies "
+        ("b", "Back Up Files (step 2, while the phone is on and USB debugging is allowed): copies "
               "photos, videos, documents, downloads and chat-app media to this computer. It only "
               "reads from the phone. It also saves a list of your installed apps."),
         ("b", "Mi Cloud: Settings > Mi Account > Xiaomi Cloud. Syncs contacts, notes, SMS, gallery "
@@ -84,7 +84,7 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
               "If it stays on the fastboot screen, click Reboot phone."),
     ]),
     ("Manage apps (debloat)", [
-        ("p", "Manage apps... (step 2, while the phone is on with USB debugging allowed) lists every "
+        ("p", "Manage Apps (step 2, while the phone is on with USB debugging allowed) lists every "
               "app on the phone. Tick the ones to remove and click Remove ticked."),
         ("b", "Known bloat shows Xiaomi ads, tracking and promotional apps from mitoolkit's list. "
               "Tick recommended ticks the ones rated safe to remove."),
@@ -99,14 +99,14 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
         ("p", "Show more (the bar under the device details) lists everything the phone gives over USB: serial "
               "number, IMEI, software, hardware, modem, SIM, boot, servicing and debugging, partitions, sensors "
               "and battery. It stays on your screen. Copy details (top of step 2) copies what is shown."),
-        ("p", "Live status... (step 2) draws live graphs of processor, memory, battery, temperature and network, "
+        ("p", "Live Status (step 2) draws live graphs of processor, memory, battery, temperature and network, "
               "shows each processor core, the GPU and every temperature sensor, and lists processes like a "
               "task manager. It only reads; close the window to stop. Use Ctrl+1 to Ctrl+4 for its tabs."),
-        ("p", "Log viewer... (Phone menu) shows the phone's recent system log with a level filter and search. "
+        ("p", "Log Viewer (Phone menu) shows the phone's recent system log with a level filter and search. "
               "Logs can contain personal details: check them before sharing."),
     ]),
     ("Debug Wi-Fi and mobile data", [
-        ("p", "Connections... (step 2) reads Wi-Fi, the modem and mobile network, the SIM, Bluetooth, USB and power, "
+        ("p", "Connections (step 2) reads Wi-Fi, the modem and mobile network, the SIM, Bluetooth, USB and power, "
               "and tells you in plain words what looks wrong and what to try."),
         ("b", "Summary: the findings, worst first, and two graphs of Wi-Fi and mobile signal. Tick Update every "
               "5 s to watch them live while you move around."),
@@ -119,7 +119,7 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
         ("p", "Android's dump formats differ between phones. If a value is missing, the phone did not report it."),
     ]),
     ("Security check", [
-        ("p", "Security check... (step 2, while the phone is on) looks at the phone and changes nothing:"),
+        ("p", "Security Check (step 2, while the phone is on) looks at the phone and changes nothing:"),
         ("b", "Phone software: compares your security patch with Android's security bulletins (from OSV, "
               "AOSP data) and says how many fixes are missing and whether your Android version still gets fixes."),
         ("b", "Google Play: whether Play Protect is on, how old the Google Play system update is, and which "

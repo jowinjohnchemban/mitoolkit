@@ -12,7 +12,7 @@ from mitoolkit.ui.theme import BORDER, DOCS, WARN_BG, WARN_FG
 
 
 class GuideWindow(Dialog):
-    title = "MiToolkit guide"
+    title = "MiToolkit Guide"
     size = "820x560"
     min_size = (560, 360)
     padding = 10
@@ -22,9 +22,9 @@ class GuideWindow(Dialog):
         nav = ttk.Frame(self.win, padding=(10, 0, 10, 10))
         nav.pack(side="bottom", fill="x", before=self.body)
         Button(nav, text="Close", command=self.close).pack(side="right")
-        Button(nav, text="Next ▶", command=lambda: self.step(1)).pack(side="right", padx=6)
-        Button(nav, text="◀ Back", command=lambda: self.step(-1)).pack(side="right")
-        Button(nav, text="Open full guide in browser",
+        Button(nav, text="Next", command=lambda: self.step(1)).pack(side="right", padx=6)
+        Button(nav, text="Back", command=lambda: self.step(-1)).pack(side="right")
+        Button(nav, text="Open Full Guide in Browser",
                    command=lambda: webbrowser.open(DOCS + "unlock-guide.md")).pack(side="left")
 
         widest = max(len(title) for title, _ in guide.TOPICS) + 4
@@ -58,9 +58,9 @@ class GuideWindow(Dialog):
         t.insert("end", title + "\n", "h")
         for kind, content in blocks:
             if kind == "b":
-                t.insert("end", "•  " + content + "\n", "b")
+                t.insert("end", "-  " + content + "\n", "b")
             elif kind == "w":
-                t.insert("end", "⚠  " + content + "\n", "w")
+                t.insert("end", "Warning: " + content + "\n", "w")
             else:
                 t.insert("end", content + "\n")
         t.configure(state="disabled")

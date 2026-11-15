@@ -104,70 +104,71 @@ class MenuBar:
     def _file(self, bar: tk.Menu) -> None:
         app, m = self.app, self._menu(bar, "&File")
         key, text = self._ctrl("l")
-        self._add(m, "&Activity log", app._toggle_details, key, text)
+        self._add(m, "&Activity Log", app._toggle_details, key, text)
         m.add_separator()
-        self._add(m, "&Sign out and delete saved session...", app._sign_out)
+        self._add(m, "&Sign Out and Delete Saved Session", app._sign_out)
         m.add_separator()
         key, text = self._ctrl("q")
         self._add(m, "&Quit", app.root.destroy, key, text)
 
     def _unlock(self, bar: tk.Menu) -> None:
         app, m = self.app, self._menu(bar, "&Unlock")
-        self._add(m, "&Sign in to Mi Account...", app._login, enabled=lambda: self._idle() and not self._signed_in())
+        self._add(m, "&Sign In to Mi Account", app._login, enabled=lambda: self._idle() and not self._signed_in())
         # no Ctrl+E: Tk text fields use it ("end of line"), so it would also fire while typing
-        self._add(m, "Check &eligibility", app._check,
+        self._add(m, "Check &Eligibility", app._check,
                   enabled=lambda: (self._signed_in() and self._idle() and bool(app.device) and not app.unlocked))
 
     def _phone(self, bar: tk.Menu) -> None:
         app, m = self.app, self._menu(bar, "&Phone")
         self._add(m, "&Rescan", app._rescan, "F5", "F5", enabled=self._idle)
         m.add_separator()
-        self._add(m, "Re&start or power off...", app._restart_dialog,
+        self._add(m, "Re&start or Power Off", app._restart_dialog,
                   enabled=lambda: self._on_android() or self._in_fastboot())
         m.add_separator()
-        self._add(m, "&Back up files...", app._backup_dialog, enabled=self._on_android)
-        self._add(m, "Manage &apps...", app._apps_dialog, enabled=self._on_android)
-        self._add(m, "Security &check...", app._security_dialog, enabled=self._on_android)
-        self._add(m, "&Live status...", app._live_dialog, enabled=self._on_android)
-        self._add(m, "C&onnections and signal...", app._connect_dialog, enabled=self._on_android)
-        self._add(m, "Log v&iewer...", app._log_dialog, enabled=self._on_android)
+        self._add(m, "&Back Up Files", app._backup_dialog, enabled=self._on_android)
+        self._add(m, "Manage &Apps", app._apps_dialog, enabled=self._on_android)
+        self._add(m, "Security &Check", app._security_dialog, enabled=self._on_android)
+        self._add(m, "&Live Status", app._live_dialog, enabled=self._on_android)
+        self._add(m, "C&onnections and Signal", app._connect_dialog, enabled=self._on_android)
+        self._add(m, "Log V&iewer", app._log_dialog, enabled=self._on_android)
         m.add_separator()
-        self._add(m, "&Wi-Fi connection...", app._wireless_dialog, enabled=self._idle)
-        self._add(m, "Copy device &details", app._copy_device, enabled=lambda: bool(app._device_pairs()))
-        self._add(m, "&Export device details...", app._export_device, enabled=lambda: bool(app._device_pairs()))
-        self._add(m, "Stop &Google's adb", app._stop_google_adb,
+        self._add(m, "&Wi-Fi Connection", app._wireless_dialog, enabled=self._idle)
+        self._add(m, "Copy Device &Details", app._copy_device, enabled=lambda: bool(app._device_pairs()))
+        self._add(m, "&Export Device Details", app._export_device, enabled=lambda: bool(app._device_pairs()))
+        self._add(m, "Stop &Google's ADB", app._stop_google_adb,
                   enabled=lambda: self._idle() and bool((app.android or {}).get("adb_running")))
 
     def _view(self, bar: tk.Menu) -> None:
         app, m = self.app, self._menu(bar, "&View")
         text = MOD_TEXT
-        self._add(m, "&Larger text", lambda: app._zoom(+1), f"{MOD_EVENT}-equal", "⌘+" if MAC else f"{text}Plus")
-        self._add(m, "&Smaller text", lambda: app._zoom(-1), f"{MOD_EVENT}-minus", "⌘-" if MAC else f"{text}Minus")
-        self._add(m, "&Normal text size", lambda: app._zoom(0), f"{MOD_EVENT}-Key-0", f"{text}0")
+        self._add(m, "&Larger Text", lambda: app._zoom(+1), f"{MOD_EVENT}-equal", "⌘+" if MAC else f"{text}Plus")
+        self._add(m, "&Smaller Text", lambda: app._zoom(-1), f"{MOD_EVENT}-minus", "⌘-" if MAC else f"{text}Minus")
+        self._add(m, "&Normal Text Size", lambda: app._zoom(0), f"{MOD_EVENT}-Key-0", f"{text}0")
         # the same keys on the numeric keypad, and "+" typed with Shift
         for event, step in ((f"{MOD_EVENT}-plus", 1), (f"{MOD_EVENT}-KP_Add", 1), (f"{MOD_EVENT}-KP_Subtract", -1)):
             app.root.bind_all(f"<{event}>", lambda _e, d=step: app._zoom(d))
 
     def _help(self, bar: tk.Menu) -> None:
         app, m = self.app, self._menu(bar, "&Help")
-        self._add(m, "&Step-by-step guide", app._open_guide, "F1", "F1")
+        self._add(m, "&Step-by-Step Guide", app._open_guide, "F1", "F1")
         if drivers.supported():
-            self._add(m, "&USB driver help...", app._driver_help)
+            self._add(m, "&USB Driver Help", app._driver_help)
         m.add_separator()
         docs = tk.Menu(m, tearoff=0)
-        for label, page in (("Full unlock guide", "unlock-guide.md"), ("Safety model", "safety.md"),
-                            ("Error codes", "error-codes.md"), ("FAQ", "faq.md")):
+        for label, page in (("Full Unlock Guide", "unlock-guide.md"), ("Safety Model", "safety.md"),
+                            ("Error Codes", "error-codes.md"), ("FAQ", "faq.md")):
             docs.add_command(label=label, command=lambda p=page: webbrowser.open(DOCS + p))
-        m.add_cascade(label="Online documentation", menu=docs, **({} if MAC else {"underline": 0}))
-        self._add(m, "Report a &problem...", lambda: webbrowser.open(REPO + "/issues"))
+        m.add_cascade(label="Online Documentation", menu=docs, **({} if MAC else {"underline": 0}))
+        self._add(m, "Report a &Problem", lambda: webbrowser.open(REPO + "/issues"))
+        self._add(m, "&AI Agent Connection", app._agent_dialog)
         self.debug_var = tk.BooleanVar(value=log.debug_enabled())
-        m.add_checkbutton(label="Debug logging", variable=self.debug_var, command=lambda: log.set_debug(
+        m.add_checkbutton(label="Debug Logging", variable=self.debug_var, command=lambda: log.set_debug(
             self.debug_var.get()), **({} if MAC else {"underline": 0}))
         m.add_separator()
-        self._add(m, "Check and &fix problems...", app._doctor_dialog)
-        self._add(m, "Check for &updates...", app._update_dialog)
+        self._add(m, "Check and &Fix Problems", app._doctor_dialog)
+        self._add(m, "Check for &Updates", app._update_dialog)
         self.auto_var = tk.BooleanVar(value=updater.auto_enabled())
-        m.add_checkbutton(label="Check for updates automatically", variable=self.auto_var, command=lambda: settings.set(
+        m.add_checkbutton(label="Check for Updates Automatically", variable=self.auto_var, command=lambda: settings.set(
             "auto_update_check", self.auto_var.get()))
         m.add_separator()
         self._add(m, "&About MiToolkit", app._about)

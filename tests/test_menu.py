@@ -62,34 +62,34 @@ class MenuTests(unittest.TestCase):
 
     def test_idle_with_no_phone(self):
         phone = labels(self.menu("Phone"))
-        for item in ("Back up files...", "Manage apps...", "Security check...", "Restart or power off...",
-                     "Export device details...", "Stop Google's adb"):
+        for item in ("Back Up Files", "Manage Apps", "Security Check", "Restart or Power Off",
+                     "Export Device Details", "Stop Google's ADB"):
             self.assertEqual(phone[item], "disabled", item)
-        self.assertEqual(labels(self.menu("Unlock"))["Check eligibility"], "disabled")
-        self.assertEqual(labels(self.menu("Unlock"))["Sign in to Mi Account..."], "normal")
+        self.assertEqual(labels(self.menu("Unlock"))["Check Eligibility"], "disabled")
+        self.assertEqual(labels(self.menu("Unlock"))["Sign In to Mi Account"], "normal")
         self.assertEqual(labels(self.menu("File"))["Quit"], "normal")
 
     def test_android_phone_enables_tools(self):
         self.app.android = {"serial": "X", "state": "device", "model": "POCO M2 Pro"}
         phone = labels(self.menu("Phone"))
-        for item in ("Back up files...", "Manage apps...", "Security check...", "Restart or power off..."):
+        for item in ("Back Up Files", "Manage Apps", "Security Check", "Restart or Power Off"):
             self.assertEqual(phone[item], "normal", item)
 
     def test_fastboot_phone_can_be_restarted_from_the_menu(self):
         self.app.device, self.app.fastboot = "FB1", "built-in USB fastboot"
-        self.assertEqual(labels(self.menu("Phone"))["Restart or power off..."], "normal")
+        self.assertEqual(labels(self.menu("Phone"))["Restart or Power Off"], "normal")
 
     def test_signed_in_fastboot_allows_check(self):
         self.app.token, self.app.device = {"userId": "1"}, "FB1"
         unlock = labels(self.menu("Unlock"))
-        self.assertEqual(unlock["Check eligibility"], "normal")
-        self.assertEqual(unlock["Sign in to Mi Account..."], "disabled")
+        self.assertEqual(unlock["Check Eligibility"], "normal")
+        self.assertEqual(unlock["Sign In to Mi Account"], "disabled")
 
     def test_busy_disables_everything_that_starts_work(self):
         self.app.android = {"serial": "X", "state": "device"}
         self.app.busy = True
         phone = labels(self.menu("Phone"))
-        self.assertEqual(phone["Back up files..."], "disabled")
+        self.assertEqual(phone["Back Up Files"], "disabled")
         self.assertEqual(phone["Rescan"], "disabled")
 
     def test_shortcut_does_nothing_while_disabled(self):

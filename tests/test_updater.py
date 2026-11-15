@@ -239,12 +239,12 @@ class UpdateWindowTests(unittest.TestCase):
             d = self.dialog(release("v99.0.0"))
             self.assertIn("v99.0.0", d.line.cget("text"))
             self.assertEqual(d.action.cget("text"), "Download")                  # a pip or source install: get the file
-            self.assertEqual(self.packed(d), ["Download", "Release page"])
+            self.assertEqual(self.packed(d), ["Download", "Release Page"])
             d.close()
         with mock.patch.object(updater, "can_self_update", return_value=True):
             d = self.dialog(release("v99.0.0"))
-            self.assertEqual(d.action.cget("text"), "Install and restart")
-            self.assertEqual(self.packed(d), ["Install and restart", "Download only", "Release page"])
+            self.assertEqual(d.action.cget("text"), "Install and Restart")
+            self.assertEqual(self.packed(d), ["Install and Restart", "Download Only", "Release Page"])
             d.close()
 
     def test_the_buttons_all_fit_in_the_window(self):

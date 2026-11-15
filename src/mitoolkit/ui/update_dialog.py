@@ -16,7 +16,7 @@ from mitoolkit.ui.theme import GREEN, MUTED, RED
 
 
 class UpdateDialog(Dialog):
-    title = "Check for updates"
+    title = "Check for Updates"
     resizable = False
     padding = 16
 
@@ -37,7 +37,7 @@ class UpdateDialog(Dialog):
         body = self.body
         ttk.Label(body, text="MiToolkit updates", font=self.fonts.heading).pack(anchor="w")
         ttk.Label(body, text=f"You have {build.full_version()}", foreground=MUTED).pack(anchor="w")
-        self.line = ttk.Label(body, text="Looking for updates...", wraplength=440, justify="left")
+        self.line = ttk.Label(body, text="Looking for updates", wraplength=440, justify="left")
         self.line.pack(anchor="w", pady=(12, 0))
         self.notes = tk.Text(body, width=58, height=9, wrap="word", borderwidth=0, highlightthickness=0,
                              background=self.app.bg, font=self.fonts.small, state="disabled", takefocus=0)
@@ -45,10 +45,10 @@ class UpdateDialog(Dialog):
         row = ttk.Frame(body)
         row.pack(fill="x", pady=(14, 0))
         Button(row, text="Close", command=self.close).pack(side="right")
-        self.action = Button(row, text="Install and restart", primary=True, command=self._action)
-        self.download_btn = Button(row, text="Download only", command=self._download)       # beside Install
-        self.page_btn = Button(row, text="Release page", command=self._open_page)
-        self.reveal_btn = Button(row, text="Show in folder", command=self._reveal)
+        self.action = Button(row, text="Install and Restart", primary=True, command=self._action)
+        self.download_btn = Button(row, text="Download Only", command=self._download)       # beside Install
+        self.page_btn = Button(row, text="Release Page", command=self._open_page)
+        self.reveal_btn = Button(row, text="Show in Folder", command=self._reveal)
         self.row = row
 
     def _say(self, text: str, colour: str = "") -> None:
@@ -99,7 +99,7 @@ class UpdateDialog(Dialog):
         for button in (self.page_btn, self.download_btn, self.action):       # right to left: Close, then these
             button.pack_forget()
         if updater.can_self_update():
-            self.action.configure(text="Install and restart")
+            self.action.configure(text="Install and Restart")
             self.action.pack(side="right", padx=6)
             self.download_btn.pack(side="right")
         else:
@@ -123,7 +123,7 @@ class UpdateDialog(Dialog):
         if not updater.can_self_update():
             self._download()
             return
-        self._begin("Downloading and checking the update...")
+        self._begin("Downloading and checking the update")
         release = self.release
         exe = updater.running_program()
         part = exe.with_name(exe.name + ".new")
@@ -178,7 +178,7 @@ class UpdateDialog(Dialog):
             self.app.log(f"Update failed: {err}")
             return
         self.app.log(f"Updated to {self.release.tag if self.release else 'the new version'}; restarting.")
-        self._say("Updated. Restarting...", GREEN)
+        self._say("Updated. Restarting", GREEN)
         self.win.after(600, lambda: self._restart(program))
 
     # --------------------------------------------------------------- downloading only
@@ -186,7 +186,7 @@ class UpdateDialog(Dialog):
         """Save the release file for this system in Downloads (checked), without installing anything."""
         if self.release is None or self._busy:
             return
-        self._begin("Downloading and checking the release...")
+        self._begin("Downloading and checking the release")
         release, folder = self.release, updater.downloads_folder()
 
         def work() -> None:

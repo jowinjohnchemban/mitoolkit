@@ -354,7 +354,7 @@ def wait_for_device(say: bool = True, timeout: Optional[float] = None) -> None:
         if not told and (found or say):
             print("A phone in fastboot mode was found but cannot be opened. "
                   + usbio.no_access_advice(found[0].get("reason") or usbio.BUSY)
-                  if found else "Waiting for a phone in fastboot mode... (Ctrl+C to stop)")
+                  if found else "Waiting for a phone in fastboot mode (press Ctrl+C to stop)")
             told = True
         if timeout is not None and time.monotonic() - start > timeout:
             raise FastbootError("No phone in fastboot mode is connected.")

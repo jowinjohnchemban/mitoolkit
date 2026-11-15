@@ -119,7 +119,7 @@ class Skeleton(tk.Canvas):
     heights: bar height in pixels."""
 
     def __init__(self, parent, rows: int = 4, widths: Sequence[float] = (0.92, 0.7, 0.84, 0.5), bar: int = 12,
-                 gap: int = 12, label: str = "Loading..."):
+                 gap: int = 12, label: str = "Loading"):
         super().__init__(parent, bg=page_background(parent), highlightthickness=0, borderwidth=0,
                          height=rows * (bar + gap) - gap + 4, width=200)
         self.rows, self.widths, self.bar, self.gap = rows, tuple(widths), bar, gap

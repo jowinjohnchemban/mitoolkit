@@ -38,7 +38,7 @@ class AboutDialog(Dialog):
         links.pack(fill="x", pady=(14, 0))
         Button(links, text="Credits", command=lambda: webbrowser.open(REPO + "/blob/main/CREDITS.md")).pack(side="left")
         Button(links, text="Website", command=lambda: webbrowser.open(REPO)).pack(side="left", padx=6)
-        Button(links, text="Copy version info", command=self._copy).pack(side="left")
+        Button(links, text="Copy Version Info", command=self._copy).pack(side="left")
         row = ttk.Frame(body)
         row.pack(fill="x", pady=(14, 0))
         Button(row, text="Close", primary=True, command=self.close).pack(side="right")

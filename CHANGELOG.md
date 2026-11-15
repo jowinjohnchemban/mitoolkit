@@ -34,7 +34,16 @@ pull request titles (see CONTRIBUTING.md); the full, generated notes of each rel
   switches to USB. A phone on Wi-Fi says up front that fastboot needs a cable. The footer shows the USB port
   (`USB port 2-8`) even when adb's device list does not say where the phone is plugged in.
 
+- Text is written one way everywhere: Title Case for labels (buttons, menus, window titles), sentence case for
+  sentences and messages with a capital after "Step 2:", no "..." and no decorative symbols (middle dots, bullets, arrows).
+  A test keeps it so.
+
 ### Added
+- MCP in the app: Help > AI Agent Connection lets an AI agent use the running MiToolkit (local address and secret token,
+  off until turned on). Changing things asks the person first, unlocking is never offered, and the status bar shows the
+  agent's name in green while it is connected.
+- AGENTS.md (how to work on the project, the text standard, and to listen to the two upstream repositories for
+  patches, updates and ideas) and docs/upstream.md (what was last reviewed).
 - Check for updates can download the latest release file (checked against its SHA-256, saved in Downloads with the
   version in its name, nothing installed) as well as install it, for every kind of install, and opens the release
   page. The window grows to fit its buttons.

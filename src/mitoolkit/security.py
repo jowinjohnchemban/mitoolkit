@@ -269,7 +269,7 @@ def check_apps(report: Report, phone: adb.Phone, log: Callable[[str], None]) -> 
     if others:
         report.add(INFO, area, f"{len(others)} app(s) not installed from a store",
                    "Installed from a file or another app: " + ", ".join(others[:15])
-                   + (" ..." if len(others) > 15 else "") + ". Fine if you installed them on purpose.")
+                   + (" and more" if len(others) > 15 else "") + ". Fine if you installed them on purpose.")
     check_stalkerware(report, phone, set(installers), log)
     malware.scan(report, phone, installers, set(TRUSTED_STORES), log)
 
@@ -340,7 +340,7 @@ def check_stalkerware(report: Report, phone: adb.Phone, packages: Set[str], log:
         confirmed = None
         try:
             path = phone.shell(f"pm path {adb.valid_package(pkg)}").strip().splitlines()[0].replace("package:", "")
-            log(f"Checking the certificate of {pkg} ...")
+            log(f"Checking the certificate of {pkg}")
             with tempfile.TemporaryDirectory() as tmp:
                 local = Path(tmp) / "base.apk"
                 sync = phone.sync()
@@ -402,10 +402,10 @@ def run(serial: Optional[str] = None, log: Callable[[str], None] = lambda _t: No
     phone = adb.Phone(serial)
     report = Report()
     info = phone.info()
-    log("Checking the security patch against Android's security bulletins (OSV) ...")
+    log("Checking the security patch against Android's security bulletins (OSV)")
     check_patch_level(report, str(info.get("android") or ""), info.get("security_patch"), today)
-    log("Checking Google Play Protect and the Google Play system update ...")
+    log("Checking Google Play Protect and the Google Play system update")
     check_play(report, phone, today)
-    log("Checking apps: where they came from, what access they have, known stalkerware ...")
+    log("Checking apps: where they came from, what access they have, known stalkerware")
     check_apps(report, phone, log)
     return report

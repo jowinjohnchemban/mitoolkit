@@ -218,7 +218,7 @@ class WindowTests(unittest.TestCase):
                 menu = self.root.nametowidget(bar.entrycget(i, "menu"))
                 labels += [menu.entrycget(j, "label") for j in range(menu.index("end") + 1) if menu.type(j) == "command"]
         self.assertNotIn("Show log file", labels)
-        self.assertIn("Activity log", labels)
+        self.assertIn("Activity Log", labels)
 
     def test_the_wireless_window_offers_both_ways_to_pair(self):
         from mitoolkit.ui.wireless_dialog import WirelessDialog

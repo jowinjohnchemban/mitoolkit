@@ -11,16 +11,17 @@ from mitoolkit.ui.components.buttons import Button
 from mitoolkit.ui.base import Dialog
 from mitoolkit.ui.theme import AMBER, GREEN, MUTED, RED, WARN_BG, WARN_FG
 
+AREA_TITLES = {"Phone software": "Phone Software", "Malware scan": "Malware Scan"}     # headings; the report keeps its names
 STYLE = {
-    security.HIGH: ("⚠", RED, "Needs attention"),
+    security.HIGH: ("⚠", RED, "Needs Attention"),
     security.MEDIUM: ("●", AMBER, "Review"),
-    security.INFO: ("ℹ", MUTED, "Good to know"),
+    security.INFO: ("ℹ", MUTED, "Good to Know"),
     security.OK: ("✔", GREEN, "OK"),
 }
 
 
 class SecurityDialog(Dialog):
-    title = "Security check"
+    title = "Security Check"
     size = "860x620"
     min_size = (640, 420)
 
@@ -32,7 +33,7 @@ class SecurityDialog(Dialog):
 
     def build(self) -> None:
         body = self.body
-        self.verdict = ttk.Label(body, text="Checking the phone...", font=self.fonts.title)
+        self.verdict = ttk.Label(body, text="Checking the phone", font=self.fonts.title)
         self.verdict.pack(anchor="w")
         self.summary = ttk.Label(body, foreground=MUTED, justify="left", text=(
             "Compares the phone with Android's security bulletins (OSV), checks Google Play Protect and "
@@ -46,7 +47,7 @@ class SecurityDialog(Dialog):
         buttons = ttk.Frame(body)
         buttons.pack(side="bottom", fill="x", pady=(8, 0))
         Button(buttons, text="Close", command=self.close).pack(side="right")
-        self.again = Button(buttons, text="Check again", command=self.start)
+        self.again = Button(buttons, text="Check Again", command=self.start)
         self.again.pack(side="right", padx=6)
         Button(buttons, text="Android Security Bulletins",
                    command=lambda: webbrowser.open(security.BULLETINS)).pack(side="left")
@@ -84,8 +85,8 @@ class SecurityDialog(Dialog):
         self.again.configure(state="disabled")
         self.bar.pack(fill="x", before=self.text.master)
         self.bar.start(12)
-        self.verdict.configure(text="Checking the phone...", foreground="")
-        self.app.run(lambda: security.run(self.serial, self.progress), self._done, "Running the security check...")
+        self.verdict.configure(text="Checking the phone", foreground="")
+        self.app.run(lambda: security.run(self.serial, self.progress), self._done, "Running the security check")
 
     def _done(self, status: str, result) -> None:
         if not self.alive():
@@ -103,8 +104,8 @@ class SecurityDialog(Dialog):
         colour = {"Needs attention": RED, "Some things to review": AMBER}.get(report.verdict, GREEN)
         self.verdict.configure(text=report.verdict, foreground=colour)
         counts = {lv: sum(1 for f in report.findings if f.level == lv) for lv in STYLE}
-        self.summary.configure(text=" · ".join(f"{counts[lv]} {STYLE[lv][2].lower()}" for lv in STYLE
-                                                    if counts[lv]) + ". Nothing on the phone was changed.")
+        self.summary.configure(text=", ".join(f"{STYLE[lv][2]}: {counts[lv]}" for lv in STYLE if counts[lv])
+                               + ". Nothing on the phone was changed.")
         self.show(report)
 
     def show(self, report: security.Report) -> None:
@@ -116,7 +117,7 @@ class SecurityDialog(Dialog):
             items = sorted((f for f in report.findings if f.area == area), key=lambda f: order[f.level])
             if not items:
                 continue
-            t.insert("end", area + "\n", "area")
+            t.insert("end", AREA_TITLES.get(area, area) + "\n", "area")
             for i, f in enumerate(items):
                 icon = STYLE[f.level][0]
                 t.insert("end", f"{icon}  ", (f.level, "title"))

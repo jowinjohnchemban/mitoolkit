@@ -386,9 +386,9 @@ def wait_for_qr_pairing(name: str, password: str, cancel, timeout: float = 120.0
         cancel.wait(poll)
     if cancel.is_set():
         raise AdbError("Cancelled.")
-    raise AdbError("The phone did not scan the code in time. Try again, or use Pairing code instead. If the phone did "
+    raise AdbError("The phone did not scan the code in time. Try again, or use Pairing Code instead. If the phone did "
                    "scan it, this network may hide phones from this computer (a PC on a cable and a phone on Wi-Fi "
-                   "often cannot see each other): Pairing code works there.")
+                   "often cannot see each other): Pairing Code works there.")
 
 
 _tried: Dict[str, float] = {}       # address -> when MiToolkit last tried to connect to it (so it is not hammered)

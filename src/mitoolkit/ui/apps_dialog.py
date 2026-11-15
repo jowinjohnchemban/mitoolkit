@@ -67,11 +67,11 @@ class AppRow:
 
 
 class AppManagerDialog(Dialog):
-    title = "Manage apps"
+    title = "Manage Apps"
     size = "1000x640"
     min_size = (760, 460)
 
-    TABS = (("suggested", "Suggested"), ("system", "All preinstalled"), ("yours", "Installed by you"),
+    TABS = (("suggested", "Suggested"), ("system", "All Preinstalled"), ("yours", "Installed by You"),
             ("removed", "Removed"))
 
     def __init__(self, app, serial: str):
@@ -142,7 +142,7 @@ class AppManagerDialog(Dialog):
         self.d_meaning.pack(anchor="w", pady=(2, 8))
         self.d_note = ttk.Label(side, text="", foreground=MUTED, wraplength=280, justify="left")
         self.d_note.pack(anchor="w")
-        self.d_lookup = Button(side, text="Look it up on the web", command=self._look_up)
+        self.d_lookup = Button(side, text="Look It Up on the Web", command=self._look_up)
         side.bind("<Configure>", lambda e: [w.configure(wraplength=max(e.width - 20, 120)) for w in
                                             (self.d_name, self.d_pkg, self.d_meaning, self.d_note)])
         panes.add(side, weight=1)
@@ -153,9 +153,9 @@ class AppManagerDialog(Dialog):
 
         buttons = ttk.Frame(body)
         buttons.pack(fill="x", pady=(8, 0))
-        self.tick_all_btn = Button(buttons, text="Tick all in this tab", command=self.tick_all)
+        self.tick_all_btn = Button(buttons, text="Tick All in This Tab", command=self.tick_all)
         self.tick_all_btn.pack(side="left")
-        Button(buttons, text="Clear ticks", command=self.clear_ticks).pack(side="left", padx=6)
+        Button(buttons, text="Clear Ticks", command=self.clear_ticks).pack(side="left", padx=6)
         Button(buttons, text="Close", command=self.close).pack(side="right")
         self.action_btn = Button(buttons, text="Remove", primary=True, command=self.apply)
         self.action_btn.pack(side="right", padx=6)
@@ -175,7 +175,7 @@ class AppManagerDialog(Dialog):
         self.fill()
 
     def reload(self) -> None:
-        self.status.configure(text="Reading the app list from the phone...", foreground=MUTED)
+        self.status.configure(text="Reading the app list from the phone", foreground=MUTED)
 
         def loaded(status, result):
             if not self.alive():
@@ -186,7 +186,7 @@ class AppManagerDialog(Dialog):
                 return
             self.set_apps(result)
 
-        self.app.run(lambda: adb.list_packages(self.serial), loaded, "Reading the app list from the phone...")
+        self.app.run(lambda: adb.list_packages(self.serial), loaded, "Reading the app list from the phone")
 
     def visible(self) -> List[AppRow]:
         order = {r: i for i, r in enumerate(bloat.RATINGS)}
@@ -213,7 +213,7 @@ class AppManagerDialog(Dialog):
         if a is None:
             return
         self.d_name.configure(text=a.label)
-        self.d_pkg.configure(text=f"{a.package}\n{'Preinstalled' if a.system else 'Installed by you'} · {a.status}")
+        self.d_pkg.configure(text=f"{a.package}\n{'Preinstalled' if a.system else 'Installed by you'}, {a.status}")
         self.d_rating.configure(text=a.rating_label, foreground=COLOURS[a.rating] or "")
         self.d_meaning.configure(text=bloat.LABELS[a.rating][1])
         self.d_note.configure(text=a.note)
@@ -234,7 +234,7 @@ class AppManagerDialog(Dialog):
             return
         a = self.apps[package]
         if package not in self.marked and a.rating == "avoid" and a.installed:
-            if not messagebox.askyesno("Keep this app", f"{a.label} is needed by the system or for unlocking. "
+            if not messagebox.askyesno("Keep This App", f"{a.label} is needed by the system or for unlocking. "
                                        "Tick it anyway?", default="no", icon="warning", parent=self.win):
                 return
         self._result_shown = False
@@ -262,7 +262,7 @@ class AppManagerDialog(Dialog):
         verb = "Restore" if self._restoring() else "Remove"
         self.action_btn.configure(text=f"{verb} {n} app{'s' if n != 1 else ''}" if n else verb,
                                   state="normal" if n else "disabled")
-        self.tick_all_btn.configure(text="Tick all suggested" if self.tab.get() == "suggested" else "Tick all in this tab")
+        self.tick_all_btn.configure(text="Tick All Suggested" if self.tab.get() == "suggested" else "Tick All in This Tab")
         if not self._result_shown:
             self.status.configure(text=f"{len(self.tree.get_children())} shown, {len(self.marked)} ticked. "
                                        "Click the box to tick an app; click its name to see what it is.",
@@ -279,11 +279,11 @@ class AppManagerDialog(Dialog):
         text = f"Remove {len(rows)} app(s)?\n\nPreinstalled ones can be brought back from the Removed tab."
         if risky:
             text += ("\n\nThese are marked Caution, Keep or Unknown:\n  " + "\n  ".join(risky[:12])
-                     + ("\n  ..." if len(risky) > 12 else ""))
+                     + (f"\n  and {len(risky) - 12} more" if len(risky) > 12 else ""))
         if yours:
             text += f"\n\n{len(yours)} of them you installed yourself: they are uninstalled and must be " \
                     "reinstalled from the store."
-        return messagebox.askyesno("Remove apps", text, default="no" if risky else "yes",
+        return messagebox.askyesno("Remove Apps", text, default="no" if risky else "yes",
                                    icon="warning" if risky else "question", parent=self.win)
 
     def apply(self) -> None:
@@ -323,4 +323,4 @@ class AppManagerDialog(Dialog):
                      + ("" if restore else " Find them in the Removed tab to bring them back."),
                 foreground=RED if failed else GREEN)
 
-        self.app.run(work, done, ("Restoring" if restore else "Removing") + " apps...")
+        self.app.run(work, done, ("Restoring" if restore else "Removing") + " apps")

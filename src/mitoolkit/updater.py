@@ -188,7 +188,7 @@ def download_to(release: Release, folder: Path, progress: Callable[[int, int], N
         download(release, part, progress, cancel)
         os.replace(part, dest)
         if sys.platform != "win32":
-            os.chmod(dest, 0o755)                      # a program saved from the web is not executable by default
+            os.chmod(dest, 0o700)                      # a program saved from the web is not executable by default: yours only
     except OSError as err:
         part.unlink(missing_ok=True)
         raise UpdateError(f"Could not save it in {folder} ({err.strerror or err.__class__.__name__}).") from None

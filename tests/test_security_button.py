@@ -33,7 +33,7 @@ class SecurityButtonTests(unittest.TestCase):
     def test_colour_follows_the_verdict_and_a_mark_says_it_in_words(self):
         b = self.app.security_btn
         self.app._paint_security_button()
-        self.assertEqual((b.kind, b.cget("text")), ("normal", "Security check..."))      # not checked yet
+        self.assertEqual((b.kind, b.cget("text")), ("normal", "Security Check"))      # not checked yet
         for verdict, kind, mark in (("No problems found", "good", "✔"), ("Some things to review", "warn", "!"),
                                     ("Needs attention", "danger", "⚠")):
             self.app.security_result("X", verdict)

@@ -26,7 +26,7 @@ from mitoolkit.ui.theme import RED as TEXT_RED
 INTERVAL = 1.0
 CALL_TIMEOUT = 15.0       # a reading that takes longer than this is given up on (and tried again)
 WINDOWS = ((60, "1 min"), (300, "5 min"), (900, "15 min"), (1800, "30 min"), (3600, "1 hr"))
-PROCESS_FILTERS = (("apps", "Apps"), ("apps+system", "Apps and system"), ("all", "Everything"))
+PROCESS_FILTERS = (("apps", "Apps"), ("apps+system", "Apps and System"), ("all", "Everything"))
 COLUMNS = (("name", "Name", 300, "w"), ("pid", "PID", 70, "e"), ("cpu", "CPU %", 80, "e"),
            ("mem", "Memory", 90, "e"), ("state", "State", 70, "w"))
 TABS = (("overview", "Overview"), ("processor", "SoC"), ("sensors", "Sensors"),
@@ -48,15 +48,15 @@ def temperature_level(degrees: float) -> str:
 
 
 def with_temperature(text: str, degrees: Optional[float]) -> str:
-    """``text`` followed by a part's temperature and what it means, like "2208 MHz · 49 °C warm"."""
+    """``text`` followed by a part's temperature and what it means, like "2208 MHz, 49 °C, Warm"."""
     if degrees is None:
         return text
-    reading = f"{degrees:.0f} °C {temperature_level(degrees).lower()}"
-    return f"{text} · {reading}" if text else reading
+    reading = f"{degrees:.0f} °C, {temperature_level(degrees)}"
+    return f"{text}, {reading}" if text else reading
 
 
 class LiveStatusDialog(Dialog):
-    title = "Live status"
+    title = "Live Status"
     size = "1000x820"
     min_size = (700, 460)
     padding = 0
@@ -93,12 +93,12 @@ class LiveStatusDialog(Dialog):
         present = bool(current) and current.get("serial") == self.serial and current.get("state") == "device"
         if not present and not self._gone and self._heard:
             self._gone = True
-            self._badge("● Disconnected", TEXT_RED)
+            self._badge("Disconnected", TEXT_RED)
             self.headline.configure(text=f"{self.name or 'Phone'}: disconnected")
             self._set_sub("The phone was unplugged. This window continues by itself when it is back.", TEXT_RED)
         elif present and self._gone:
             self._gone = False                           # back: the next reading redraws everything
-            self._badge("◌ Reconnecting", AMBER)
+            self._badge("Reconnecting", AMBER)
         self.win.after(500, self._watch_connection)
 
     # --------------------------------------------------------------- layout
@@ -110,12 +110,12 @@ class LiveStatusDialog(Dialog):
         top.pack(fill="x")
         head = ttk.Frame(top)
         head.pack(fill="x")
-        self.headline = ttk.Label(head, text=f"{self.name or 'Phone'}: reading...", font=f.heading)
+        self.headline = ttk.Label(head, text=f"{self.name or 'Phone'}: reading", font=f.heading)
         self.headline.pack(side="left")
-        Button(head, text="Copy snapshot", icon="copy", command=self._copy).pack(side="right")
+        Button(head, text="Copy Snapshot", icon="copy", command=self._copy).pack(side="right")
         self.pause_btn = Button(head, text="Pause", icon="pause", command=self._toggle_pause)
         self.pause_btn.pack(side="right", padx=(0, 8))
-        self.live = ttk.Label(head, text="● Live", foreground=GREEN_TEXT, font=f.bold)
+        self.live = ttk.Label(head, text="Live", foreground=GREEN_TEXT, font=f.bold)
         self.live.pack(side="right", padx=(0, 16))
         self.sub = ttk.Label(top, text="One reading a second. Nothing on the phone is changed.", foreground=MUTED)
         self.sub.pack(anchor="w", pady=(2, 10))
@@ -127,7 +127,7 @@ class LiveStatusDialog(Dialog):
         self.range_box = ttk.Frame(row)
         self.window_var = tk.IntVar(value=WINDOWS[0][0])
         segmented(self.range_box, WINDOWS, self.window_var, self._window_changed).pack(side="right")
-        ttk.Label(self.range_box, text="Time range").pack(side="right", padx=(0, 10))
+        ttk.Label(self.range_box, text="Time Range").pack(side="right", padx=(0, 10))
         ttk.Separator(self.body, orient="horizontal").pack(fill="x")
 
         self.stage = ttk.Frame(self.body)
@@ -244,7 +244,7 @@ class LiveStatusDialog(Dialog):
         page = self._plain_page("sensors")
         ttk.Label(page, text="Every temperature sensor the phone lets us read, hottest first.",
                   foreground=MUTED).pack(anchor="w", pady=(0, 8))
-        self.sensor_note = ttk.Label(page, text="Waiting for readings...", foreground=MUTED)
+        self.sensor_note = ttk.Label(page, text="Waiting for readings", foreground=MUTED)
         self.sensor_note.pack(side="bottom", anchor="w", pady=(6, 0))
         self.sensor_skel = Skeleton(page, rows=7, widths=(0.55, 0.4, 0.5, 0.35, 0.48, 0.42, 0.52), label="Reading sensors")
         self.sensor_skel.pack(fill="x")
@@ -265,7 +265,7 @@ class LiveStatusDialog(Dialog):
         SearchBox(bar, self.query, "Search processes", width=300,
                   suggest=lambda text: rank(text, ((str(p["name"]), f"PID {p['pid']}") for p in self.procs))
                   ).pack(side="right")
-        self.proc_note = ttk.Label(page, text="Waiting for the process list...", foreground=MUTED)
+        self.proc_note = ttk.Label(page, text="Waiting for the process list", foreground=MUTED)
         self.proc_note.pack(side="bottom", anchor="w", pady=(6, 0))
         self.proc_skel = Skeleton(page, rows=9, widths=(0.6, 0.45, 0.7, 0.5, 0.55, 0.4, 0.65, 0.48, 0.58),
                                   label="Reading processes")
@@ -361,7 +361,7 @@ class LiveStatusDialog(Dialog):
         slow phone never looks like a frozen window. The grey shapes shimmer meanwhile."""
         if not self.alive() or self._heard:
             return
-        self._badge("◌ Connecting", AMBER)
+        self._badge("Connecting", AMBER)
         if time.monotonic() - self._opened >= 8:      # a normal start says nothing more; only a slow one explains
             self._set_sub("Still waiting for the phone. Unlock its screen, check the cable, and allow USB "
                           "debugging if it asks. The window is fine: it keeps trying.", MUTED)
@@ -385,7 +385,7 @@ class LiveStatusDialog(Dialog):
         if sample is None:
             if self._gone:
                 return                                   # already said "disconnected"; no error text over it
-            self._badge("● No answer", TEXT_RED)
+            self._badge("No Answer", TEXT_RED)
             self.headline.configure(text=f"{self.name or 'Phone'}: not answering")
             self._set_sub((error or "")[:160] or "Check the cable and that USB debugging is allowed.", TEXT_RED)
             return
@@ -402,7 +402,7 @@ class LiveStatusDialog(Dialog):
             self.gpu.push(g("gpu_pct"), redraw=last)
         if not last:
             return
-        self._badge("● Live", GREEN_TEXT)
+        self._badge("Live", GREEN_TEXT)
         cpu_speed = f"{max(g('cores_mhz') or [0])} MHz top core" if g("cores_mhz") else ""
         mem_text = f"{g('mem_used_gb')} of {g('mem_total_gb')} GB" if g("mem_total_gb") else ""
         gpu_speed = f"{g('gpu_mhz')} MHz" if g("gpu_mhz") else ""
@@ -558,11 +558,11 @@ class LiveStatusDialog(Dialog):
         if self.paused.is_set():
             self.paused.clear()
             self.pause_btn.configure(text="Pause", icon="pause")
-            self._badge("● Live", GREEN_TEXT)
+            self._badge("Live", GREEN_TEXT)
         else:
             self.paused.set()
             self.pause_btn.configure(text="Resume", icon="play")
-            self._badge("❚❚ Paused", MUTED)
+            self._badge("Paused", MUTED)
 
     def _copy(self) -> None:
         if not self.last:
