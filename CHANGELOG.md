@@ -43,6 +43,11 @@ pull request titles (see CONTRIBUTING.md); the full, generated notes of each rel
   button. Device details given to agents leave out addresses and IDs in every section (a "Wi-Fi IP address" row got
   through). The line announcing the agent connection is no longer shown in red.
 
+- Releases are made only when every other check on the merged commit (CI, CodeQL, Security, OSV-Scanner) is green, and
+  the programs carry the version in their file names (`mitoolkit-windows-x64-v1.6.0.exe`). The in-app updater finds
+  either kind of name. Apps from v1.5.0 and earlier look for the old names, so they cannot self-update to a release with
+  versioned names: download it once from the release page (or Check for Updates > Download).
+
 ### Added
 - MCP in the app: Help > AI Agent Connection lets an AI agent use the running MiToolkit (local address and secret token,
   off until turned on). Changing things asks the person first, unlocking is never offered, and the status bar shows the

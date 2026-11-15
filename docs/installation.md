@@ -116,7 +116,7 @@ If you would rather not install Python, download a ready-made program from the
 
 | File | What it is |
 |---|---|
-| `mitoolkit-windows-x64.exe`, `mitoolkit-linux-x64`, `mitoolkit-macos-arm64` | The program: opens the GUI, or runs on the command line with `--cli` |
+| `mitoolkit-windows-x64-v1.6.0.exe`, `mitoolkit-linux-x64-v1.6.0`, `mitoolkit-macos-arm64-v1.6.0` (the version is in the name) | The program: opens the GUI, or runs on the command line with `--cli` |
 | `SHA256SUMS.txt` | Checksums |
 
 They are built by GitHub Actions from the tagged source. Check your download
@@ -131,7 +131,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 
 ```powershell
 # Windows PowerShell: compare the printed hash with the line in SHA256SUMS.txt
-Get-FileHash .\mitoolkit-windows-x64.exe -Algorithm SHA256
+Get-FileHash .\mitoolkit-windows-x64-v1.6.0.exe -Algorithm SHA256
 ```
 
 **Windows SmartScreen.** SmartScreen warns about any program it has not seen many times, and trusts one
