@@ -13,6 +13,8 @@ venv/
 session.json
 session.log
 *.log
+*.log.*
+logs/
 *.encryptData
 *encryptData
 .env

@@ -16,6 +16,7 @@ import re
 from typing import Dict, List, Optional, Tuple
 
 from mitoolkit import fastboot
+from mitoolkit.adb_core import is_wireless
 
 Section = Tuple[str, List[Tuple[str, str]]]
 
@@ -375,8 +376,8 @@ def phone_details(phone) -> List[Section]:
     identity: List[Tuple[str, str]] = []
     for label, names in _PROP_SECTIONS[0][1]:
         value = _pick(props, names)
-        if label == "Serial number" and value == phone.serial:
-            continue  # already shown with the basic details
+        if label == "Serial number" and (value == phone.serial or is_wireless(phone.serial)):
+            continue  # already shown with the basic details (over Wi-Fi the phone's own serial is shown there too)
         if value:
             identity.append((label, value))
     imeis = _imeis(props, out)

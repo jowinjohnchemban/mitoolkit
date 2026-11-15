@@ -21,9 +21,11 @@ import socket
 import threading
 from typing import Dict, List, Optional
 
+from mitoolkit import settings, wifi_scan
 from mitoolkit.adb_core import AdbError, SyncSession, is_wireless
 
 HOST, PORT = "127.0.0.1", 5037
+HOSTS_KEY, MAX_HOSTS = "wifi_hosts", 5          # the addresses of phones that were connected over Wi-Fi, newest first
 
 
 class _Conn:
@@ -148,6 +150,25 @@ def devices() -> List[Dict[str, str]]:
     return out
 
 
+def usb_locations() -> Dict[str, str]:
+    """Where each cable-connected phone is plugged in, as Google's adb reports it: {serial: "1-3"} (the ``usb:`` field
+    of ``adb devices -l``). Best effort: an empty answer only means the footer shows no port."""
+    conn = _Conn()
+    try:
+        conn.request("host:devices-l")
+        body = _read_text(conn)
+    except AdbError:
+        return {}
+    finally:
+        conn.close()
+    found = {}
+    for line in body.splitlines():
+        match = re.match(r"^(\S+)\s+.*\busb:(\S+)", line)
+        if match:
+            found[match.group(1)] = match.group(2)
+    return found
+
+
 _started = {"by_us": False}      # did MiToolkit start the adb server that is running? (then it also stops it)
 
 
@@ -245,7 +266,7 @@ def pair(address: str, code: str) -> str:
     does not ask "Allow debugging?" again. Returns the pairing address. The code is never logged."""
     target = valid_address(address, require_port=True)
     if target is None:
-        raise AdbError("Use the pairing address shown on the phone, with its port, like 192.168.1.5:41234.")
+        raise AdbError("Use the pairing address shown on the phone, with its port, like 192.168.1.xx:41234.")
     code = code.strip()
     if not re.fullmatch(r"\d{6}", code):
         raise AdbError("The pairing code is the 6 digits shown on the phone.")
@@ -259,6 +280,7 @@ def pair(address: str, code: str) -> str:
     logging.getLogger("miunlock.adb").debug("adb pair %s: %s", target, answer)
     if "successfully paired" not in answer.lower():
         raise AdbError(answer or "The phone did not accept the pairing code.")
+    remember_host(target.rsplit(":", 1)[0])
     return target
 
 
@@ -280,23 +302,65 @@ def mdns_services(timeout: float = 8.0) -> List[Dict[str, str]]:
     return found
 
 
+class NothingListening(AdbError):
+    """Nothing at that address is waiting for adb (the phone is off or asleep, or Wireless debugging is)."""
+
+
+def known_hosts() -> List[str]:
+    """Addresses of phones connected over Wi-Fi before, newest first. The port changes, the address mostly does not."""
+    hosts = settings.get(HOSTS_KEY, [])
+    return [h for h in hosts if isinstance(h, str) and valid_address(h)] if isinstance(hosts, list) else []
+
+
+def remember_host(host: str) -> None:
+    """Keep ``host`` so the phone can be found again even when the network does not announce it."""
+    hosts = [host] + [h for h in known_hosts() if h != host]
+    if hosts != known_hosts():
+        settings.set(HOSTS_KEY, hosts[:MAX_HOSTS])
+
+
 def connect(address: str) -> str:
-    """Connect to a phone over Wi-Fi ("192.168.1.5" or "192.168.1.5:5555"). Needs the phone's wireless
-    adb switched on (see ServerDevice.tcpip) and Google's adb server running. Returns its answer."""
+    """Connect to a phone over Wi-Fi: "192.168.1.xx:39865" (the address on the Wireless debugging screen) or only
+    "192.168.1.xx", in which case its port is looked for. Needs Google's adb server. Returns the address connected."""
     target = valid_address(address)
     if target is None:
-        raise AdbError("That is not an address. Use the phone's Wi-Fi address, like 192.168.1.5.")
+        raise AdbError("That is not an address. Use the phone's Wi-Fi address, like 192.168.1.xx.")
     if not start():
         raise AdbError(NEEDS_GOOGLE_ADB)
+    if ":" not in address.strip():                 # no port given: Wireless debugging picks a random one
+        return find_on_host(target.rsplit(":", 1)[0])
+    return _connect_to(target)
+
+
+def _connect_to(target: str) -> str:
     try:
         answer = _host_command(f"host:connect:{target}")
     except AdbError as err:
         raise AdbError(f"{_readable(str(err))}{PAIR_HINT}") from None
     logging.getLogger("mitoolkit.adb").debug("adb server connect %s: %s", target, answer)
-    low = answer.lower()
-    if "connected to" not in low:
+    if "connected to" not in answer.lower():
         raise AdbError((answer or "The phone did not answer. Check it is on the same Wi-Fi.") + PAIR_HINT)
+    remember_host(target.rsplit(":", 1)[0])
     return target
+
+
+def find_on_host(host: str, limit: int = 3) -> str:
+    """Connect to the phone at ``host`` when its port is not known (and the network does not announce it): look for
+    the port, then connect. Returns the address. Raises NothingListening when no port answers, AdbError when one does
+    but the phone refuses (usually: it needs pairing first)."""
+    log = logging.getLogger("mitoolkit.adb")
+    ports = wifi_scan.candidates(host)
+    log.debug("ports of %s that may be adb: %s", host, ports)
+    if not ports:
+        raise NothingListening(f"Nothing at {host} is waiting for adb. Check the phone is awake and on the same "
+                               "Wi-Fi, with Wireless debugging on.")
+    last: Optional[AdbError] = None
+    for port in ports[:limit]:
+        try:
+            return _connect_to(f"{host}:{port}")
+        except AdbError as err:
+            last = err
+    raise last or AdbError("The phone did not answer.")
 
 
 def pairing_qr() -> Dict[str, str]:
@@ -322,19 +386,55 @@ def wait_for_qr_pairing(name: str, password: str, cancel, timeout: float = 120.0
         cancel.wait(poll)
     if cancel.is_set():
         raise AdbError("Cancelled.")
-    raise AdbError("The phone did not scan the code in time. Try again, or pair with the code on its screen instead.")
+    raise AdbError("The phone did not scan the code in time. Try again, or use Pairing code instead. If the phone did "
+                   "scan it, this network may hide phones from this computer (a PC on a cable and a phone on Wi-Fi "
+                   "often cannot see each other): Pairing code works there.")
 
 
 _tried: Dict[str, float] = {}       # address -> when MiToolkit last tried to connect to it (so it is not hammered)
+_scanned: Dict[str, tuple] = {}     # host -> (when, state, address) of the last port search, for phones nothing announces
 
 
-def discover_and_connect(min_gap: float = 20.0) -> List[Dict[str, str]]:
-    """Wireless mode's look around: phones announcing Wireless debugging on this network, connected when they already
-    trust this computer. Returns [{"address", "name", "state"}] with state "connected" or "needs-pairing" (the phone is
-    there but has not been paired: pairing is a one-time step with a code shown on the phone). A phone that did not
-    accept is not tried again for ``min_gap`` seconds."""
+def _search_known_hosts(serials: List[str], skip: set, scan_gap: float) -> List[Dict[str, str]]:
+    """The phones whose address is remembered, for networks that do not announce them: already connected, or look for
+    the port (at most every ``scan_gap`` seconds) and connect. State is "connected" or "needs-pairing"; a phone that
+    is off or has Wireless debugging off is simply not listed."""
     import time
-    announced = [s for s in mdns_services() if s["kind"] == "connect"]
+    out: List[Dict[str, str]] = []
+    for host in known_hosts():
+        if host in skip:
+            continue
+        live = next((s for s in serials if s.startswith(host + ":")), None)
+        if live:
+            out.append({"address": live, "name": "", "state": "connected"})
+            continue
+        when, state, address = _scanned.get(host, (-1e9, "", ""))
+        if time.monotonic() - when >= scan_gap:
+            try:
+                state, address = "connected", find_on_host(host)
+            except NothingListening:
+                state, address = "", ""
+            except AdbError:
+                state, address = "needs-pairing", host
+            _scanned[host] = (time.monotonic(), state, address)
+        if state:
+            out.append({"address": address, "name": "", "state": state})
+    return out
+
+
+def discover_and_connect(min_gap: float = 20.0, scan_gap: float = 45.0) -> List[Dict[str, str]]:
+    """Wireless mode's look around: phones announcing Wireless debugging on this network, connected when they already
+    trust this computer, then the phones connected before (their port is looked for directly, for networks that never
+    deliver the announcements). Returns [{"address", "name", "state"}] with state "connected" or "needs-pairing" (the
+    phone is there but has not been paired: pairing is a one-time step with a code shown on the phone). A phone that
+    did not accept is not tried again for ``min_gap`` seconds."""
+    import time
+    if not start():
+        raise AdbError(NEEDS_GOOGLE_ADB)
+    try:
+        announced = [s for s in mdns_services() if s["kind"] == "connect"]
+    except AdbError:
+        announced = []                              # this network does not pass announcements: see the known hosts
     serials = [d["serial"] for d in devices() if d["state"] == "device"]
     out: List[Dict[str, str]] = []
     for service in announced:
@@ -353,7 +453,8 @@ def discover_and_connect(min_gap: float = 20.0) -> List[Dict[str, str]]:
         except AdbError:
             # not paired with this computer (or it refused): the person is shown how to pair it
             out.append({"address": address, "name": name, "state": "needs-pairing"})
-    return out
+    announced_hosts = {s["address"].rsplit(":", 1)[0] for s in announced}
+    return out + _search_known_hosts(serials, announced_hosts, scan_gap)
 
 
 def disconnect(address: str) -> None:

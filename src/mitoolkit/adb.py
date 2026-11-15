@@ -45,6 +45,7 @@ _PROPS = {
     "verified_boot": "ro.boot.verifiedbootstate",
     "encryption": "ro.crypto.state",
     "slot": "ro.boot.slot_suffix",
+    "serialno": "ro.serialno",                 # the phone's own serial (over Wi-Fi the connection is named by address)
 }
 
 # What "Back up files" can copy. Each choice is a list of folders in the phone's shared
@@ -127,6 +128,7 @@ class Phone:
         info: Dict[str, object] = {key: (props.get(prop) or None) for key, prop in _PROPS.items()}
         flag = info.pop("bootloader_locked")
         info["bootloader_locked"] = None if flag is None else flag == "1"
+        info["serialno"] = info["serialno"] or props.get("ro.boot.serialno") or None
         info.update(self._hardware())
         return info
 

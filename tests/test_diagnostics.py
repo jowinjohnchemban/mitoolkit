@@ -188,6 +188,19 @@ class ReportTests(unittest.TestCase):
         rows = d.network_test(phone, "192.168.1.1")
         self.assertEqual(len(rows), 3)
 
+    def test_the_router_is_the_wifi_gateway_never_the_carriers(self):
+        """The phone has a gateway on Wi-Fi (the router) and one on mobile data (the carrier's equipment, which does not
+        answer pings). The network test used to ping the last one it found and report the router as failed."""
+        report = d.build(self.raw())
+        sections = dict(report["sections"])
+        wifi = {label: value for label, value, _level in sections["Wi-Fi"]}
+        mobile = {label: value for label, value, _level in sections["Mobile network"]}
+        self.assertEqual(report["gateway"], wifi["Gateway (router)"])
+        self.assertIn("Gateway", mobile)
+        self.assertNotIn("Gateway (router)", mobile)                   # a carrier's gateway is not a router
+        self.assertNotEqual(report["gateway"], mobile["Gateway"])
+        self.assertEqual(d.redact(report)["gateway"], "(hidden)")      # agents never see the router's address
+
 
 if __name__ == "__main__":
     unittest.main()

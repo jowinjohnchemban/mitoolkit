@@ -56,7 +56,7 @@ src/mitoolkit/
 ├── bloat.py           known Xiaomi bloat, with ratings, for the app manager
 ├── security.py        read-only security check (OSV bulletins, Play Protect, app access, stalkerware)
 ├── guide.py           the in-app step-by-step guide
-├── log.py             scrubbed mitoolkit.log next to the executable
+├── log.py             scrubbed logs/mitoolkit.log next to the executable
 ├── hints.py           plain-English explanations of Xiaomi error codes
 ├── assets/logo.png    window icon
 ├── unlock.py          InteractiveUnlock: the prompting command-line flow

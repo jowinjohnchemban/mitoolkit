@@ -12,14 +12,31 @@ pull request titles (see CONTRIBUTING.md); the full, generated notes of each rel
   `mitoolkit`, which is this program, instead of Xiaomi's `miunlock` tool, since the rename.
 - The Wireless adb window fits its content (Close was cut off), keeps one size while you change pairing method, and
   hides actions that do not apply.
-- After pairing, MiToolkit waits for the address the phone announces a few seconds later and connects by itself,
+- After pairing, MiToolkit waits for the phone to start listening a few seconds later and connects by itself,
   instead of asking to pair again. Phones that Google's adb lists by their network name now count as wireless.
+- A phone on Wi-Fi is found even when the network never delivers the announcements adb listens for (a PC on a cable
+  and a phone on Wi-Fi often cannot hear each other): its address is remembered and its Wireless debugging port is
+  looked for directly on that one address. Connect by address works with the address alone.
+- The Connections window's Network test pinged the mobile carrier's gateway and reported the router as failed; it now
+  pings the Wi-Fi router.
+- The Serial row showed the Wi-Fi address for a phone on Wi-Fi; it shows the phone's own serial, with the address on
+  its own row.
+- Refreshing the phone's details no longer rebuilds the Phone section (it flickered): values change in place.
+- The log file and crash.log are written in a `logs` folder next to the program instead of beside it, and that folder
+  is ignored by git (a rotated `mitoolkit.log.1` was once committed by accident).
 
 ### Added
-- A USB | Wireless selector in the Phone section (USB by default; both choices always visible). Wireless mode finds
-  phones with Wireless debugging on the network, connects the ones that already trust this computer, and guides
-  pairing for a new one: with a QR code that the phone scans, or with the pairing code. Friendlier messages when
-  a connection fails.
+- A USB | Wi-Fi selector in the Phone section (USB by default; both choices always visible, the labels fade as the
+  thumb slides). Wi-Fi mode finds phones with Wireless debugging on the network, connects the ones that already
+  trust this computer, and guides pairing for a new one: with a QR code that the phone scans, or with the pairing
+  code. Friendlier messages when a connection fails; example addresses in the address boxes.
+- The footer says how the phone is connected: its USB port (`USB port 1-3`) or its Wi-Fi address and port.
+- Malware scan, as part of Security check: risky access in apps that did not come from a store, hidden or fake
+  system apps, leftover programs in `/data/local/tmp`, root, and debug builds. Read through adb; nothing is uploaded.
+- Live status: the Processor tab is now SoC, with the processor, GPU and memory each showing load, speed and
+  temperature.
+- The Phone section's Copy details, Export and Rescan are quiet icon buttons with tooltips, on one line with the
+  selector. The Wireless adb menu item and window are now called Wi-Fi connection, to match the selector.
 - Closing MiToolkit lets go of the phone: its USB connections are closed, a Google fastboot it started is stopped,
   and so is the Google adb server it started (one already running is left alone). The log file and crash.log are
   closed too.

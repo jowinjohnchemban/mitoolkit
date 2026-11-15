@@ -7,6 +7,7 @@ import unittest.mock as mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))
 
+from isolate import isolate_settings  # noqa: E402
 from tkhelper import make_root  # noqa: E402
 
 from mitoolkit import adb_server  # noqa: E402
@@ -41,6 +42,9 @@ class InputTests(unittest.TestCase):
 
 
 class PairTests(unittest.TestCase):
+    def setUp(self):
+        isolate_settings(self)                         # a success remembers the phone's address: not in the real settings
+
     def test_success_sends_code_then_address(self):
         with mock.patch.object(adb_server, "start", return_value=True), mock.patch.object(
                 adb_server, "_host_command",
@@ -85,6 +89,7 @@ class FindTests(unittest.TestCase):
 class DialogTests(unittest.TestCase):
     def setUp(self):
         from mitoolkit import gui
+        isolate_settings(self)
         self.root = make_root()
         self.app = gui.App(self.root)
         self.app._polling = True

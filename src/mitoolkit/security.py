@@ -13,6 +13,9 @@ What it looks at, and where the facts come from:
 - Known stalkerware: package names and signing certificates from AssoEchap's
   stalkerware-indicators (CC-BY 4.0; also used by Amnesty's MVT). A name match is confirmed
   against the app's certificate when the APK carries a v1 signature.
+- Malware scan (malware.py): apps not installed from a store that hold the access spyware and banking trojans rely
+  on, apps that hide their icon or pretend to be system apps, programs left in /data/local/tmp, and signs of root
+  or a debug build. Heuristics read through adb; nothing is uploaded.
 
 This is not an antivirus. Google Play Protect stays the main protection on the phone.
 """
@@ -31,7 +34,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
 
-from mitoolkit import adb
+from mitoolkit import adb, malware
 from mitoolkit.adbkey import _der_read
 
 OSV_QUERY = "https://api.osv.dev/v1/query"
@@ -268,6 +271,7 @@ def check_apps(report: Report, phone: adb.Phone, log: Callable[[str], None]) -> 
                    "Installed from a file or another app: " + ", ".join(others[:15])
                    + (" ..." if len(others) > 15 else "") + ". Fine if you installed them on purpose.")
     check_stalkerware(report, phone, set(installers), log)
+    malware.scan(report, phone, installers, set(TRUSTED_STORES), log)
 
 
 # ------------------------------------------------------------- stalkerware

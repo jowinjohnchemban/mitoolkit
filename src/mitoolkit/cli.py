@@ -122,7 +122,7 @@ def _cmd_connections(args):
     from mitoolkit import diagnostics
     report = diagnostics.run(adb.Phone(args.serial))
     if args.network_test:
-        gateway = next((v for _t, rows in report["sections"] for k, v, _l in rows if k == "Gateway (router)"), None)
+        gateway = report.get("gateway") or None
         report["network_test"] = [{"label": k, "value": v, "level": lvl}
                                   for k, v, lvl in diagnostics.network_test(adb.Phone(args.serial), gateway)]
     return report

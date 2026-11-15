@@ -2,9 +2,9 @@
 
 Why not a toggle switch: a switch turns one thing on or off, so with a name on each side it is unclear which side is
 "on" and what a click will do. Here both choices are always visible inside one pill, the chosen one rides on a white
-thumb that slides to it, and each choice is clicked directly. The chosen name is dark and bold with a blue glyph (a
-plug for USB, the Wi-Fi symbol for Wireless); the other is grey, so colour is never the only signal. A faint tint
-shows the segment under the pointer.
+thumb that slides to it while the colours fade, and each choice is clicked directly. The chosen name is dark and bold
+with a blue glyph (a plug for USB, the Wi-Fi symbol for Wireless); the other is grey, so colour is never the only
+signal. A faint tint shows the segment under the pointer.
 
 Keyboard: Left and Right (also Home and End, Up and Down) choose; Space and Enter flip to the other one. It has one
 tab stop and a blue focus ring with a gap, shown for the keyboard only, never after a mouse click. One variable holds
@@ -19,14 +19,14 @@ from tkinter import font as tkfont
 from typing import Callable, Optional, Tuple
 
 from mitoolkit.ui.components import render, skeleton
-from mitoolkit.ui.components.shapes import page_background
+from mitoolkit.ui.components.shapes import mix, page_background
 
-HEIGHT = 34                                 # the pill's height at 96 dpi; everything scales with the screen
+HEIGHT = 30                                 # the pill's height at 96 dpi; everything scales with the screen
 PAD = 3                                     # between the pill's edge and the thumb
 GLYPH = 16                                  # the width given to a glyph
 SEG_PAD = 12                                # space either side of a segment's content
-MARGIN = 7                                  # room around the pill for the focus ring
-FRAMES, FRAME_MS = 12, 16
+MARGIN = 4                                  # room around the pill for the focus ring
+FRAMES, FRAME_MS = 14, 16                   # about a quarter of a second: the thumb slides and the colours fade
 TEXT, MUTED_TEXT = "#1b1b1b", "#555555"
 TRACK, BORDER = "#e5e7eb", "#6b7280"        # the pill and its outline (the outline is 3:1 or better on the page)
 THUMB = "#ffffff"
@@ -175,7 +175,9 @@ class ModeSwitch(tk.Canvas):
         mid = self._margin + self._pill_h // 2
         ring = RING if (self._focus and not self._mouse) else ""      # keyboard focus ring, with a gap
         centres = self._glyph_centres()
-        glyphs = [(("usb", "wifi")[i], centres[i], ACTIVE if i == chosen else INACTIVE) for i in (0, 1)]   # plug, Wi-Fi
+        # 1 under the thumb, 0 away from it: the colours fade with the thumb instead of flipping when it starts
+        near = [max(0.0, 1.0 - abs(self._pos - i)) for i in (0, 1)]
+        glyphs = [(("usb", "wifi")[i], centres[i], mix(INACTIVE, ACTIVE, near[i])) for i in (0, 1)]   # plug, Wi-Fi
         if render.HAVE:
             self._image = render.segmented_photo(self._pill_w, self._pill_h, self._seg_w, self._pad, self._pos,
                                                  self._hover, TRACK, BORDER, THUMB, tuple(glyphs), ring, self._margin,
@@ -187,7 +189,7 @@ class ModeSwitch(tk.Canvas):
             self._plain(chosen, ring)
         for i, (_value, label) in enumerate(self.choices):
             x = self._margin + self._pad + i * self._seg_w + self._seg_pad + self._glyph + round(7 * self._k)
-            c.create_text(x, mid, text=label, anchor="w", fill=TEXT if i == chosen else MUTED_TEXT,
+            c.create_text(x, mid, text=label, anchor="w", fill=mix(MUTED_TEXT, TEXT, near[i]),
                           font=self._bold if i == chosen else self._font)
 
     def _plain(self, chosen: int, ring: str) -> None:

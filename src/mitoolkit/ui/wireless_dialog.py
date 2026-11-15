@@ -1,4 +1,4 @@
-"""Phone > Wireless adb: use the phone over Wi-Fi instead of a cable (not for fastboot or unlocking).
+"""Phone > Wi-Fi connection: use the phone over Wi-Fi instead of a cable (not for fastboot or unlocking).
 
 The window has one fixed size that fits a small screen, so nothing jumps when the panel changes, and Close is in a
 bar at the bottom that is always visible. Pairing has two ways side by side: a QR code the phone scans, or the code
@@ -17,6 +17,7 @@ from mitoolkit.adb_core import is_wireless
 from mitoolkit.adb_usb import AdbError
 from mitoolkit.ui.base import Dialog
 from mitoolkit.ui.components.buttons import Button, segmented
+from mitoolkit.ui.components.placeholder import placeholder
 from mitoolkit.ui.theme import MUTED, RED
 
 QR_SIZE = 208               # pixels at 96 dpi, square: big enough for a phone camera, small enough for a laptop screen
@@ -32,7 +33,7 @@ CODE_STEPS = ("On the phone open Settings > Developer options > Wireless debuggi
 
 
 class WirelessDialog(Dialog):
-    title = "Wireless adb"
+    title = "Wi-Fi connection"
     resizable = False
     padding = 16
 
@@ -89,9 +90,10 @@ class WirelessDialog(Dialog):
         entry = ttk.Entry(line, textvariable=self.address, width=24)
         entry.pack(side="left")
         entry.bind("<Return>", lambda _e: self._connect())
+        placeholder(entry, self.address, "192.168.1.xx")
         self.connect_btn = Button(line, text="Connect", command=self._connect)
         self.connect_btn.pack(side="left", padx=8)
-        ttk.Label(line, text="for a phone that is already paired", foreground=MUTED).pack(side="left")
+        ttk.Label(line, text="the phone's address; it must be paired already", foreground=MUTED).pack(side="left")
         self._refresh()
         self._show_method()
         self.win.after(60, self._focus_first)
@@ -136,6 +138,8 @@ class WirelessDialog(Dialog):
         pair_entry.bind("<Return>", lambda _e: self.code_entry.focus_set())
         self.pair_btn = Button(pair, text="Pair", primary=True, command=self._pair)
         self.pair_btn.grid(row=1, column=2, padx=(10, 0))
+        placeholder(pair_entry, self.pair_address, "192.168.1.xx:41234")
+        placeholder(self.code_entry, self.pair_code, "6 digits")
 
     def _focus_first(self) -> None:
         """The keyboard starts on the main action of what is showing."""
@@ -175,6 +179,9 @@ class WirelessDialog(Dialog):
             self.action.pack_forget()
         else:
             self.action.pack(anchor="w", pady=(8, 0))
+        # while something runs the other actions are greyed, not silently ignored (Cancel stays available)
+        for button in (self.find_btn, self.pair_btn, self.connect_btn, self.qr_show):
+            button.configure(state="disabled" if self._busy else "normal")
 
     # --------------------------------------------------------------- actions
     def _say(self, text: str, error: bool = False) -> None:
@@ -217,7 +224,7 @@ class WirelessDialog(Dialog):
                     self.app._rescan()
             else:
                 self._say(value, error=True)
-                self.app._log(f"Wireless adb: {value}")
+                self.app._log(f"Wi-Fi connection: {value}")
                 if on_error is not None:
                     on_error()
             self._refresh()
@@ -255,13 +262,14 @@ class WirelessDialog(Dialog):
             if connect:
                 return f"Found a phone with Wireless debugging on at {connect[0]['address']}. Press Connect."
             return ("No phone found. Open Pair device with pairing code on the phone and keep it open, or type "
-                    "the address shown there.")
+                    "the address shown there. Some networks hide phones from this computer (a PC on a cable and a "
+                    "phone on Wi-Fi often cannot see each other): typing the address always works.")
         self._work("Looking for phones on this Wi-Fi network...", adb_server.mdns_services, found, rescan=False)
 
     def _pair(self) -> None:
         address, code = self.pair_address.get(), self.pair_code.get()
         if adb_server.valid_address(address, require_port=True) is None:
-            self._say("Use the pairing address shown on the phone, with its port, like 192.168.1.5:41234.", error=True)
+            self._say("Use the pairing address shown on the phone, with its port, like 192.168.1.xx:41234.", error=True)
             return
         if not re.fullmatch(r"\d{6}", code.strip()):
             self._say("The pairing code is the 6 digits shown on the phone.", error=True)
@@ -273,10 +281,11 @@ class WirelessDialog(Dialog):
         self._work("Pairing...", lambda: self._connect_announced(adb_server.pair(address, code)), paired)
 
     @staticmethod
-    def _connect_announced(target: str, wait: float = 20.0, poll: float = 1.5):
-        """After pairing: connect to the address the phone announces for Wireless debugging. The phone only starts
-        announcing it a few seconds after pairing, so this keeps looking for up to ``wait`` seconds. Returns (address,
-        True) when connected, or (pairing address, False) when it did not show up in time."""
+    def _connect_announced(target: str, wait: float = 30.0, poll: float = 1.5):
+        """After pairing: connect to the phone's Wireless debugging port. It is announced on the network a few seconds
+        after pairing; where the network does not deliver announcements (a PC on a cable and a phone on Wi-Fi often
+        cannot hear each other) the port is looked for on the phone's address instead. Keeps trying for up to ``wait``
+        seconds. Returns (address, True) when connected, or (pairing address, False) when it did not work out."""
         import time
         host = target.rsplit(":", 1)[0]
         end = time.monotonic() + wait
@@ -286,8 +295,12 @@ class WirelessDialog(Dialog):
                     if service["kind"] == "connect" and service["address"].startswith(host + ":"):
                         return adb_server.connect(service["address"]), True
             except AdbError:
-                # Pairing itself worked. Finding or reaching the connect address failed this time (mDNS is slow to
-                # start, or blocked): try again until the time is up.
+                # mDNS is slow to start or blocked: the direct search below covers it
+                pass
+            try:
+                return adb_server.find_on_host(host), True
+            except AdbError:
+                # the phone is not listening yet (it starts a few seconds after pairing): try again until time is up
                 pass
             if time.monotonic() >= end:
                 return target, False
@@ -381,10 +394,11 @@ class WirelessDialog(Dialog):
     def _connect(self) -> None:
         text = self.address.get()
         if adb_server.valid_address(text) is None:
-            self._say("That is not an address. Use the phone's Wi-Fi address, like 192.168.1.5.", error=True)
+            self._say("That is not an address. Use the phone's Wi-Fi address, like 192.168.1.xx.", error=True)
             return
 
         def connected(target) -> str:
             self.app.use_wireless()
             return f"Connected over Wi-Fi at {target}."
-        self._work("Connecting...", lambda: adb_server.connect(text), connected)
+        label = "Connecting..." if ":" in text else "Looking for the phone's port, a few seconds..."
+        self._work(label, lambda: adb_server.connect(text), connected)

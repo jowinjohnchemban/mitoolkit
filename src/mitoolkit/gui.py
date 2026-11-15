@@ -102,6 +102,11 @@ class App:
         self._wifi_found: Optional[dict] = None    # a phone seen on the network that is not paired yet
         self._wifi_probing = False
         self._wifi_probe_at = 0.0
+        self._fb_links: dict = {}               # fastboot serial -> how it is plugged in (for the footer)
+        self._shown_layout = None               # what the Phone section holds now (see _render_status)
+        self._info_names: tuple = ()            # the labels of the details grid, and its value cells
+        self._info_cells: list = []
+        self._more_icon = ""
         self._info: dict = {}
         self._fbinfo: dict = {}
         self._guide: Optional[GuideWindow] = None
@@ -179,6 +184,8 @@ class App:
         self.status.pack(side="left")
         self.last_activity = ttk.Label(bar, text="", foreground=MUTED)
         self.last_activity.pack(side="left", padx=(12, 0), fill="x", expand=True)
+        self.link_info = ttk.Label(bar, text="", foreground=MUTED)     # how the phone is connected: its USB port or Wi-Fi address
+        self.link_info.pack(side="right", padx=(12, 0))
 
     def _wrap(self, parent, text="", **kw) -> ttk.Label:
         lab = ttk.Label(parent, text=text, justify="left", wraplength=600, **kw)
@@ -213,16 +220,18 @@ class App:
         self.f2 = self._section(page, "2. Phone")
         head = ttk.Frame(self.f2)
         head.pack(fill="x")
-        self.rescan_btn = Button(head, text="Rescan", icon="refresh", command=self._rescan)
-        self.rescan_btn.pack(side="right", anchor="n")
+        # The row is one line, everything centred on it: the phone's name on the left; on the right the tools as quiet
+        # icon buttons (their names show as tooltips), and between them how the phone is reached.
+        self.rescan_btn = Button(head, text="Rescan", icon="refresh", kind="quiet", compact=True, command=self._rescan)
+        self.rescan_btn.pack(side="right")
         # How the phone is reached: a cable (the default) or Wi-Fi. Wireless mode looks for phones on the network.
         self.link_var = tk.StringVar(value="usb")
-        self.link = ModeSwitch(head, self.link_var, ("usb", "USB"), ("wifi", "Wireless"), command=self._link_changed)
-        self.link.pack(side="right", anchor="n", padx=(0, 8))
+        self.link = ModeSwitch(head, self.link_var, ("usb", "USB"), ("wifi", "Wi-Fi"), command=self._link_changed)
+        self.link.pack(side="right", padx=(10, 6))
         self.dev_dot = tk.Label(head, text="\u25cf", fg=MUTED, bg=self.bg, font=self.f_base)
-        self.dev_dot.pack(side="left", anchor="n")
+        self.dev_dot.pack(side="left")
         self.dev_text = ttk.Label(head, text="Looking for a phone...", font=self.f_bold, justify="left")
-        self.dev_text.pack(side="left", padx=6, fill="x", anchor="n")
+        self.dev_text.pack(side="left", padx=6, fill="x")
         self.dev_detail = self._wrap(self.f2, "", foreground=MUTED)
         self.dev_detail.pack(anchor="w", padx=(22, 0), pady=(2, 0))
         # One aligned row of equal-width buttons: the main action first (bold), then the tools
@@ -250,8 +259,10 @@ class App:
         self.more_btn = Button(self.details, text="Show more", icon="down", kind="flat", command=self._toggle_more)
         self.more_btn.pack(fill="x", pady=(8, 0))
         # Copy details sits at the top of the section, beside Rescan, while there are details to copy
-        self.copy_btn = Button(head, text="Copy details", icon="copy", command=self._copy_device)
-        self.export_btn = Button(head, text="Export...", icon="save", command=self._export_device)
+        self.copy_btn = Button(head, text="Copy details", icon="copy", kind="quiet", compact=True,
+                               command=self._copy_device)
+        self.export_btn = Button(head, text="Export details...", icon="save", kind="quiet", compact=True,
+                                 command=self._export_device)
 
         # 3. Eligibility
         self.f3 = self._section(page, "3. Eligibility")
@@ -609,7 +620,7 @@ class App:
         self._link_mode = mode
         self._wifi_found, self._wifi_probe_at = None, 0.0
         self._info.clear()
-        self._log("Looking for phones on Wi-Fi (Wireless mode)." if mode == "wifi" else "Looking for phones on the cable (USB mode).")
+        self._log("Looking for phones on Wi-Fi." if mode == "wifi" else "Looking for phones on the cable (USB mode).")
         if mode == "usb":
             threading.Thread(target=adb_server.stop_started, daemon=True, name="adb-release").start()
         self._set_status("Looking for the phone...")
@@ -629,6 +640,7 @@ class App:
                 usable = [d for d in found if d["accessible"]]
                 if usable:
                     serial = usable[0]["serial"]
+                    self._fb_links[serial] = usable[0].get("link") or "USB"
                 elif found:  # in fastboot, but it cannot be opened
                     android = {"serial": found[0]["serial"], "state": "no-access", "mode": "fastboot",
                                "reason": found[0].get("reason")}
@@ -682,6 +694,13 @@ class App:
 
         threading.Thread(target=guarded, daemon=True, name="scan").start()
 
+    def _link_text(self) -> str:
+        """The footer's right side: how the phone is connected. A cable phone shows its USB port (bus and port, like
+        1-3), a Wi-Fi phone its address and port, a phone in fastboot its USB port and the mode."""
+        if self.device:
+            return f"{self._fb_links.get(self.device, 'USB')} · fastboot"
+        return (self.android or {}).get("link", "")
+
     def _device_seen(self, serial: Optional[str], android: Optional[dict] = None, fb: Optional[dict] = None):
         if self.status.cget("text") == "Looking for the phone...":   # a Rescan finished
             self._set_status("Ready.")
@@ -691,6 +710,7 @@ class App:
         log.get("gui").debug("Phone state changed: fastboot=%s android=%s", serial,
                              {k: (android or {}).get(k) for k in ("serial", "state", "model", "reason")})
         self.device, self.android, self.fb_info = serial, android, fb
+        self.link_info.configure(text=self._link_text())
         self._none_since = None if (serial or android) else (self._none_since or time.time())
         self._render_status()
         if serial:
@@ -751,7 +771,7 @@ class App:
             if is_wireless(str(android.get("serial", ""))):                # connected over Wi-Fi
                 return (ORANGE_DOT, "Allow debugging on the phone",
                         "Unlock the phone, tap Allow and tick \"Always allow from this computer\". To skip this "
-                        "prompt for good, pair it once in Phone > Wireless adb.", None)
+                        "prompt for good, pair it once in Phone > Wi-Fi connection.", None)
             return (ORANGE_DOT, "Allow USB debugging on the phone",
                     "Unlock the phone, tap Allow and tick \"Always allow from this computer\".", None)
         if state == "offline":
@@ -767,26 +787,40 @@ class App:
         self.dev_dot.configure(fg=colour)
         self.dev_text.configure(text=headline, foreground=GREEN if colour == GREEN else "")
         self.dev_detail.configure(text=detail)
-        for widget in (self.buttons, self.details):
-            widget.pack_forget()
         row = ([action] if action is not None else []) + (self.tool_btns if state == "device" else [])
-        self.buttons.set(row)
-        self._paint_security_button()          # a different phone may have a different last result
-        if row:
-            self.buttons.pack(fill="x", padx=(22, 0), pady=(10, 0))
         pairs = [(k, v) for k, v in self._device_pairs() if v not in (None, "")]
-        self._show_info(pairs)
+        self._show_info(pairs)                 # new readings change the text in place: nothing is torn down
         self._show_more()
-        self.copy_btn.pack_forget()
-        self.export_btn.pack_forget()
-        if pairs:
-            self.details.pack(fill="x", padx=(22, 0), pady=(10, 0))
-            self.export_btn.pack(side="right", anchor="n", padx=(0, 8))  # beside Rescan, at the top
-            self.copy_btn.pack(side="right", anchor="n", padx=(0, 8))
+        # The sections are laid out again only when what they hold changed (a different row of buttons, details
+        # appearing or going). A refresh that only brings new readings must not flicker the window.
+        layout = (tuple(id(b) for b in row), bool(pairs))
+        if layout != self._shown_layout:
+            self._shown_layout = layout
+            for widget in (self.buttons, self.details):
+                widget.pack_forget()
+            self.buttons.set(row)
+            if row:
+                self.buttons.pack(fill="x", padx=(22, 0), pady=(10, 0))
+            self.copy_btn.pack_forget()
+            self.export_btn.pack_forget()
+            if pairs:
+                self.details.pack(fill="x", padx=(22, 0), pady=(10, 0))
+                self.export_btn.pack(side="right")           # left of the selector: Copy, Export, then USB | Wi-Fi
+                self.copy_btn.pack(side="right")
+        self._paint_security_button()          # a different phone may have a different last result
 
     def _show_info(self, pairs) -> None:
+        """The details grid. With the same rows as before only the values that changed are rewritten, in place (a
+        refresh every few seconds must not rebuild the grid: that flickers and moves the page)."""
+        names = tuple(label for label, _value in pairs)
+        if names == self._info_names and self._info_cells:
+            for cell, (_label, value) in zip(self._info_cells, pairs):
+                if cell.cget("text") != str(value):
+                    cell.configure(text=str(value))
+            return
         for child in self.info_box.winfo_children():
             child.destroy()
+        self._info_names, self._info_cells = names, []
         half = (len(pairs) + 1) // 2
         for col in (1, 3):
             self.info_box.columnconfigure(col, weight=1)
@@ -794,7 +828,9 @@ class App:
             row, col = i % half, (i // half) * 2
             ttk.Label(self.info_box, text=label, foreground=MUTED).grid(
                 row=row, column=col, sticky="w", padx=(0 if col == 0 else 24, 12), pady=1)
-            ttk.Label(self.info_box, text=str(value)).grid(row=row, column=col + 1, sticky="w", pady=1)
+            cell = ttk.Label(self.info_box, text=str(value))
+            cell.grid(row=row, column=col + 1, sticky="w", pady=1)
+            self._info_cells.append(cell)
 
     def _device_pairs(self):
         serial, android, fb = self.device, self.android, self.fb_info
@@ -833,7 +869,9 @@ class App:
                 ("Encryption", {"encrypted": "On", "unencrypted": "Off"}.get(str(android.get("encryption")),
                                                                              android.get("encryption"))),
                 ("Battery", None if battery is None else f"{battery}%" + (f", {temp:.0f} °C" if temp else "")),
-                ("Serial", android["serial"]),
+                # the phone's own serial; over Wi-Fi the connection's name is an address, which is shown as its own row
+                ("Serial", android.get("serialno") or (None if is_wireless(android["serial"]) else android["serial"])),
+                ("Wi-Fi address", android["serial"] if is_wireless(android["serial"]) else None),
             ]
         return []
 
@@ -851,11 +889,15 @@ class App:
         """Show or hide the extra details; fetch them the first time. Hiding only hides: the rows stay
         built, so Show less is instant and Show more again is too (building them is the slow part)."""
         key = self._device_key()
-        self.more_btn.configure(text="Show less" if self._more_open else "Show more",
-                                icon="up" if self._more_open else "down", state="normal" if key else "disabled")
+        text, icon, state = ("Show less" if self._more_open else "Show more", "up" if self._more_open else "down",
+                             "normal" if key else "disabled")
+        if (self.more_btn.cget("text"), self.more_btn.cget("state")) != (text, state) or self._more_icon != icon:
+            self._more_icon = icon                         # only when it changed: a refresh must not repaint it
+            self.more_btn.configure(text=text, icon=icon, state=state)
         if not (self._more_open and key):
-            self.more_box.pack_forget()
-            self.page.refit()                           # no blank gap or stale pixels where the rows were
+            if self.more_box.winfo_manager():              # only when it is showing: no refit on every refresh
+                self.more_box.pack_forget()
+                self.page.refit()                          # no blank gap or stale pixels where the rows were
             return
         if key not in self._more:
             for child in self.more_box.winfo_children():
@@ -866,11 +908,12 @@ class App:
                      label="Reading details").pack(fill="x", pady=(6, 0))
             self._read_more(key)
             return
-        built = (key, id(self._more[key]))
+        built = (key, repr(self._more[key]))           # by content: re-reading the same values changes nothing
         if self._more_built != built:                  # new phone or new readings: build the rows once
             self._build_more(key)
             self._more_built = built
-        self.more_box.pack(fill="x", before=self.more_btn, pady=(8, 0))
+        if not self.more_box.winfo_manager():
+            self.more_box.pack(fill="x", before=self.more_btn, pady=(8, 0))
 
     def _build_more(self, key) -> None:
         """One text widget with all the sections: built in milliseconds, selectable, and it sizes itself."""

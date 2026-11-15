@@ -13,7 +13,7 @@ class FakePhone:
     def __init__(self, answers):
         self.answers = answers
 
-    def shell(self, command):
+    def shell(self, command, timeout_ms=60000):          # the same signature as adb.Phone.shell
         for start, out in self.answers.items():
             if command.startswith(start):
                 return out

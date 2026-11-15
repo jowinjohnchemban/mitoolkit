@@ -26,6 +26,14 @@ def is_wireless(serial: str) -> bool:
     return ":" in serial or "._adb-tls-" in serial or serial.startswith("adb-")
 
 
+def describe_link(serial: str, usb_location: Optional[str] = None) -> str:
+    """How a phone is connected, in words for the footer: "Wi-Fi 192.168.1.xx:39865" for a wireless phone (its
+    address and port), "USB port 1-3" (bus 1, port 3) for a cable, or just "USB" when the port is not known."""
+    if is_wireless(serial):
+        return f"Wi-Fi {serial}"
+    return f"USB port {usb_location}" if usb_location else "USB"
+
+
 class SyncSession:
     """adb's file transfer service (``sync:``): stat, list and receive files. Works over any
     byte stream with read(n), write(data), close() and .closed: a USB stream here, or a

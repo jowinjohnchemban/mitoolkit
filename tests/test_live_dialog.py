@@ -100,6 +100,27 @@ class LiveDialogTests(unittest.TestCase):
         self.assertEqual(len(d.cpu.data[0]) - before, queued)  # every reading reached the graph
         self.assertFalse(d._scheduled)
 
+    def test_the_soc_tab_shows_processor_gpu_and_memory_with_their_temperatures(self):
+        from mitoolkit.ui.live_dialog import TABS
+        self.assertEqual(dict(TABS)["processor"], "SoC")
+        d = self.dlg
+        self.feed(3)
+        self.assertIn("41 °C normal", d.s_cpu.caption)                  # the phone's cpu sensor
+        self.assertIn("52 °C warm", d.s_gpu.caption)                    # the phone's GPU sensor
+        self.assertNotIn("°C", d.s_ram.caption)                         # no memory sensor on this phone: nothing made up
+        self.assertIsNotNone(d.s_ram.percent)
+
+    def test_a_gpu_without_a_load_reading_says_so_instead_of_loading_for_ever(self):
+        d = self.dlg
+        d.tab_var.set("processor")
+        d._show_tab()
+        d.s_gpu.set_unavailable("No load reading", "46 °C normal")
+        self.root.update()
+        self.assertFalse(d.s_gpu.loading)
+        self.assertEqual(d.s_gpu.state_text, "No load reading")
+        d.s_gpu.set(40, "710 MHz")                                      # a later reading puts the ring back
+        self.assertFalse(d.s_gpu.n_a)
+
     def test_a_broken_reading_does_not_break_the_window(self):
         d = self.dlg
         d._deliver({"cpu": "not a number", "mem_pct": None, "thermal": "oops"}, None)

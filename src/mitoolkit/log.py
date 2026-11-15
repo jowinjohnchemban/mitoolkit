@@ -1,4 +1,4 @@
-"""Logging to ``mitoolkit.log`` next to the program.
+"""Logging to ``logs/mitoolkit.log`` next to the program.
 
 The log is for diagnosing problems and for bug reports, so it records what
 happened (steps, result codes, error types) and never secrets. Messages pass
@@ -6,8 +6,8 @@ through a scrubber that hides token-like values even if one slips into a message
 The file is restricted to your user account and rotated at 512 KB, keeping three
 old copies.
 
-Location: the folder of the executable when running a built program, otherwise
-the current directory. If that folder is not writable, logging to a file is
+Location: a ``logs`` folder in the folder of the executable when running a built program, otherwise in the
+current directory (the project, when run from source). If that folder is not writable, logging to a file is
 skipped and the program carries on.
 """
 import logging
@@ -21,6 +21,7 @@ from typing import Optional
 from mitoolkit.auth.store import restrict_to_current_user
 
 NAME = "mitoolkit.log"
+FOLDER = "logs"                  # the log and crash.log live here, in their own folder (ignored by git)
 _log = logging.getLogger("mitoolkit")
 _path: Optional[Path] = None
 
@@ -76,8 +77,9 @@ def setup(verbose: Optional[bool] = None) -> Optional[Path]:
     verbose = env_debug() if verbose is None else verbose
     _log.setLevel(logging.DEBUG if verbose else logging.INFO)
     _log.propagate = False
-    path = log_dir() / NAME
+    path = log_dir() / FOLDER / NAME
     try:
+        path.parent.mkdir(exist_ok=True)
         handler = RotatingFileHandler(path, maxBytes=512 * 1024, backupCount=3, encoding="utf-8")
     except OSError:
         return None  # read-only folder: run without a log file

@@ -252,12 +252,7 @@ class ConnectionsDialog(Dialog):
             return
         self._testing = True
         self.test_btn.configure(state="disabled", text="Testing...")
-        gateway = ""
-        for _title, rows in self.report["sections"]:  # type: ignore[union-attr]
-            for label, value, _level in rows:
-                if label == "Gateway (router)":
-                    gateway = value
-                    break
+        gateway = str(self.report.get("gateway") or "")       # the Wi-Fi router (the carrier's gateway never answers)
 
         def work() -> None:
             try:
