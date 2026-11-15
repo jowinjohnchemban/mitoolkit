@@ -156,8 +156,13 @@ class ClosingFreesThingsTests(unittest.TestCase):
                 if not workers.render_pool.waiting:
                     break
                 time.sleep(0.01)
-            root.update()
-            alive = [ref() for ref in charts if not freed(ref, tries=150)]
+            for _ in range(300):                         # results of finished drawing jobs are handed over (and the
+                root.update()                            # references let go) only while the window runs its events
+                memory.collect()
+                if all(ref() is None for ref in charts):
+                    break
+                time.sleep(0.01)
+            alive = [ref() for ref in charts if ref() is not None]
             detail = ""
             if alive:                                    # say what still holds it, so a failure can be tracked down
                 detail = "; ".join(f"{type(r).__name__}: {str(r)[:90]}" for r in gc.get_referrers(alive[0])[:8])
