@@ -117,7 +117,6 @@ If you would rather not install Python, download a ready-made program from the
 | File | What it is |
 |---|---|
 | `mitoolkit-windows-x64.exe`, `mitoolkit-linux-x64`, `mitoolkit-macos-arm64` | The program: opens the GUI, or runs on the command line with `--cli` |
-| `mitoolkit-<version>-py3-none-any.whl`, `mitoolkit-<version>.tar.gz` | Python packages |
 | `SHA256SUMS.txt` | Checksums |
 
 They are built by GitHub Actions from the tagged source. Check your download

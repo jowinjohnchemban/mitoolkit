@@ -42,30 +42,6 @@ jobs:
           FORCED_BUMP: ${{ inputs.bump }}
         run: python3 .github/scripts/release_version.py ${FORCED_BUMP:+--bump "$FORCED_BUMP"} >> "$GITHUB_OUTPUT"
 
-  dist:
-    needs: check
-    if: needs.check.outputs.release == 'true'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.12"
-      - name: Stamp the release version (not committed)
-        env:
-          VERSION: ${{ needs.check.outputs.version }}
-        run: python .github/scripts/stamp_version.py "$VERSION"
-      - name: Stamp the build (date and commit shown in the app)
-        shell: bash
-        run: printf 'DATE = "%s"\nCOMMIT = "%s"\n' "$(git log -1 --format=%cd --date=format:%d%m%Y)" "$(git rev-parse --short HEAD)" > src/mitoolkit/_build.py
-      - run: python -m pip install build && python -m build
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: dist
-          path: dist/*
-
   executables:
     needs: check
     if: needs.check.outputs.release == 'true'
@@ -136,7 +112,7 @@ jobs:
           path: out/*
 
   publish:
-    needs: [check, dist, executables]
+    needs: [check, executables]
     runs-on: ubuntu-24.04
     permissions:
       contents: write   # only this job may create the release
@@ -161,7 +137,6 @@ jobs:
             echo
             echo "### Downloads"
             echo "- \`mitoolkit-*\` program for Windows, Linux and macOS: opens the GUI, or runs on the command line with \`--cli\`. The app updates itself from here (Help > Check for updates)."
-            echo "- \`.whl\` / \`.tar.gz\`: Python packages (\`pip install <file>\`)"
             echo "- \`SHA256SUMS.txt\`: verify downloads with \`sha256sum -c SHA256SUMS.txt\`"
             echo
             echo "Windows SmartScreen and macOS Gatekeeper may warn about a program they have not seen before (more so if it is not code-signed). Check the download against SHA256SUMS.txt, then choose More info > Run anyway on Windows. Updating from inside the app does not trigger the warning."
