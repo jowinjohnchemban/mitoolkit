@@ -1,0 +1,12 @@
+# What MiToolkit needs to run from source: pip install -r requirements.txt
+# (pip install -e . reads the same list from pyproject.toml, the source of truth).
+requests
+rich
+qrcode
+pyaes
+Pillow>=10
+pyusb>=1.2.1
+libusb-package; sys_platform == "win32" or sys_platform == "darwin" or (sys_platform == "linux" and platform_machine == "x86_64")
+
+# Optional: keep the sign-in session in the system's credential store (macOS Keychain, Linux Secret Service).
+# keyring>=24
