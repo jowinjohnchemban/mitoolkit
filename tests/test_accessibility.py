@@ -79,7 +79,7 @@ class TextSizeTests(unittest.TestCase):
             from tkinter import font as tkfont
             t.apply_theme(root)
             fonts = t.Fonts(root)
-            body = tkfont.nametofont("TkDefaultFont", root=root)
+            body = t.named_font("TkDefaultFont", root)
             normal, heading = body.actual("size"), fonts.heading.actual("size")
             t.scale_fonts(root, 2.0, fonts.all())
             self.assertGreaterEqual(body.actual("size"), normal * 2 - 1)

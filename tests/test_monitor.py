@@ -1,6 +1,7 @@
 """Live status: parsing the phone's /proc and /sys readings, and rates between samples."""
 import os
 import sys
+import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -87,6 +88,7 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(first["mem_pct"], 75.0)
         self.assertEqual(first["current_ma"], -450)
         self.assertEqual(first["hottest"], ("cpu", 41.0))
+        time.sleep(0.05)                                     # Windows' clock ticks every 15 ms: rates need time to pass
         second = mon.sample()
         self.assertAlmostEqual(second["cpu"], 10.0)         # 100 busy of 1000 total jiffies
         self.assertGreater(second["net_down_kbs"], 0)

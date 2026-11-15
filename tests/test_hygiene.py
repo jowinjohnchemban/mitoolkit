@@ -156,7 +156,11 @@ class ClosingFreesThingsTests(unittest.TestCase):
                     break
                 time.sleep(0.01)
             root.update()
-            self.assertTrue(all(freed(ref, tries=150) for ref in charts))
+            alive = [ref() for ref in charts if not freed(ref, tries=150)]
+            detail = ""
+            if alive:                                    # say what still holds it, so a failure can be tracked down
+                detail = "; ".join(f"{type(r).__name__}: {str(r)[:90]}" for r in gc.get_referrers(alive[0])[:8])
+            self.assertEqual(alive, [], f"still alive: {detail}")
         finally:
             root.destroy()
 
