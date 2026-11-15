@@ -1,14 +1,11 @@
+from miunlock import fastboot
 from miunlock.utils import _send
-from miunlock.commands import get_device_token, get_product
-from miunlock.system import console, GREEN, ORANGE, RED, WHITE, NO_WINDOW
+from miunlock.system import console, GREEN, ORANGE, RED, WHITE
 import random
 import hashlib
-import os
-import subprocess
-import tempfile
-from pathlib import Path
 
-def unlock_device(domain, service, fastboot_cmd):
+
+def unlock_device(domain, service):
 
     cookies = service["cookies"]
     ssecurity = service['servicedata']["ssecurity"]
@@ -26,9 +23,10 @@ def unlock_device(domain, service, fastboot_cmd):
 
     console.print(f"\n[{GREEN}][[/] [{ORANGE}]Ensure your Xiaomi device is in fastboot mode[/] [{GREEN}]] < [/]\n")
 
-    product = get_product(fastboot_cmd)
-    if isinstance(product, dict) and "error" in product:
-        console.print(f"\n[{RED}]{product['error']}[/]\n")
+    try:
+        product = fastboot.get_product()
+    except fastboot.FastbootError as err:
+        console.print(f"\n[{RED}]{err}[/]\n")
         return
 
     console.print(f"\n[{GREEN}]Device Codename: {product}[/]\n")
@@ -49,9 +47,10 @@ def unlock_device(domain, service, fastboot_cmd):
 
     console.input(f"\n[{WHITE}]Press 'Enter' to continue — unlock(encryptData)[/]")
 
-    device_token = get_device_token(fastboot_cmd)
-    if isinstance(device_token, dict) and "error" in device_token:
-        console.print(f"\n[{RED}]{device_token['error']}[/]\n")
+    try:
+        device_token = fastboot.get_token()
+    except fastboot.FastbootError as err:
+        console.print(f"\n[{RED}]{err}[/]\n")
         return
 
     data = {
@@ -90,19 +89,8 @@ def unlock_device(domain, service, fastboot_cmd):
             console.print(f"\n[{ORANGE}]{unlock_result}[/]\n")
         return
 
-    encryptData = unlock_result["encryptData"]
-    # A private (owner-only), unpredictably named file, deleted as soon as fastboot is done.
-    fd, name = tempfile.mkstemp(prefix="miunlock-", suffix=".encryptData")
-    filename = Path(name)
-    with os.fdopen(fd, "wb") as edfile:
-        edfile.write(bytes.fromhex(encryptData))
-
     try:
-        subprocess.run([fastboot_cmd, "stage", str(filename)], check=True, capture_output=True, text=True, creationflags=NO_WINDOW)
-        subprocess.run([fastboot_cmd, "oem", "unlock"], check=True, capture_output=True, text=True, creationflags=NO_WINDOW)
+        fastboot.stage_and_unlock(bytes.fromhex(unlock_result["encryptData"]))
         console.print(f"\n[{GREEN}]Unlock successful[/]\n")
-    except subprocess.CalledProcessError as e:
-        console.print(f"\n[{RED}]{e.stderr}[/]\n")
-    finally:
-        if filename.exists():
-            filename.unlink()
+    except fastboot.FastbootError as err:
+        console.print(f"\n[{RED}]{err}[/]\n")

@@ -24,7 +24,7 @@ miunlock --cli
 
 It walks through the whole process:
 
-1. Finds `fastboot`, or downloads Google's platform-tools if it is missing.
+1. Checks it can use USB (adb and fastboot are built in).
 2. Logs in. If a saved session exists it offers to reuse it; otherwise it asks for
    **Browser** or **QR code** login. Log in on the Xiaomi page that opens (check
    the address bar says `account.xiaomi.com`).
@@ -99,22 +99,34 @@ When eligible, `check` returns `"eligible": true` together with
 miunlock backup --dest D:\\phone-backup --only photos,documents
 ```
 
-Copies folders from a phone running Android to your computer with `adb pull`, and writes
+Copies folders from a phone running Android to your computer over adb, and writes
 `installed-apps.txt`. Choices for `--only`: `photos`, `documents`, `chats`, `audio`,
 `everything`. Read-only for the phone; progress goes to stderr and the result is JSON.
 
-### install-tools and install-driver
+### apps
 
 ```sh
-miunlock install-tools     # latest adb and fastboot (Android platform-tools) from dl.google.com
+miunlock apps list --known                       # known bloat on the phone, with ratings
+miunlock apps list                               # every app
+miunlock apps remove com.miui.msa.global         # remove for your user (restorable)
+miunlock apps restore com.miui.msa.global        # bring it back
+```
+
+Removing uses `pm uninstall -k --user 0`: a preinstalled app is hidden for your user and
+can be restored; an app you installed yourself is uninstalled. Unlocking resets the phone,
+which brings removed apps back. Ratings: `recommended`, `optional`, `advanced`, `avoid`,
+`unknown` (see `src/miunlock/bloat.py`).
+
+### install-driver
+
+```sh
 miunlock install-driver    # Windows: Google's official USB driver, via pnputil (UAC prompt)
 ```
 
-`install-tools` replaces the copy in `~/platform-tools`; a system-wide adb/fastboot is left
-alone. `install-driver` logs the download's SHA-256 and installs with Windows' own
-`pnputil`. Google's driver does not list Xiaomi's USB IDs, so if Windows does not use it by
-itself, pick it in Device Manager: *Update driver > Browse my computer > Let me pick >
-Android Device > Android Bootloader Interface*. Both are also in the GUI's **File** menu.
+Logs the download's SHA-256 and installs with Windows' own `pnputil`. Google's driver does
+not list Xiaomi's USB IDs, so if Windows does not use it by itself, pick it in Device
+Manager: *Update driver > Browse my computer > Let me pick > Android Device > Android
+Bootloader Interface*. Also in the GUI's **File** menu.
 
 ## GUI
 
@@ -141,6 +153,8 @@ Handy features:
 - Connected phones show their details (model, versions, bootloader state, battery). **Copy
   info** copies them, **Rescan** looks again, and a tip appears if no phone shows up for 20 s.
 - **Back up files...** copies photos, documents, chat media and more from a phone that is on.
+- **Manage apps...** lists the phone's apps with a rating for known bloat; tick and remove,
+  or restore removed ones.
 - When Xiaomi says to wait, the message includes the date and time to try again.
 
 ## Saved session and log

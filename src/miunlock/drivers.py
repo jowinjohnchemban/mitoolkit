@@ -8,8 +8,8 @@ administrator (UAC) prompt. Windows itself checks the driver's signature.
 
 Google's .inf does not list Xiaomi's USB IDs, so Windows may not pick the driver for a
 Xiaomi phone by itself. Once it is in the driver store it can be chosen by hand in Device
-Manager (see MANUAL_STEPS). adb and fastboot come from Google's platform-tools; see
-fastboot.update_platform_tools.
+Manager (see MANUAL_STEPS). This driver is the only thing miunlock downloads from
+Google: adb and fastboot are built in (adb_usb.py, fastboot_usb.py).
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ import sys
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from miunlock.system import NO_WINDOW
 

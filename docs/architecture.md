@@ -12,13 +12,20 @@ src/miunlock/
 ├── gui.py             Tkinter GUI
 ├── mcp.py             MCP server for AI agents (no unlock tool)
 ├── api.py             programmatic API used by the subcommands, GUI and MCP
-├── adb.py             adb: list phones, device info, reboot to fastboot
+├── adb.py             adb features: phones, details, reboot, backup, app manager
+├── adb_usb.py         built-in adb client (USB protocol, auth, shell, sync)
+├── adbkey.py          adb RSA key (~/.android/adbkey), pure Python
+├── fastboot.py        fastboot features: devices, getvar, token, stage + oem unlock
+├── fastboot_usb.py    built-in fastboot client (USB protocol)
+├── usbio.py           USB access through pyusb + libusb
+├── drivers.py         Google USB driver installer (Windows)
+├── bloat.py           known Xiaomi bloat, with ratings, for the app manager
+├── guide.py           the in-app step-by-step guide
 ├── log.py             scrubbed miunlock.log next to the executable
 ├── hints.py           plain-English explanations of Xiaomi error codes
 ├── assets/logo.png    window icon
 ├── unlock.py          the original interactive unlock sequence
-├── commands.py        fastboot queries: product, device token
-├── fastboot.py        locate or download fastboot
+├── commands.py        Termux only: fastboot queries through the fastboot command
 ├── utils.py           request signing, encryption and the HTTP call to Xiaomi
 ├── system.py          platform detection helpers
 ├── termux.py          Android (Termux) fastboot setup
@@ -61,8 +68,26 @@ POST /api/v2/nonce                    nonces are single use
 POST /api/v3/ahaUnlock                returns encryptData
         │
         ▼
-fastboot stage <file>  ──►  fastboot oem unlock
+download (stage) encryptData  ──►  oem unlock
 ```
+
+The fastboot steps are miunlock's own USB client (`fastboot_usb.py`); `encryptData` goes
+from memory straight to the phone and is never written to disk. On Termux the termux
+`fastboot` command is used instead, because Android apps cannot open USB devices directly.
+
+## Built-in adb and fastboot
+
+Both clients follow AOSP's implementation (adb.cpp, client/auth.cpp,
+daemon/file_sync_service.cpp, fastboot/README.md, fastboot_driver.cpp). Details that matter:
+
+- adb: CNXN payload `host::features=` with no NUL; version `0x01000001`; the phone's token
+  is signed with PKCS#1 v1.5 as a SHA-1 digest; if refused, the public key is sent in adb's
+  own format with a trailing NUL. Writes whose length is a multiple of the USB packet size
+  end with a zero-length packet. Each WRTE is acknowledged with OKAY.
+- sync: `LIST` returns full-size `DENT` entries ending with a zeroed `DONE`; the phone ends
+  the sync session after a `FAIL`, so the client reopens it.
+- fastboot: responses are at most 256 bytes; `INFO`/`TEXT` repeat until `OKAY`, `FAIL` or
+  `DATA`; downloads send no zero-length packet.
 
 Everything above the confirmation line is read-only. See
 [how it works](how-it-works.md) for what `deviceToken` and `encryptData` are.

@@ -78,10 +78,28 @@ miunlock --help
 Run `miunlock` for the GUI or `miunlock --cli` for the command line. To update later, run the same
 command with `--upgrade`. To remove it, run `pip uninstall miunlock`.
 
-## fastboot
+## adb, fastboot and USB drivers
 
-`miunlock` uses `fastboot`. If it is not on your `PATH`, it downloads Google's
-platform-tools into `~/platform-tools` the first time it is needed.
+adb and fastboot are built into `miunlock`; Google's platform-tools are not needed. The
+program talks to the phone over USB with [libusb](https://libusb.info), which `pip`
+installs with it (the `libusb-package` wheel) on Windows, macOS and 64-bit Linux. Elsewhere,
+install libusb from your system's packages.
+
+- **Windows** needs a USB driver for the phone. Run *File > Install Google USB driver* in
+  the GUI, or `miunlock install-driver`, which installs Google's official driver after an
+  administrator prompt. If the phone still has a yellow mark in Device Manager, right-click
+  it > *Update driver > Browse my computer > Let me pick > Android Device > Android
+  Bootloader Interface* (or *Android ADB Interface* while Android is running).
+- **Linux** needs permission for the phone: add a udev rule for Android devices, for
+  example by installing `android-sdk-platform-tools-common` (Debian/Ubuntu), then reconnect.
+- **macOS** needs nothing extra.
+
+Only one program can use the phone at a time. Close Google's adb (`adb kill-server`),
+Android Studio, Mi Unlock or Mi Flash before using `miunlock`.
+
+The first time adb connects, the phone asks *Allow USB debugging?*. `miunlock` uses the same
+key file as Google's adb (`~/.android/adbkey`), creating it if needed, so a computer you
+already allowed is recognised.
 
 ## Android (Termux)
 

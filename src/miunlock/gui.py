@@ -27,10 +27,9 @@ from tkinter import font as tkfont
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, Optional
 
-from miunlock import __version__, adb, api, drivers, guide, log
+from miunlock import __version__, adb, api, bloat, drivers, fastboot, guide, log, usbio
 from miunlock.auth import store
 from miunlock.auth.redact import mask_id
-from miunlock.fastboot import get_fastboot, update_platform_tools
 from miunlock.hints import explain
 from miunlock.system import NO_WINDOW
 
@@ -91,7 +90,6 @@ class App:
         self.busy = False
         self._polling = False
         self.android: Optional[dict] = None  # phone seen by adb while running Android
-        self._adb: Optional[str] = None
         self._info: dict = {}
         self._fbinfo: dict = {}
         self._none_since: Optional[float] = time.time()  # when we last started seeing no phone
@@ -132,7 +130,6 @@ class App:
         file_menu.add_command(label="Sign out and delete saved session...", command=self._sign_out)
         file_menu.add_command(label="Show log file", command=self._show_log)
         file_menu.add_separator()
-        file_menu.add_command(label="Update adb and fastboot (from Google)...", command=self._update_tools)
         if drivers.supported():
             file_menu.add_command(label="Install Google USB driver...", command=self._install_driver)
         file_menu.add_separator()
@@ -255,6 +252,7 @@ class App:
         self.rescan_btn.pack(side="right")
         self.copy_btn = ttk.Button(drow, text="Copy info", command=self._copy_device)
         self.backup_btn = ttk.Button(drow, text="Back up files...", command=self._backup_dialog)
+        self.apps_btn = ttk.Button(drow, text="Manage apps...", command=self._apps_dialog)
         self.dev_tip = self._wrap(b2, "", foreground=AMBER, font=self.f_small)
         self.dev_tip.pack_forget()
         self.info_box = ttk.Frame(b2)  # device details, filled in when a phone is seen
@@ -466,27 +464,26 @@ class App:
 
     # --------------------------------------------------------------- fastboot
     def _prepare_fastboot(self):
-        self._log("Looking for fastboot (it is downloaded on first use)...")
-        self.dev_text.configure(text="Preparing fastboot (first run may download it)...")
+        self.dev_text.configure(text="Preparing USB...")
 
         def work():
             try:
-                self.q.put(("fastboot", get_fastboot(), None))
+                self.q.put(("fastboot", fastboot.ready(), None))
             except SystemExit:
                 self.q.put(("fastboot", None, "fastboot is not available on this system."))
             except Exception as err:
-                self.q.put(("fastboot", None, f"Could not set up fastboot: {err}"))
+                self.q.put(("fastboot", None, str(err)))
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _fastboot_ready(self, path: Optional[str], error: Optional[str]):
-        if error or not path:
+    def _fastboot_ready(self, how: Optional[str], error: Optional[str]):
+        if error or not how:
             self.dev_dot.configure(fg=RED)
-            self.dev_text.configure(text=error or "fastboot not found", foreground=RED)
-            self._log(error or "fastboot not found")
+            self.dev_text.configure(text=error or "USB access is not available", foreground=RED)
+            self._log(error or "USB access is not available")
             return
-        self.fastboot = path
-        self._log(f"Using fastboot at {path}")
+        self.fastboot = how
+        self._log(f"Using {how}. No adb or fastboot program is needed.")
         self.dev_text.configure(text="No phone detected. Waiting...", foreground=MUTED)
         self.root.after(500, self._poll_device)
 
@@ -529,26 +526,23 @@ class App:
                 serial = None
                 android = None
                 try:
-                    out = subprocess.run(
-                        [self.fastboot, "devices"], capture_output=True, text=True,
-                        timeout=8, creationflags=NO_WINDOW,
-                    ).stdout
-                    for line in out.splitlines():
-                        parts = line.split()
-                        if len(parts) >= 2 and parts[1] == "fastboot":
-                            serial = parts[0]
-                            break
+                    found = fastboot.devices()
+                    usable = [d for d in found if d["accessible"]]
+                    if usable:
+                        serial = usable[0]["serial"]
+                    elif found:  # in fastboot, but no driver or permission
+                        android = {"serial": found[0]["serial"], "state": "no-access", "mode": "fastboot"}
                 except Exception:
                     serial = None
-                if serial is None:
+                if serial is None and android is None:
                     try:  # no phone in fastboot: see whether one is running Android
-                        self._adb = self._adb or adb.get_adb()
-                        found = adb.devices(self._adb)
+                        found = adb.devices()
                         if found:
-                            android = dict(found[0])
+                            ready = [d for d in found if d["state"] == "device"]
+                            android = dict(ready[0] if ready else found[0])
                             if android["state"] == "device":
                                 if android["serial"] not in self._info:
-                                    self._info[android["serial"]] = adb.device_info(android["serial"], self._adb)
+                                    self._info[android["serial"]] = adb.device_info(android["serial"])
                                 android.update(self._info[android["serial"]])
                     except Exception:
                         android = None
@@ -556,7 +550,7 @@ class App:
                 if serial:
                     try:
                         if serial not in self._fbinfo:
-                            self._fbinfo[serial] = adb.fastboot_info(self.fastboot, serial)
+                            self._fbinfo[serial] = fastboot.info(serial)
                         fbinfo = self._fbinfo[serial]
                     except Exception:
                         fbinfo = None
@@ -620,8 +614,10 @@ class App:
             self.copy_btn.pack_forget()
         if android and android.get("state") == "device" and not serial:
             self.backup_btn.pack(side="right", before=self.copy_btn if pairs else self.rescan_btn)
+            self.apps_btn.pack(side="right", padx=6, before=self.backup_btn)
         else:
             self.backup_btn.pack_forget()
+            self.apps_btn.pack_forget()
         self.fb_btn.pack_forget()
         if serial:
             self.dev_dot.configure(fg=GREEN)
@@ -637,10 +633,20 @@ class App:
                 foreground=MUTED)
             self.fb_btn.pack(side="left", padx=6)
             self._log(f"Phone seen by adb: {name}")
+        elif android and android["state"] == "no-access":
+            where = " in fastboot mode" if android.get("mode") == "fastboot" else ""
+            self.dev_dot.configure(fg=ORANGE_DOT)
+            self.dev_text.configure(text=f"Phone found{where}, but it can't be opened. " + usbio.no_access_advice(),
+                                    foreground=AMBER)
+        elif android and android["state"] == "unauthorized":
+            self.dev_dot.configure(fg=ORANGE_DOT)
+            self.dev_text.configure(
+                text="Phone connected. Tap Allow on its \"Allow USB debugging?\" prompt.",
+                foreground=MUTED)
         elif android:
             self.dev_dot.configure(fg=ORANGE_DOT)
             self.dev_text.configure(
-                text="Phone connected, but USB debugging is not allowed yet. Accept the prompt on the phone.",
+                text="Phone connected, but adb can't talk to it. Turn USB debugging off and on, then reconnect.",
                 foreground=MUTED)
         else:
             self.dev_dot.configure(fg=MUTED)
@@ -655,13 +661,14 @@ class App:
 
     def _to_fastboot(self):
         serial = (self.android or {}).get("serial")
-        if not serial or not self._adb:
+        if not serial:
             return
         self._log("Asking the phone to reboot into fastboot mode (nothing is erased)...")
         self.fb_btn.configure(state="disabled")
 
         def work():
-            adb.reboot_to_bootloader(serial, self._adb)
+            adb.reboot_to_bootloader(serial)
+            self._info.pop(serial, None)
             return None
 
         def done(status, result):
@@ -786,8 +793,7 @@ class App:
         if not self.fastboot:
             return
         try:
-            subprocess.run([self.fastboot, "reboot"], capture_output=True, text=True,
-                           timeout=15, creationflags=NO_WINDOW)
+            fastboot.reboot(self.device)
             self._log("Sent reboot command.")
         except Exception as err:
             self._log(f"Reboot failed: {err}")
@@ -809,32 +815,6 @@ class App:
         self._show_check("", "", "", MUTED)
         self._log("Saved session deleted.")
         self._refresh()
-
-    def _update_tools(self):
-        if self.busy:
-            return
-        if not messagebox.askyesno(
-            "Update adb and fastboot",
-            "This downloads the latest adb and fastboot (Android platform-tools) from Google\n"
-            "(dl.google.com) into your home folder's platform-tools folder, replacing the old copy.\n\nContinue?",
-        ):
-            return
-
-        def work():
-            return update_platform_tools()
-
-        def done(status, result):
-            if status == "error":
-                self._log(f"Could not update adb and fastboot: {result}")
-                messagebox.showerror("Update adb and fastboot", str(result))
-                return
-            self.fastboot = None  # pick the new copy up on the next scan
-            self._adb = None
-            self._prepare_fastboot()
-            self._log(f"adb and fastboot updated in {result}")
-            messagebox.showinfo("Update adb and fastboot", f"Updated.\n\n{result}")
-
-        self._run(work, done, "Downloading adb and fastboot from Google...")
 
     def _install_driver(self):
         if self.busy:
@@ -877,7 +857,7 @@ class App:
     # ------------------------------------------------------------------ backup
     def _backup_dialog(self):
         serial = (self.android or {}).get("serial")
-        if not serial or not self._adb:
+        if not serial:
             return
         win = tk.Toplevel(self.root)
         win.title("Back up files from the phone")
@@ -931,7 +911,7 @@ class App:
             dest = dest_var.get().strip()
 
             def work():
-                return adb.backup_files(serial, dest, chosen, self._adb, self._bk_log, cancel_event)
+                return adb.backup_files(serial, dest, chosen, self._bk_log, cancel_event)
 
             def done(status, result):
                 bar.stop()
@@ -942,7 +922,10 @@ class App:
                 elif result.get("cancelled"):
                     msg = f"Cancelled. Files copied so far are in {result['dest']}"
                 else:
-                    msg = f"Done. {len(result['copied'])} folder(s) saved to {result['dest']}"
+                    msg = (f"Done. {result['files']} files ({result['bytes'] / 1e6:.1f} MB) from "
+                           f"{len(result['copied'])} folder(s) saved to {result['dest']}")
+                    if result.get("failed_files"):
+                        msg += f". {result['failed_files']} file(s) could not be read"
                     if result["skipped"]:
                         msg += f"  (not found or failed: {', '.join(result['skipped'])})"
                 self._bk_label.configure(text=msg, foreground=RED if status == "error" else GREEN)
@@ -951,6 +934,178 @@ class App:
             self._run(work, done, "Backing up files from the phone...")
 
         start.configure(command=begin)
+
+    # ------------------------------------------------------------ app manager
+    def _apps_dialog(self):
+        serial = (self.android or {}).get("serial")
+        if not serial:
+            return
+        win = tk.Toplevel(self.root)
+        win.title("Manage apps")
+        win.geometry("900x600")
+        win.minsize(640, 400)
+        win.transient(self.root)
+        body = ttk.Frame(win, padding=12)
+        body.pack(fill="both", expand=True)
+
+        tk.Label(body, bg=WARN_BG, fg=WARN_FG, justify="left", anchor="w", padx=10, pady=6, wraplength=840,
+                 text="Tick the apps to remove, then click Remove ticked. Preinstalled apps are only removed "
+                      "for your user and can be restored here. Unlocking the bootloader resets the phone and "
+                      "brings them all back, so debloat after unlocking, or if you are not unlocking."
+                 ).pack(fill="x")
+
+        bar = ttk.Frame(body)
+        bar.pack(fill="x", pady=(10, 6))
+        ttk.Label(bar, text="Show:").pack(side="left")
+        view_var = tk.StringVar(value="Known bloat")
+        view = ttk.Combobox(bar, textvariable=view_var, state="readonly", width=24,
+                            values=["Known bloat", "All preinstalled", "Installed by you", "Removed (restorable)", "Everything"])
+        view.pack(side="left", padx=6)
+        ttk.Label(bar, text="Search:").pack(side="left", padx=(12, 0))
+        search_var = tk.StringVar()
+        ttk.Entry(bar, textvariable=search_var, width=28).pack(side="left", padx=6)
+        count_lbl = ttk.Label(bar, text="Loading apps from the phone...", foreground=MUTED)
+        count_lbl.pack(side="right")
+
+        table = ttk.Frame(body)
+        table.pack(fill="both", expand=True)
+        cols = ("mark", "name", "package", "rating", "status", "note")
+        tree = ttk.Treeview(table, columns=cols, show="headings", selectmode="browse")
+        for col, title, width, stretch in (("mark", "", 34, False), ("name", "App", 170, False),
+                                           ("package", "Package", 250, True), ("rating", "Rating", 100, False),
+                                           ("status", "Status", 90, False), ("note", "Note", 260, True)):
+            tree.heading(col, text=title)
+            tree.column(col, width=width, stretch=stretch, anchor="center" if col == "mark" else "w")
+        ysb = ttk.Scrollbar(table, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=ysb.set)
+        ysb.pack(side="right", fill="y")
+        tree.pack(side="left", fill="both", expand=True)
+        for tag, colour in (("recommended", GREEN), ("advanced", AMBER), ("avoid", RED), ("unknown", MUTED)):
+            tree.tag_configure(tag, foreground=colour)
+
+        status_lbl = ttk.Label(body, text="", foreground=MUTED, wraplength=840, justify="left")
+        status_lbl.pack(fill="x", pady=(6, 0))
+        buttons = ttk.Frame(body)
+        buttons.pack(fill="x", pady=(8, 0))
+
+        apps: list = []
+        marked: set = set()
+
+        def label(app) -> tuple:
+            name, rating, note = bloat.describe(app["package"], app["system"])
+            status = "Removed" if not app["installed"] else ("Disabled" if app["disabled"] else "Installed")
+            return name, rating, note, status
+
+        def shown(app) -> bool:
+            name, rating, _note, _status = label(app)
+            v = view_var.get()
+            if v == "Known bloat" and not (app["package"] in bloat.KNOWN and rating != "avoid" and app["installed"]):
+                return False
+            if v == "All preinstalled" and not (app["system"] and app["installed"]):
+                return False
+            if v == "Installed by you" and app["system"]:
+                return False
+            if v == "Removed (restorable)" and app["installed"]:
+                return False
+            q = search_var.get().strip().lower()
+            return not q or q in app["package"].lower() or q in name.lower()
+
+        def fill(*_):
+            tree.delete(*tree.get_children())
+            order = {r: i for i, r in enumerate(bloat.RATINGS)}
+            rows = [a for a in apps if shown(a)]
+            rows.sort(key=lambda a: (order[label(a)[1]], a["package"]))
+            for a in rows:
+                name, rating, note, status = label(a)
+                tree.insert("", "end", iid=a["package"], tags=(rating,),
+                            values=("\u2611" if a["package"] in marked else "\u2610", name, a["package"],
+                                    rating.capitalize(), status, note))
+            count_lbl.configure(text=f"{len(rows)} shown, {len(marked)} ticked")
+
+        def toggle_row(row):
+            if not row:
+                return
+            marked.symmetric_difference_update({row})
+            tree.set(row, "mark", "\u2611" if row in marked else "\u2610")
+            count_lbl.configure(text=f"{len(tree.get_children())} shown, {len(marked)} ticked")
+
+        tree.bind("<Button-1>", lambda e: toggle_row(tree.identify_row(e.y)))
+        tree.bind("<space>", lambda _e: toggle_row(tree.focus()))
+        view.bind("<<ComboboxSelected>>", fill)
+        search_var.trace_add("write", fill)
+
+        def tick_recommended():
+            for a in apps:
+                if a["installed"] and bloat.describe(a["package"], a["system"])[1] == "recommended":
+                    marked.add(a["package"])
+            fill()
+
+        def act(restore: bool):
+            chosen = sorted(marked)
+            by_pkg = {a["package"]: a for a in apps}
+            if restore:
+                chosen = [p for p in chosen if not by_pkg[p]["installed"]]
+            else:
+                chosen = [p for p in chosen if by_pkg[p]["installed"]]
+            if not chosen:
+                messagebox.showinfo("Manage apps", "Tick at least one "
+                                    + ("removed app to restore." if restore else "installed app to remove."), parent=win)
+                return
+            if not restore:
+                risky = [p for p in chosen if bloat.describe(p, by_pkg[p]["system"])[1] in ("avoid", "advanced", "unknown")]
+                yours = [p for p in chosen if not by_pkg[p]["system"]]
+                text = f"Remove {len(chosen)} app(s) for your user?"
+                if risky:
+                    text += ("\n\nThese can affect the phone or the unlock:\n  " + "\n  ".join(risky[:12])
+                             + ("\n  ..." if len(risky) > 12 else ""))
+                if yours:
+                    text += f"\n\n{len(yours)} of them were installed by you and will be uninstalled, not just hidden."
+                if not messagebox.askyesno("Remove apps", text, default="no" if risky else "yes",
+                                           icon="warning" if risky else "question", parent=win):
+                    return
+
+            def work():
+                done_ok, failed = [], []
+                for pkg in chosen:
+                    try:
+                        (adb.restore_for_user if restore else adb.uninstall_for_user)(pkg, serial)
+                        done_ok.append(pkg)
+                        self._log(("Restored " if restore else "Removed ") + pkg)
+                    except adb.AdbError as err:
+                        failed.append(pkg)
+                        self._log(f"Could not {'restore' if restore else 'remove'} {pkg}: {err}")
+                return done_ok, failed, adb.list_packages(serial)
+
+            def done(status, result):
+                if status == "error":
+                    status_lbl.configure(text=str(result), foreground=RED)
+                    return
+                ok, failed, fresh = result
+                apps[:] = fresh
+                marked.difference_update(ok)
+                fill()
+                verb = "Restored" if restore else "Removed"
+                status_lbl.configure(
+                    text=f"{verb} {len(ok)} app(s)." + (f" {len(failed)} failed: {', '.join(failed[:6])}" if failed else ""),
+                    foreground=RED if failed else GREEN)
+
+            self._run(work, done, ("Restoring" if restore else "Removing") + " apps...")
+
+        ttk.Button(buttons, text="Tick recommended", command=tick_recommended).pack(side="left")
+        ttk.Button(buttons, text="Clear ticks", command=lambda: (marked.clear(), fill())).pack(side="left", padx=6)
+        ttk.Button(buttons, text="Close", command=win.destroy).pack(side="right")
+        ttk.Button(buttons, text="Restore ticked", command=lambda: act(True)).pack(side="right", padx=6)
+        ttk.Button(buttons, text="Remove ticked", style="Primary.TButton", command=lambda: act(False)).pack(side="right")
+
+        def loaded(status, result):
+            if status == "error":
+                count_lbl.configure(text="")
+                status_lbl.configure(text=f"Could not read the app list: {result}", foreground=RED)
+                return
+            apps[:] = result
+            fill()
+
+        self._run(lambda: adb.list_packages(serial), loaded, "Reading the app list from the phone...")
 
     def _bk_log(self, text: str):
         self.q.put(("log", text))

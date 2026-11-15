@@ -13,12 +13,17 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
 - GUI shows device details when a phone is connected: model, codename, Android and HyperOS/MIUI
   version, security patch, bootloader state, battery and a masked serial (fastboot mode shows
   codename, bootloader state and version, and active slot).
-- Official Google downloads: `miunlock install-tools` / *File > Update adb and fastboot*
-  fetches the latest platform-tools, and on Windows `miunlock install-driver` / *File > Install
-  Google USB driver* installs Google's USB driver with pnputil after a UAC prompt.
+- Built-in adb and fastboot: miunlock speaks both USB protocols itself (pyusb + libusb),
+  checked against AOSP's sources. Google's platform-tools are no longer downloaded. adb uses
+  the same `~/.android/adbkey` as Google's adb. Termux keeps using its own fastboot.
+- App manager (debloat): **Manage apps...** in the GUI and `miunlock apps list|remove|restore`
+  list every app with a rating from a curated Xiaomi bloat list, remove ticked apps for your
+  user (`pm uninstall --user 0`) and restore them.
+- Windows: `miunlock install-driver` / *File > Install Google USB driver* installs Google's
+  USB driver with pnputil after a UAC prompt.
 - Back up files before unlocking: a **Back up files...** dialog in the GUI and
   `miunlock backup --dest <folder> --only photos,documents` copy photos, documents, chat media,
-  audio or all shared storage from a running phone with `adb pull`, plus a list of installed
+  audio or all shared storage from a running phone over adb, plus a list of installed
   apps. Read-only for the phone. The guide has a new "Back up your data" section.
 - Waiting-period message now says when to try again; GUI shows a tip when no phone is found
   after 20 s, and has Rescan and Copy info buttons.

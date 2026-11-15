@@ -94,7 +94,10 @@ Python 3.9 or newer.
   - [Google ADB driver](https://dl.google.com/android/repository/latest_usb_driver_windows.zip)
     ([guide](https://developer.android.com/studio/run/oem-usb#InstallingDriver))
 - Make sure the device is in **fastboot** mode, not *fastbootd*.
-- If adb or fastboot is old, run `miunlock install-tools` (or *File > Update adb and fastboot*).
+- On Linux, add a udev rule for Android phones (for example the
+  `android-sdk-platform-tools-common` package) and reconnect.
+- Close other programs that use the phone: Google's adb (`adb kill-server`), Android
+  Studio, Mi Unlock, Mi Flash. Only one program can use it at a time.
 - Try a different USB data cable. A bad or charge-only cable is the most common
   cause; prefer the original.
 - Unplug and replug the cable and check it is seated properly.

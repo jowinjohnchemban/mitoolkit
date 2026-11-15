@@ -26,7 +26,7 @@ jobs:
       - name: Install
         run: python -m pip install .
       - name: Imports
-        run: python -c "import miunlock.api, miunlock.cli, miunlock.gui, miunlock.auth"
+        run: python -c "import miunlock.api, miunlock.cli, miunlock.gui, miunlock.auth, miunlock.adb_usb, miunlock.fastboot_usb, miunlock.usbio"
       - name: Version
         run: miunlock --version
       - name: Unit tests

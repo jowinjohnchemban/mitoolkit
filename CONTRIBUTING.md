@@ -47,8 +47,8 @@ touches credentials, logging or the unlock confirmation.
   supply it.
 - Do not add password entry, or any way for the program to read or store the Mi
   Account password.
-- Do not add network destinations other than Xiaomi's services and Google's
-  platform-tools download, and no telemetry.
+- Do not add network destinations other than Xiaomi's services and Google's USB
+  driver download (Windows, on request), and no telemetry.
 - Do not log tokens or session contents.
 
 **Documentation**

@@ -213,9 +213,10 @@ class UnlockGateTests(unittest.TestCase):
     """perform_unlock must refuse, and touch neither fastboot nor the network."""
 
     def setUp(self):
-        guard = mock.patch.object(api, "get_fastboot", side_effect=AssertionError("fastboot was reached"))
-        guard.start()
-        self.addCleanup(guard.stop)
+        for name in ("get_token", "stage_and_unlock", "get_product"):
+            guard = mock.patch.object(api.fastboot, name, side_effect=AssertionError("fastboot was reached"))
+            guard.start()
+            self.addCleanup(guard.stop)
         send = mock.patch.object(api, "_send", side_effect=AssertionError("network was reached"))
         send.start()
         self.addCleanup(send.stop)

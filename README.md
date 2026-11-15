@@ -24,7 +24,8 @@ does **not** bypass the waiting period or any account requirement.
 - Works on Windows, macOS, Linux and Android (Termux)
 - One program, three ways to drive it: a GUI (default), a command line (`--cli`, JSON output)
   and an AI-agent interface (`--mcp`)
-- Uses adb to see your phone, show its details and reboot it into fastboot for you
+- Built-in adb and fastboot (no platform-tools): see your phone, show its details, reboot it
+  into fastboot, back up its files and remove preinstalled apps
 - Python API for your own scripts and automation
 - Login happens on Xiaomi's own page (browser or QR code); your password never
   passes through this program
@@ -37,7 +38,8 @@ does **not** bypass the waiting period or any account requirement.
 - A Mi Account that has been added to the device under
   *Developer options → Mi Unlock status* (see the [unlock guide](docs/unlock-guide.md))
 
-`fastboot` is downloaded automatically from Google if it is not already installed.
+adb and fastboot are built in: no Android platform-tools are needed. On Windows the phone
+needs a USB driver; the program can install Google's for you.
 
 ## Installation
 

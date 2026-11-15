@@ -26,6 +26,10 @@ dependencies = [
     "rich",
     "qrcode",
     "pyaes",
+    # Built-in adb and fastboot talk to the phone over USB through libusb.
+    "pyusb>=1.2.1",
+    # Ships the libusb library itself. Not on Android (Termux), which uses its own fastboot.
+    'libusb-package; sys_platform == "win32" or sys_platform == "darwin" or (sys_platform == "linux" and platform_machine == "x86_64")',
 ]
 
 [project.optional-dependencies]

@@ -5,7 +5,7 @@ import sys
 from miunlock.auth import get_passtoken, get_service, get_region, get_dataCenterZone
 
 from miunlock.unlock import unlock_device
-from miunlock.fastboot import get_fastboot
+from miunlock import fastboot
 from miunlock.system import console, GREEN, WHITE, ORANGE
 from miunlock import api, log, __version__
 
@@ -14,7 +14,11 @@ def interactive_main():
     """The original interactive flow. Unchanged behavior: run `miunlock`
     with no arguments and this is exactly what runs, same as always."""
 
-    fastboot_cmd = get_fastboot()
+    try:
+        fastboot.ready()
+    except fastboot.FastbootError as err:
+        print(err, file=sys.stderr)
+        raise SystemExit(1)
 
     param = {"sid": 'unlockApi'}
     param["checkSafeAddress"] = True
@@ -60,7 +64,7 @@ def interactive_main():
         "Europe": "https://eu-unlock.update.intl.miui.com",
     }.get(Zone)
 
-    unlock_device(domain, service, fastboot_cmd)
+    unlock_device(domain, service)
 
 
 # ---------------------------------------------------------------------------
@@ -103,28 +107,40 @@ def _cmd_backup(args):
     from miunlock import adb
     sets = [s.strip() for s in args.only.split(",") if s.strip()]
     try:
-        path = adb.get_adb()
-        phones = [d for d in adb.devices(path) if d["state"] == "device"]
-        if args.serial:
-            phones = [d for d in phones if d["serial"] == args.serial]
-        if not phones:
-            raise adb.AdbError("No phone with USB debugging allowed was found. Run `miunlock devices`.")
-        if len(phones) > 1:
-            raise adb.AdbError("More than one phone is connected; pass --serial.")
-        result = adb.backup_files(phones[0]["serial"], args.dest, sets, path,
-                                  log=lambda t: print(t, file=sys.stderr))
+        result = adb.backup_files(args.serial, args.dest, sets, log=lambda t: print(t, file=sys.stderr))
         _print_json(result)
     except adb.AdbError as e:
         _print_json({"copied": [], "error": str(e)})
         sys.exit(1)
 
 
-def _cmd_install_tools(args):
-    from miunlock import fastboot
+def _cmd_apps(args):
+    from miunlock import adb, bloat
     try:
-        _print_json({"installed": True, "folder": fastboot.update_platform_tools()})
-    except (SystemExit, Exception) as e:
-        _print_json({"installed": False, "error": str(e) or type(e).__name__})
+        if args.action == "list":
+            out = []
+            for app in adb.list_packages(args.serial):
+                name, rating, note = bloat.describe(app["package"], app["system"])
+                if args.known and app["package"] not in bloat.KNOWN:
+                    continue
+                out.append({**app, "name": name, "rating": rating, "note": note})
+            _print_json(out)
+            return
+        if not args.packages:
+            raise adb.AdbError("Name at least one package.")
+        fn = adb.uninstall_for_user if args.action == "remove" else adb.restore_for_user
+        results = {}
+        for pkg in args.packages:
+            try:
+                fn(pkg, args.serial)
+                results[pkg] = "ok"
+            except adb.AdbError as e:
+                results[pkg] = str(e)
+        _print_json(results)
+        if any(v != "ok" for v in results.values()):
+            sys.exit(1)
+    except adb.AdbError as e:
+        _print_json({"error": str(e)})
         sys.exit(1)
 
 
@@ -276,15 +292,19 @@ def main():
     p_rb.add_argument("--serial", help="Device serial, if more than one phone is connected.")
     p_rb.set_defaults(func=_cmd_reboot_fastboot)
 
-    p_bk = sub.add_parser("backup", help="Copy files from a phone running Android to this computer with adb. Read-only for the phone.")
+    p_bk = sub.add_parser("backup", help="Copy files from a phone running Android to this computer over adb. Read-only for the phone.")
     p_bk.add_argument("--dest", required=True, help="Folder to save into.")
     p_bk.add_argument("--only", default="photos,documents",
                       help="Comma-separated: photos, documents, chats, audio, everything (default: photos,documents).")
     p_bk.add_argument("--serial", help="Device serial, if more than one phone is connected.")
     p_bk.set_defaults(func=_cmd_backup)
 
-    p_tools = sub.add_parser("install-tools", help="Download the latest adb and fastboot from Google (platform-tools).")
-    p_tools.set_defaults(func=_cmd_install_tools)
+    p_apps = sub.add_parser("apps", help="List, remove (for your user) or restore apps on a phone running Android.")
+    p_apps.add_argument("action", choices=["list", "remove", "restore"])
+    p_apps.add_argument("packages", nargs="*", help="Package names for remove/restore.")
+    p_apps.add_argument("--known", action="store_true", help="With list: only apps in miunlock's known-bloat list.")
+    p_apps.add_argument("--serial", help="Device serial, if more than one phone is connected.")
+    p_apps.set_defaults(func=_cmd_apps)
 
     p_drv = sub.add_parser("install-driver", help="Windows only: download and install Google's official USB driver (asks for administrator permission).")
     p_drv.set_defaults(func=_cmd_install_driver)

@@ -83,6 +83,18 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
         ("p", "When it finishes the phone resets. The first start can take several minutes. "
               "If it stays on the fastboot screen, click Reboot phone."),
     ]),
+    ("Manage apps (debloat)", [
+        ("p", "Manage apps... (step 2, while the phone is on with USB debugging allowed) lists every "
+              "app on the phone. Tick the ones to remove and click Remove ticked."),
+        ("b", "Known bloat shows Xiaomi ads, tracking and promotional apps from miunlock's list. "
+              "Tick recommended ticks the ones rated safe to remove."),
+        ("b", "Ratings: Recommended (safe for most people), Optional (ordinary apps), Advanced (can "
+              "affect other features), Avoid (needed by the system or the unlock), Unknown (look it up first)."),
+        ("b", "Preinstalled apps are removed for your user only. Show > Removed lists them, and "
+              "Restore ticked brings them back. Apps you installed yourself are uninstalled."),
+        ("w", "Unlocking the bootloader resets the phone, which brings every removed app back. "
+              "Debloat after unlocking, or if you are not unlocking."),
+    ]),
     ("Afterwards", [
         ("b", "Set the phone up again and restore your data."),
         ("b", "Use File > Sign out and delete saved session, then check the signed-in devices "
@@ -97,7 +109,10 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
               "installs it (Windows asks for administrator permission). If the phone still has a "
               "yellow mark in Device Manager, right-click it > Update driver > Browse my computer > "
               "Let me pick > Android Device > Android Bootloader Interface."),
-        ("b", "Old or broken adb/fastboot: File > Update adb and fastboot downloads the latest from Google."),
+        ("b", "Linux: if the phone is found but cannot be opened, add a udev rule for Android phones "
+              "(for example the android-sdk-platform-tools-common package) and reconnect."),
+        ("b", "\"Another program is using the phone\": close Google's adb (adb kill-server), Android "
+              "Studio, Mi Unlock or Mi Flash. Only one program can use the phone at a time."),
         ("b", "Details button (bottom right): shows what the program is doing. Copy it when "
               "asking for help. It contains no tokens."),
         ("b", "File > Show log file opens the saved log."),

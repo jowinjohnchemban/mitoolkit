@@ -25,19 +25,12 @@ changes, both this file and unlock.py need updating -- see CHANGES.md.
 from __future__ import annotations
 
 import hashlib
-import os
 import random
-import subprocess
-import tempfile
-from pathlib import Path
 from typing import Optional
 
-from miunlock import adb, log
+from miunlock import adb, fastboot, log
 from miunlock.auth.redact import redact_response
 from miunlock.auth import get_passtoken, get_service, get_region, get_dataCenterZone
-from miunlock.fastboot import get_fastboot
-from miunlock.commands import get_product, get_device_token
-from miunlock.system import NO_WINDOW
 from miunlock.utils import _send
 
 DOMAIN_BY_ZONE = {
@@ -98,13 +91,15 @@ def get_account_zone(passtoken: dict) -> str:
     return zone
 
 
-def get_device_codename(fastboot_cmd: Optional[str] = None) -> str:
-    """Phone must already be in fastboot mode and connected over USB."""
-    fastboot_cmd = fastboot_cmd or get_fastboot()
-    product = get_product(fastboot_cmd)
-    if isinstance(product, dict) and "error" in product:
-        raise UnlockError(product["error"])
-    return product
+def get_device_codename(wait: bool = True) -> str:
+    """The codename of the phone in fastboot mode. With wait=True (default) it waits for
+    one to be connected; with wait=False it fails at once if there is none."""
+    try:
+        if not wait and not any(d["accessible"] for d in fastboot.devices()):
+            raise UnlockError("No phone in fastboot mode is connected.")
+        return fastboot.get_product(wait=wait)
+    except fastboot.FastbootError as err:
+        raise UnlockError(str(err)) from None
 
 
 def check_unlock_eligibility(passtoken: dict, zone: Optional[str] = None) -> dict:
@@ -125,8 +120,7 @@ def check_unlock_eligibility(passtoken: dict, zone: Optional[str] = None) -> dic
     zone = zone or get_account_zone(passtoken)
     domain = DOMAIN_BY_ZONE[zone]
 
-    fastboot_cmd = get_fastboot()
-    product = get_device_codename(fastboot_cmd)
+    product = get_device_codename()
 
     ssecurity = service["servicedata"]["ssecurity"]
     cookies = service["cookies"]
@@ -203,10 +197,10 @@ def perform_unlock(passtoken: dict, eligibility: dict, *, confirm_wipe: bool) ->
     device_id = service["servicedata"]["deviceId"]
 
     _log.warning("unlock: confirmed by caller, starting for product=%s zone=%s", product, zone)
-    fastboot_cmd = get_fastboot()
-    device_token = get_device_token(fastboot_cmd)
-    if isinstance(device_token, dict) and "error" in device_token:
-        raise UnlockError(device_token["error"])
+    try:
+        device_token = fastboot.get_token()
+    except fastboot.FastbootError as err:
+        raise UnlockError(str(err)) from None
 
     data = {
         "clientId": "2",
@@ -234,22 +228,12 @@ def perform_unlock(passtoken: dict, eligibility: dict, *, confirm_wipe: bool) ->
     if unlock_result.get("code") != 0:
         raise UnlockError(str(unlock_result.get("descEN") or redact_response(unlock_result)))
 
-    encrypt_data = unlock_result["encryptData"]
-    # A private (owner-only), unpredictably named file, deleted as soon as fastboot is done.
-    fd, name = tempfile.mkstemp(prefix="miunlock-", suffix=".encryptData")
-    filename = Path(name)
+    # Sent straight from memory over USB; it is never written to disk.
     try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(bytes.fromhex(encrypt_data))
-
-        subprocess.run([fastboot_cmd, "stage", str(filename)], check=True, capture_output=True, text=True, creationflags=NO_WINDOW)
-        subprocess.run([fastboot_cmd, "oem", "unlock"], check=True, capture_output=True, text=True, creationflags=NO_WINDOW)
-    except subprocess.CalledProcessError as e:
-        _log.error("unlock: fastboot failed (exit %s): %s", e.returncode, (e.stderr or "").strip()[:300])
-        raise UnlockError(e.stderr) from e
-    finally:
-        if filename.exists():
-            filename.unlink()
+        fastboot.stage_and_unlock(bytes.fromhex(unlock_result["encryptData"]))
+    except fastboot.FastbootError as err:
+        _log.error("unlock: fastboot failed: %s", str(err)[:300])
+        raise UnlockError(str(err)) from None
     _log.warning("unlock: fastboot reported success for product=%s", product)
 
     return {"success": True, "product": product}
@@ -259,7 +243,8 @@ def list_devices() -> dict:
     """Phones currently connected, found with adb (running Android) and fastboot (bootloader).
 
     Returns {"android": [{"serial", "state", plus model/codename/android/miui/
-    bootloader_locked when the state is "device"}], "fastboot": [serials]}.
+    bootloader_locked/battery when the state is "device"}], "fastboot": [serials],
+    "fastboot_no_access": [serials found but without driver or permission]}.
     Read-only; it never changes anything on the phone.
     """
     android = []
@@ -273,15 +258,13 @@ def list_devices() -> dict:
             android.append(dev)
     except adb.AdbError as err:
         raise UnlockError(str(err)) from None
-
-    fast = []
-    out = subprocess.run([get_fastboot(), "devices"], capture_output=True, text=True,
-                         timeout=15, creationflags=NO_WINDOW).stdout
-    for line in out.splitlines():
-        parts = line.split()
-        if len(parts) >= 2 and parts[1] == "fastboot":
-            fast.append(parts[0])
-    return {"android": android, "fastboot": fast}
+    try:
+        found = fastboot.devices()
+    except fastboot.FastbootError as err:
+        raise UnlockError(str(err)) from None
+    return {"android": android,
+            "fastboot": [d["serial"] for d in found if d["accessible"]],
+            "fastboot_no_access": [d["serial"] for d in found if not d["accessible"]]}
 
 
 def reboot_to_fastboot(serial: Optional[str] = None) -> dict:
