@@ -15,12 +15,12 @@ DOWNLOAD_PAGE = "https://developer.android.com/studio/run/win-usb"
 
 STEPS = [
     "Open Google's download page and download the Google USB Driver ZIP. Unzip it.",
-    "Connect the phone. In Device Manager it shows with a yellow mark, often under "
-    "Other devices (it may be called Android, Fastboot or your phone's name).",
-    "Right-click it > Update driver > Browse my computer for drivers > Let me pick from a "
-    "list > Have Disk..., and choose android_winusb.inf in the unzipped folder.",
-    "Pick Android Bootloader Interface when the phone is in fastboot mode, or Android ADB "
-    "Interface when it is running Android, and accept the warning.",
+    ("Connect the phone. In Device Manager it shows with a yellow mark, often under "
+     "Other devices (it may be called Android, Fastboot or your phone's name)."),
+    ("Right-click it > Update driver > Browse my computer for drivers > Let me pick from a "
+     "list > Have Disk..., and choose android_winusb.inf in the unzipped folder."),
+    ("Pick Android Bootloader Interface when the phone is in fastboot mode, or Android ADB "
+     "Interface when it is running Android, and accept the warning."),
     "Unplug the phone, plug it back in, and click Rescan in mitoolkit.",
 ]
 
