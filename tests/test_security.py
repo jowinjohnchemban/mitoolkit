@@ -146,7 +146,7 @@ class LogTests(unittest.TestCase):
                     log.get("t").info("ssecurity=%s", SECRET)
                     for h in logger.handlers:
                         h.flush()
-                    self.assertEqual(path, (Path(tmp) / "mitoolkit.log").resolve())
+                    self.assertEqual(path, (Path(tmp) / "logs" / "mitoolkit.log").resolve())     # in its own folder
                     text = path.read_text(encoding="utf-8")
                     self.assertIn("started", text)
                     self.assertNotIn(SECRET, text)

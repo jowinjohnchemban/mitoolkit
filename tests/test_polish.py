@@ -4,7 +4,6 @@ import os
 import sys
 import tkinter as tk
 import unittest
-import unittest.mock as mock
 from tkinter import ttk
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -199,14 +198,14 @@ class DialogBusyTests(unittest.TestCase):
     def test_while_it_works_the_actions_are_greyed_instead_of_silently_ignored(self):
         d = self.dlg
         for button in (d.find_btn, d.pair_btn, d.connect_btn, d.qr_show):
-            self.assertEqual(button.cget("state"), "normal")
+            self.assertEqual(str(button.cget("state")), "normal")        # (str: a native button gives a Tcl object)
         d._busy = True
         d._refresh()
         for button in (d.find_btn, d.pair_btn, d.connect_btn, d.qr_show):
-            self.assertEqual(button.cget("state"), "disabled")
+            self.assertEqual(str(button.cget("state")), "disabled")
         d._busy = False
         d._refresh()
-        self.assertEqual(d.find_btn.cget("state"), "normal")
+        self.assertEqual(str(d.find_btn.cget("state")), "normal")
 
     def test_the_address_boxes_show_examples_in_the_shape_of_a_local_address(self):
         examples = []

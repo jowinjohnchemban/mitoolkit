@@ -69,6 +69,9 @@ def speaks_tls(host: str, port: int, timeout: float = 1.5) -> bool:
     """True when the port answers a TLS handshake (right away, even if it then refuses us because we have no
     certificate). adb's wireless ports do; most other things on a phone do not answer at all."""
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2          # adb's wireless debugging uses TLS 1.3; nothing older
+    # Nothing is sent or trusted here: the handshake only shows whether the port answers in TLS. The phone's
+    # certificate is self-signed, so it cannot be verified (and is not used for anything).
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
     try:

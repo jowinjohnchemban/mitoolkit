@@ -22,6 +22,8 @@ pull request titles (see CONTRIBUTING.md); the full, generated notes of each rel
 - The Serial row showed the Wi-Fi address for a phone on Wi-Fi; it shows the phone's own serial, with the address on
   its own row.
 - Refreshing the phone's details no longer rebuilds the Phone section (it flickered): values change in place.
+- The log file and crash.log are written in a `logs` folder next to the program instead of beside it, and that folder
+  is ignored by git (a rotated `mitoolkit.log.1` was once committed by accident).
 
 ### Added
 - A USB | Wi-Fi selector in the Phone section (USB by default; both choices always visible, the labels fade as the

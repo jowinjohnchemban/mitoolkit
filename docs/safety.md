@@ -75,8 +75,8 @@ Deleting the session does not end it on Xiaomi's side. When you are finished:
 
 ### Log file
 
-`mitoolkit.log` is written in the same folder as the executable (the current folder when
-run from source), is limited to your user, and rotates at 512 KB with three old copies. It
+`mitoolkit.log` is written in a `logs` folder next to the executable (in the current folder when
+run from source, where git ignores it), is limited to your user, and rotates at 512 KB with three old copies. It
 records steps, result codes and error types. A scrubber hides token-like values and
 account IDs even if one reaches a message. Even so, glance through it before posting it in
 a bug report. If the folder is not writable the program runs without a log file.

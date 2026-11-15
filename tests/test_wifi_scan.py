@@ -39,6 +39,7 @@ class Listener:
                 try:
                     client.sendall(self.reply)
                 except OSError:
+                    # the test already closed its end: there is nobody to answer
                     pass
 
     def close(self):

@@ -366,6 +366,6 @@ DPAPI), expires after 24 hours, and is removed by logging out. Details, includin
 change the expiry, are in the [safety model](safety.md#saved-session).
 
 What the program is doing, including errors and warnings, is in the window: **File > Activity log**
-(with Copy). It contains no tokens. Behind the scenes a scrubbed `mitoolkit.log` (and `crash.log`) is kept next
+(with Copy). It contains no tokens. Behind the scenes a scrubbed `mitoolkit.log` (and `crash.log`) is kept in a `logs` folder next
 to the executable for bug reports and for debug mode (`--debug`); there is no menu item for it, because the
 Activity log shows the same thing in the app.
