@@ -146,7 +146,8 @@ TOPICS: list[tuple[str, list[tuple[str, str]]]] = [
               "Studio, Mi Unlock or Mi Flash. Only one program can use the phone at a time."),
         ("b", "Details button (bottom right): shows what the program is doing. Copy it when "
               "asking for help. It contains no tokens."),
-        ("b", "File > Show log file opens the saved log. File > Activity log shows what the program is doing."),
+        ("b", "File > Activity log shows what the program is doing, and keeps errors and warnings. Copy it when "
+              "asking for help."),
         ("b", "Error 20031: account not added in Mi Unlock status (section 1)."),
         ("b", "Error 20036: still in the waiting period (section 2)."),
         ("p", "More: Help > Online documentation (FAQ, Error codes, Safety model)."),

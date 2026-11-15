@@ -11,6 +11,7 @@ a vertical gradient fill under the line, round line caps and soft dots.
 """
 from __future__ import annotations
 
+import itertools
 import math
 import threading
 from collections import OrderedDict
@@ -145,8 +146,70 @@ def ring_image(size: int, percent: Optional[float], colour: str, track: str, thi
     return img.resize((size, size), Image.BOX)
 
 
+def _plug(draw, cx: float, cy: float, u: float, colour: Tuple[int, int, int, int]) -> None:
+    """A USB plug: a connector with two pins on a cable. ``u`` is one design pixel in drawing units."""
+    w = 1.7 * u
+    draw.rounded_rectangle((cx - 3.8 * u, cy - 7.4 * u, cx + 3.8 * u, cy - 1.6 * u), 1.2 * u, outline=colour, width=round(w))
+    for dx in (-1.5, 1.5):                                           # the two pins
+        draw.rectangle((cx + (dx - 0.55) * u, cy - 5.9 * u, cx + (dx + 0.55) * u, cy - 3.6 * u), fill=colour)
+    draw.line((cx, cy - 1.6 * u, cx, cy + 5.6 * u), fill=colour, width=round(1.9 * u))
+    draw.ellipse((cx - 0.95 * u, cy + 4.65 * u, cx + 0.95 * u, cy + 6.55 * u), fill=colour)       # round cable end
+
+
+def _wifi(draw, cx: float, cy: float, u: float, colour: Tuple[int, int, int, int]) -> None:
+    """The Wi-Fi symbol: three arcs over a dot, with round ends."""
+    base = cy + 4.6 * u
+    for radius in (4.2, 7.6, 11.0):
+        r = radius * u
+        draw.arc((cx - r, base - r, cx + r, base + r), 225, 315, fill=colour, width=round(1.9 * u))
+        for angle in (225, 315):                                   # round caps (PIL's arcs end square)
+            x, y = cx + r * math.cos(math.radians(angle)), base + r * math.sin(math.radians(angle))
+            draw.ellipse((x - 0.95 * u, y - 0.95 * u, x + 0.95 * u, y + 0.95 * u), fill=colour)
+    draw.ellipse((cx - 1.7 * u, base - 1.7 * u, cx + 1.7 * u, base + 1.7 * u), fill=colour)
+
+
+def toggle_image(width: int, height: int, pos: float, fill: str, border: str, thumb: str, thumb_size: int, pad: int,
+                 stretch: int, glyph: str, glyph_colour: str, ring: str, margin: int, k: float):
+    """The track, thumb (with a soft shadow and a glyph) and optional focus ring of a toggle switch, anti-aliased, on a
+    transparent background. Sizes are device pixels; ``pos`` is 0 (thumb left) to 1 (right); ``k`` is the screen's
+    scale over 96 dpi, so lines and the glyph stay in proportion on a high-DPI display."""
+    s = 4
+    w, h, m = width * s, height * s, margin * s
+    img = Image.new("RGBA", ((width + 2 * margin) * s, (height + 2 * margin) * s), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    if ring:
+        gap = margin * s // 2
+        draw.rounded_rectangle((m - gap, m - gap, m + w + gap, m + h + gap), h // 2 + gap, outline=rgb(ring) + (255,),
+                               width=max(2, round(2 * k * s)))
+    draw.rounded_rectangle((m, m, m + w, m + h), h // 2, fill=rgb(border) + (255,))
+    inset = max(1, round(k)) * s
+    draw.rounded_rectangle((m + inset, m + inset, m + w - inset, m + h - inset), (h - 2 * inset) // 2, fill=rgb(fill) + (255,))
+    # the thumb: it slides, stretching towards where it is going while pressed
+    size, p = thumb_size * s, pad * s
+    left = m + p + (w - size - 2 * p) * pos - stretch * s * pos
+    right = left + size + stretch * s
+    top = m + (h - size) / 2
+    shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).ellipse((left, top + 1.6 * k * s, right, top + size + 1.6 * k * s), fill=(0, 0, 0, 90))
+    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(1.3 * k * s)))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((left, top, right, top + size), fill=rgb(thumb) + (255,), outline=(0, 0, 0, 28), width=max(1, round(k * s / 2)))
+    cx, cy = (left + right) / 2, top + size / 2
+    colour = rgb(glyph_colour) + (255,)
+    (_plug if glyph == "usb" else _wifi)(draw, cx, cy, k * s, colour)
+    return img.resize((width + 2 * margin, height + 2 * margin), Image.LANCZOS)
+
+
+def toggle_photo(*spec):
+    """The toggle switch as a cached Tk image (position rounded to 1/24, so the animation reuses its frames)."""
+    spec = list(spec)
+    spec[2] = round(spec[2] * 24) / 24
+    return _cached(("toggle",) + tuple(spec), lambda: toggle_image(*spec))
+
+
 _photos: "OrderedDict[Tuple, object]" = OrderedDict()
 MAX_PHOTOS = 96            # images kept; the least recently used go first
+_root_tokens = itertools.count(1)
 
 
 def _cached(key: Tuple, make):
@@ -154,7 +217,13 @@ def _cached(key: Tuple, make):
     used cache, so what is on screen stays and old sizes and values are released one by one). An
     image belongs to one Tk interpreter, so the cache is keyed by it (tests make several)."""
     import tkinter
-    key = (id(tkinter._default_root),) + key
+    root = tkinter._default_root
+    token = getattr(root, "_mitoolkit_image_token", None)
+    if token is None:                       # a number that is never reused (a destroyed window's address can be)
+        token = next(_root_tokens)
+        if root is not None:
+            root._mitoolkit_image_token = token
+    key = (token,) + key
     if key in _photos:
         _photos.move_to_end(key)
         return _photos[key]

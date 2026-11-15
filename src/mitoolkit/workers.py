@@ -27,6 +27,8 @@ class BackgroundPool:
     def __init__(self, workers: int = 2, name: str = "worker", max_waiting: int = 64):
         self._jobs: queue.Queue[Job] = queue.Queue(maxsize=max_waiting)
         self._done: queue.Queue[Done] = queue.Queue()
+        self._running = 0                      # jobs a worker has taken and not yet finished
+        self._running_lock = threading.Lock()
         self._threads: List[threading.Thread] = []
         for i in range(max(1, workers)):
             t = threading.Thread(target=self._work, daemon=True, name=f"{name}-{i + 1}")
@@ -45,18 +47,26 @@ class BackgroundPool:
     def _work(self) -> None:
         while True:
             fn, callback = self._jobs.get()
+            with self._running_lock:
+                self._running += 1             # counted from here, so a slow job is never invisible to waiting
             try:
                 item = (callback, fn(), None)
             except BaseException as err:  # reported through the callback, never lost or fatal
                 item = (callback, None, err)
-            self._done.put(item)
+            self._done.put(item)               # in the done queue first, then no longer "running": no gap in between
+            with self._running_lock:
+                self._running -= 1
             # Forget the job: this thread's variables would otherwise keep the last job's callback
             # (and so the widget it belongs to) alive until the next job arrives.
             del fn, callback, item
 
     @property
     def waiting(self) -> int:
-        return self._jobs.qsize() + self._done.qsize()
+        """Jobs not yet delivered: queued, being worked on, or finished and waiting for drain(). The delivery timer
+        keeps running while this is above zero, so a result is never left behind by a timer that stopped early."""
+        with self._running_lock:
+            running = self._running
+        return self._jobs.qsize() + running + self._done.qsize()
 
     def drain(self) -> int:
         """Run the callbacks of finished jobs. Call this on the window's thread."""
