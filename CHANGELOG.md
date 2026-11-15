@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Wireless adb pairing (Android 11 and newer, no cable): Phone > Wireless adb > Pair a new phone. Find phones on
+  the Wi-Fi network, enter the pairing code, and the phone trusts this computer from then on. The window says
+  plainly when a phone is waiting for you to allow it, and what to tick.
+
 ## [1.0.0] - 2026-11-15
 
 The first release.

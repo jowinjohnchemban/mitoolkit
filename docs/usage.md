@@ -288,6 +288,15 @@ Handy features:
   speaks USB only, and the phone returns to USB-only when it restarts. **Fastboot and unlocking work over
   a USB cable only**: the bootloader has no Wi-Fi, so mitoolkit asks you to plug the phone in before it
   reboots into fastboot. When a phone is both plugged in and on Wi-Fi, it is listed once, by USB.
+  **Pairing (Android 11 or newer, no cable at all):** on the phone open Settings > Developer options >
+  Wireless debugging > *Pair device with pairing code* and leave that screen open. Press **Find phones on
+  Wi-Fi** (or type the address with its port and the 6-digit code it shows) and **Pair**. Pairing makes the
+  phone trust this computer's adb key, so it does not ask to allow debugging again; the app then connects
+  using the address the phone announces, or you enter the *IP address & port* from the Wireless debugging
+  screen and press **Connect**. The code works once and is never logged or kept. If the phone shows an
+  "Allow debugging?" prompt instead (a cable or address connection), tap Allow and tick *Always allow from
+  this computer*; until you do, the phone is listed as waiting for authorisation. Finding phones needs
+  mDNS on the network (some routers and guest networks block it: then type the address).
 - The window looks for the phone every second, and Live status and Connections show at once when it is
   unplugged and carry on when it is back. Automatic updates change only the readings, not the text bar.
 - When Xiaomi says to wait, the message includes the date and time to try again.
