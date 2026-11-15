@@ -62,7 +62,8 @@ touches credentials, logging or the unlock confirmation.
 `main` is protected: nobody, including the maintainer, pushes to it directly. Every change is a pull
 request that is squash-merged once these checks pass: **CI passed** (tests on Windows, macOS and Linux,
 Python 3.9 and 3.13), **analyze** (CodeQL), **Vulnerable dependencies** (pip-audit), **Dependency review**
-and **Secret scan**. Conversations must be resolved and the history stays linear.
+and **Secret scan**. Conversations must be resolved and the history stays linear. OSV-Scanner also checks
+the exact dependency versions against Google's OSV database and reports to the Security tab.
 
 1. Fork the repository and create a branch.
 2. Make focused commits with clear messages.
