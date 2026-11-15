@@ -1,22 +1,22 @@
-<p align="center"><img src="assets/logo.png" alt="miunlock logo" width="120"></p>
+<p align="center"><img src="assets/logo.png" alt="mitoolkit logo" width="120"></p>
 
-<h1 align="center">miunlock</h1>
+<h1 align="center">MiToolkit</h1>
 
-Unlock the bootloader of Xiaomi, Redmi and POCO devices from any operating
-system, using Xiaomi's own unlock service.
+<p align="center">A toolkit for Xiaomi, Redmi and POCO phones: unlock the bootloader with Xiaomi's own service,
+and see, test and look after the phone before and after.</p>
 
 <p align="center">
-  <a href="https://github.com/jowinjohnchemban/miunlock/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/jowinjohnchemban/miunlock?display_name=tag&sort=semver"></a>
-  <a href="https://github.com/jowinjohnchemban/miunlock/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/jowinjohnchemban/miunlock/ci.yml?branch=main&label=CI"></a>
+  <a href="https://github.com/jowinjohnchemban/mitoolkit/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/jowinjohnchemban/mitoolkit?display_name=tag&sort=semver"></a>
+  <a href="https://github.com/jowinjohnchemban/mitoolkit/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/jowinjohnchemban/mitoolkit/ci.yml?branch=main&label=CI"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg"></a>
   <a href="pyproject.toml"><img alt="Python" src="https://img.shields.io/badge/python-3.9%2B-blue.svg"></a>
   <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg">
-  <a href="https://github.com/jowinjohnchemban/miunlock/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/jowinjohnchemban/miunlock/total"></a>
-  <a href="https://github.com/jowinjohnchemban/miunlock/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/jowinjohnchemban/miunlock"></a>
-  <a href="https://github.com/jowinjohnchemban/miunlock/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/jowinjohnchemban/miunlock?style=flat"></a>
+  <a href="https://github.com/jowinjohnchemban/mitoolkit/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/jowinjohnchemban/mitoolkit/total"></a>
+  <a href="https://github.com/jowinjohnchemban/mitoolkit/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/jowinjohnchemban/mitoolkit"></a>
+  <a href="https://github.com/jowinjohnchemban/mitoolkit/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/jowinjohnchemban/mitoolkit?style=flat"></a>
 </p>
 
-`miunlock` logs in to your Mi Account, asks Xiaomi's server for a signed unlock
+`mitoolkit` logs in to your Mi Account, asks Xiaomi's server for a signed unlock
 token for your device (the `encryptData` value, see
 [How it works](docs/how-it-works.md)), and hands that token to `fastboot`. It
 follows the same official process as Xiaomi's Windows-only Mi Unlock tool, so it
@@ -67,12 +67,12 @@ USB driver help), but it never downloads or installs a driver itself.
 ## Installation
 
 ```sh
-pip install git+https://github.com/jowinjohnchemban/miunlock.git
+pip install git+https://github.com/jowinjohnchemban/mitoolkit.git
 ```
 
 This project is not published on PyPI; install from source as shown. Prebuilt
 Windows, Linux and macOS programs are on the
-[Releases page](https://github.com/jowinjohnchemban/miunlock/releases/latest).
+[Releases page](https://github.com/jowinjohnchemban/mitoolkit/releases/latest).
 Full instructions, including virtual environments and USB drivers, are in the
 [installation guide](docs/installation.md).
 
@@ -81,18 +81,18 @@ Full instructions, including virtual environments and USB drivers, are in the
 1. Add your account and device in *Developer options → Mi Unlock status* and wait
    out Xiaomi's waiting period. See the [unlock guide](docs/unlock-guide.md).
 2. Put the device in fastboot mode and connect it.
-3. Run `miunlock`: it opens the GUI. The same program is the command line when you
+3. Run `mitoolkit`: it opens the GUI. The same program is the command line when you
 add `--cli`, or give it a command:
 
 ```sh
-miunlock --cli                    # interactive prompt
-miunlock devices                  # phones seen by adb and fastboot
-miunlock reboot-fastboot          # adb: reboot a running phone into fastboot
-miunlock login                    # log in or reuse a saved session
-miunlock status                   # account and device info
-miunlock check                    # is this device eligible right now? (read-only)
-miunlock unlock --confirm-wipe    # unlock; ERASES THE DEVICE
-miunlock --mcp                    # let an AI agent control it (cannot unlock)
+mitoolkit --cli                    # interactive prompt
+mitoolkit devices                  # phones seen by adb and fastboot
+mitoolkit reboot-fastboot          # adb: reboot a running phone into fastboot
+mitoolkit login                    # log in or reuse a saved session
+mitoolkit status                   # account and device info
+mitoolkit check                    # is this device eligible right now? (read-only)
+mitoolkit unlock --confirm-wipe    # unlock; ERASES THE DEVICE
+mitoolkit --mcp                    # let an AI agent control it (cannot unlock)
 ```
 
 See the [usage guide](docs/usage.md), the [AI agent guide](docs/agents.md) and the
@@ -105,8 +105,8 @@ See the [usage guide](docs/usage.md), the [AI agent guide](docs/agents.md) and t
 | [Installation](docs/installation.md) | Python, virtual environments, USB drivers |
 | [Unlock guide](docs/unlock-guide.md) | Step-by-step process on the device |
 | [Usage](docs/usage.md) | Interactive mode, CLI, GUI, session handling |
-| [AI agents](docs/agents.md) | Control and read miunlock from an agent over MCP |
-| [Python API](docs/api.md) | `miunlock.api` reference |
+| [AI agents](docs/agents.md) | Control and read mitoolkit from an agent over MCP |
+| [Python API](docs/api.md) | `mitoolkit.api` reference |
 | [Safety model](docs/safety.md) | What is hardened, what is gated, what to watch for |
 | [FAQ](docs/faq.md) | Common questions and device troubleshooting |
 | [Error codes](docs/error-codes.md) | Messages returned by Xiaomi's servers |

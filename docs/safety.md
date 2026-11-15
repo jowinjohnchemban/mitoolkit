@@ -1,6 +1,6 @@
 # Safety model
 
-This page explains what `miunlock` protects, what it deliberately does not do, and
+This page explains what `mitoolkit` protects, what it deliberately does not do, and
 what you are still responsible for.
 
 ## What can go wrong
@@ -19,8 +19,8 @@ interface puts a deliberate human action in front of it.
 
 | Interface | Gate |
 |---|---|
-| Interactive (`miunlock`) | Shows Xiaomi's data-erase notice, then waits for Enter |
-| Command line | `miunlock unlock` refuses without `--confirm-wipe` |
+| Interactive (`mitoolkit`) | Shows Xiaomi's data-erase notice, then waits for Enter |
+| Command line | `mitoolkit unlock` refuses without `--confirm-wipe` |
 | Python API | `perform_unlock(..., confirm_wipe=True)` is required; there is no default |
 | AI agent (`--mcp`) | Unlocking is not offered at all; agents can only read and check |
 | GUI | A tick box plus typing the phone's name exactly; the button stays disabled until both are done |
@@ -58,24 +58,24 @@ available, and the program tells you which one it used:
 
 | Where | When |
 |---|---|
-| OS credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service) | `keyring` is installed: `pip install "miunlock[secure]"` |
-| `~/.miunlocksession/<name>/session.dpapi`, encrypted with Windows DPAPI | Windows, no extra package |
-| `~/.miunlocksession/<name>/session.json`, readable only by your user | everywhere else (not encrypted) |
+| OS credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service) | `keyring` is installed: `pip install "mitoolkit[secure]"` |
+| `~/.mitoolkitsession/<name>/session.dpapi`, encrypted with Windows DPAPI | Windows, no extra package |
+| `~/.mitoolkitsession/<name>/session.json`, readable only by your user | everywhere else (not encrypted) |
 
 **Expiry.** Every saved session carries a timestamp and is trusted for 24 hours. After
-that it is deleted and you log in again. Set `MIUNLOCK_SESSION_TTL_HOURS` to change it
+that it is deleted and you log in again. Set `MITOOLKIT_SESSION_TTL_HOURS` to change it
 (`0` means never reuse a session). A session saved by an older version has no timestamp and
 is treated as expired.
 
 Deleting the session does not end it on Xiaomi's side. When you are finished:
 
-1. Sign out (`miunlock` then choose log out, or **File > Sign out** in the GUI).
+1. Sign out (`mitoolkit` then choose log out, or **File > Sign out** in the GUI).
 2. Check the signed-in devices for your account at `account.xiaomi.com`.
 3. Consider changing the Mi Account password.
 
 ### Log file
 
-`miunlock.log` is written in the same folder as the executable (the current folder when
+`mitoolkit.log` is written in the same folder as the executable (the current folder when
 run from source), is limited to your user, and rotates at 512 KB with three old copies. It
 records steps, result codes and error types. A scrubber hides token-like values and
 account IDs even if one reaches a message. Even so, glance through it before posting it in
@@ -106,7 +106,7 @@ In the code as reviewed, requests go only to:
 | `account.xiaomi.com`, `api.account.xiaomi.com` | Login and account lookups |
 | `unlock.update.miui.com`, `unlock.update.intl.miui.com`, `in-/ru-/eu-unlock.update.intl.miui.com` | Unlock service, chosen by account region |
 | `api.osv.dev` | Security check only: Android security bulletin entries. Sends the Android version and AOSP project names, nothing about your apps or account |
-| `raw.githubusercontent.com` | Security check only: the stalkerware indicator list (AssoEchap/stalkerware-indicators), downloaded at most weekly and cached in `~/.miunlock/cache` |
+| `raw.githubusercontent.com` | Security check only: the stalkerware indicator list (AssoEchap/stalkerware-indicators), downloaded at most weekly and cached in `~/.mitoolkit/cache` |
 | `api.github.com`, `github.com` | Updates: once a day (Help > Check for updates automatically can be turned off) the app asks for the latest release of this project. Sends nothing about you or the phone. Downloading an update happens only when you press the button, only from this project's releases, and is checked against the release's `SHA256SUMS.txt` before it is installed. The programs are not code-signed, so that check catches damaged downloads, not a compromised release |
 | `127.0.0.1:5037` | Google's adb server on this computer, when it is running (never leaves the computer) |
 
@@ -145,7 +145,7 @@ covered the code as it was at that time. Review changes before you trust new ver
 - **Login happens on Xiaomi's page**, which this project cannot change: verify the page
   URL, and consider changing your password if you doubt it.
 - **Not on PyPI.** Install from this repository so the code you run is the code
-  you can read. A package of the same name on PyPI is a different project.
+  you can read.
 
 ## Reporting a problem
 

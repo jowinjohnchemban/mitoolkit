@@ -35,15 +35,15 @@ class _Phone(FakePhone):
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class LiveDialogTests(unittest.TestCase):
     def setUp(self):
-        from miunlock import gui
+        from mitoolkit import gui
         self.root = make_root()
         self.app = gui.App(self.root)
         self.app.android = {"serial": "X", "state": "device", "model": "POCO M2 Pro"}
         self.root.update()
         phone = _Phone()
-        from miunlock.ui.live_dialog import LiveStatusDialog
+        from mitoolkit.ui.live_dialog import LiveStatusDialog
         self.dlg = LiveStatusDialog(self.app, "X", "POCO M2 Pro", start=False)   # no reading thread: we feed readings
-        from miunlock import monitor
+        from mitoolkit import monitor
         self.mon = monitor.Monitor(phone)
 
     def tearDown(self):
@@ -157,7 +157,7 @@ class LiveDialogTests(unittest.TestCase):
         self.assertIn("No answer", d.live.cget("text"))
 
     def test_gauge_levels_use_a_word_as_well_as_colour(self):
-        from miunlock.ui.components.charts import Gauge
+        from mitoolkit.ui.components.charts import Gauge
         g = Gauge(self.root, "Memory", self.dlg.fonts, (75, 90))
         self.assertEqual(g.level(50)[1], "Normal")
         self.assertEqual(g.level(80)[1], "High")

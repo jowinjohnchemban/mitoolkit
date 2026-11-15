@@ -1,12 +1,12 @@
 [project]
-name = "miunlock"
+name = "mitoolkit"
 dynamic = ["version"]
-description = "Retrieve Xiaomi encryptData(token) to unlock bootloader"
+description = "A toolkit for Xiaomi, Redmi and POCO phones: bootloader unlock, details, live status, backup, apps and a security check"
 authors = [{name = "Jowin John Chemban"}]
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 
-keywords = ["xiaomi", "miunlock", "bootloader", "unlock", "MIUI", "HyperOS", "Tools"]
+keywords = ["xiaomi", "mitoolkit", "bootloader", "unlock", "MIUI", "HyperOS", "Tools"]
 
 
 classifiers = [
@@ -18,7 +18,7 @@ classifiers = [
 requires-python = ">=3.9"
 
 dependencies = [
-    # What the Xiaomi login code in miunlock.auth needs (see docs/safety.md).
+    # What the Xiaomi login code in mitoolkit.auth needs (see docs/safety.md).
     "requests",
     "rich",
     "qrcode",
@@ -36,11 +36,11 @@ dependencies = [
 secure = ["keyring>=24"]
 
 [project.urls]
-Repository = "https://github.com/jowinjohnchemban/miunlock"
+Repository = "https://github.com/jowinjohnchemban/mitoolkit"
 
 [project.scripts]
-miunlock = "miunlock.cli:main"
-miunlock-gui = "miunlock.gui:main"
+mitoolkit = "mitoolkit.cli:main"
+mitoolkit-gui = "mitoolkit.gui:main"
 
 [build-system]
 requires = ["setuptools>=77", "wheel"]
@@ -50,8 +50,8 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-miunlock = ["assets/*.png"]
-"miunlock.auth.login" = ["captcha.html"]
+mitoolkit = ["assets/*.png"]
+"mitoolkit.auth.login" = ["captcha.html"]
 
 [tool.setuptools.dynamic]
-version = {attr = "miunlock.__version__"}
+version = {attr = "mitoolkit.__version__"}

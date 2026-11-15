@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from tkhelper import make_root  # noqa: E402
 
-from miunlock.ui.components.search import rank  # noqa: E402
+from mitoolkit.ui.components.search import rank  # noqa: E402
 
 try:
     _r = tk.Tk()
@@ -43,7 +43,7 @@ class RankTests(unittest.TestCase):
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class SearchBoxTests(unittest.TestCase):
     def setUp(self):
-        from miunlock.ui.components.search import SearchBox
+        from mitoolkit.ui.components.search import SearchBox
         self.root = make_root()
         self.var = tk.StringVar()
         self.picked = []
@@ -98,8 +98,8 @@ class SearchBoxTests(unittest.TestCase):
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class DetailsViewTests(unittest.TestCase):
     def test_sections_rows_and_height(self):
-        from miunlock.ui.components.details_view import DetailsView
-        from miunlock.ui.theme import Fonts
+        from mitoolkit.ui.components.details_view import DetailsView
+        from mitoolkit.ui.theme import Fonts
         root = make_root()
         root.geometry("600x400")                                     # a window that is mapped and has a width
         try:

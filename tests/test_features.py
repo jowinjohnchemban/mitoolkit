@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from tkhelper import make_root  # noqa: E402
 
-from miunlock import export, fastboot, security  # noqa: E402
-from miunlock.fastboot import FastbootError  # noqa: E402
+from mitoolkit import export, fastboot, security  # noqa: E402
+from mitoolkit.fastboot import FastbootError  # noqa: E402
 
 try:
     import tkinter as tk
@@ -83,7 +83,7 @@ class FastbootRestartTests(unittest.TestCase):
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class WindowTests(unittest.TestCase):
     def setUp(self):
-        from miunlock import gui
+        from mitoolkit import gui
         self.root = make_root()
         self.app = gui.App(self.root)
         self.app._polling = True
@@ -93,7 +93,7 @@ class WindowTests(unittest.TestCase):
         self.root.destroy()
 
     def test_restart_dialog_in_android_and_in_fastboot(self):
-        from miunlock.ui.restart_dialog import RestartDialog
+        from mitoolkit.ui.restart_dialog import RestartDialog
         self.app.android = {"serial": "X", "state": "device"}
         d = RestartDialog(self.app)
         self.assertEqual(d.choice.get(), "android")
@@ -109,7 +109,7 @@ class WindowTests(unittest.TestCase):
             reboot.assert_called_once_with("recovery")
 
     def test_wifi_phone_cannot_pick_fastboot(self):
-        from miunlock.ui.restart_dialog import RestartDialog
+        from mitoolkit.ui.restart_dialog import RestartDialog
         self.app.android = {"serial": "192.168.1.5:5555", "state": "device"}
         d = RestartDialog(self.app)
         radios = [w for w in d.body.winfo_children()[2].winfo_children()]
@@ -117,7 +117,7 @@ class WindowTests(unittest.TestCase):
         self.assertTrue(radios)
 
     def test_about_dialog_is_short_and_copies_version_info(self):
-        from miunlock.ui.about_dialog import AboutDialog, version_text
+        from mitoolkit.ui.about_dialog import AboutDialog, version_text
         d = AboutDialog(self.app)
         d._copy()
         self.assertEqual(self.root.clipboard_get(), version_text())

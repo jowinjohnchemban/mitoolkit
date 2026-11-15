@@ -6,8 +6,8 @@ import unittest
 from contextlib import redirect_stdout
 from unittest import mock
 
-from miunlock import adb, api, cli, fastboot, usbio, xiaomi
-from miunlock.errors import MiunlockError, UnlockError
+from mitoolkit import adb, api, cli, fastboot, usbio, xiaomi
+from mitoolkit.errors import MitoolkitError, UnlockError
 
 SERVICE = {"servicedata": {"ssecurity": "s", "deviceId": "dev"}, "cookies": {"userId": "1"}}
 
@@ -16,10 +16,10 @@ class ErrorHierarchyTests(unittest.TestCase):
     def test_every_error_type_shares_the_base(self):
         for cls in (UnlockError, xiaomi.ServerError, adb.AdbError, fastboot.FastbootError,
                     usbio.UsbError, api.UnlockError):
-            self.assertTrue(issubclass(cls, MiunlockError), cls)
+            self.assertTrue(issubclass(cls, MitoolkitError), cls)
 
     def test_one_error_type_per_layer(self):
-        from miunlock import adb_usb, fastboot_usb
+        from mitoolkit import adb_usb, fastboot_usb
         self.assertIs(adb.AdbError, adb_usb.AdbError)
         self.assertIs(fastboot.FastbootError, fastboot_usb.FastbootError)
 
@@ -125,8 +125,8 @@ class FastbootBackendTests(unittest.TestCase):
             self.assertEqual(exe.token(), "AAAABBBB")
 
     def test_android_is_refused_with_a_clear_message(self):
-        import miunlock.system
-        with mock.patch.object(usbio, "_backend", None), mock.patch.object(miunlock.system, "IS_ANDROID", True):
+        import mitoolkit.system
+        with mock.patch.object(usbio, "_backend", None), mock.patch.object(mitoolkit.system, "IS_ANDROID", True):
             with self.assertRaises(usbio.UsbUnavailable) as ctx:
                 usbio.backend()
         self.assertIn("computer", str(ctx.exception))

@@ -8,7 +8,7 @@ venv/
 *.log
 
 # Never commit credentials, sessions, logs or device data
-.miunlocksession/
+.mitoolkitsession/
 .migatesession/
 session.json
 session.log
@@ -25,4 +25,4 @@ bugreport*
 screen*.png
 
 # Written by the release workflow (build date and commit)
-src/miunlock/_build.py
+src/mitoolkit/_build.py

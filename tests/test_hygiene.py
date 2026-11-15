@@ -10,7 +10,7 @@ import weakref
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))
 
-from miunlock import memory, workers  # noqa: E402
+from mitoolkit import memory, workers  # noqa: E402
 from tkhelper import make_root  # noqa: E402
 
 try:
@@ -77,7 +77,7 @@ class BackgroundPoolTests(unittest.TestCase):
 class ImageCacheTests(unittest.TestCase):
     @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
     def test_cache_is_bounded_and_keeps_recent_images(self):
-        from miunlock.ui.components import render
+        from mitoolkit.ui.components import render
         if not render.HAVE:
             self.skipTest("Pillow is not installed")
         root = make_root()
@@ -137,8 +137,8 @@ class HousekeepingTests(unittest.TestCase):
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class ClosingFreesThingsTests(unittest.TestCase):
     def test_a_closed_live_window_is_garbage_collected(self):
-        from miunlock import gui
-        from miunlock.ui.live_dialog import LiveStatusDialog
+        from mitoolkit import gui
+        from mitoolkit.ui.live_dialog import LiveStatusDialog
         root = make_root()
         try:
             app = gui.App(root)

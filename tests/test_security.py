@@ -15,10 +15,10 @@ from unittest import mock
 
 import requests
 
-from miunlock import api, log, mcp, xiaomi
-from miunlock.auth import browser, requester, store
-from miunlock.auth.redact import mask_id, redact_response
-from miunlock.hints import explain
+from mitoolkit import api, log, mcp, xiaomi
+from mitoolkit.auth import browser, requester, store
+from mitoolkit.auth.redact import mask_id, redact_response
+from mitoolkit.hints import explain
 
 SECRET = "SUPER-SECRET-TOKEN-123"
 
@@ -117,7 +117,7 @@ class SessionStoreTests(unittest.TestCase):
 
     def test_ttl_can_be_shortened_and_zero_disables_reuse(self):
         store.save("t", {"passToken": SECRET})
-        with mock.patch.dict(os.environ, {"MIUNLOCK_SESSION_TTL_HOURS": "0"}):
+        with mock.patch.dict(os.environ, {"MITOOLKIT_SESSION_TTL_HOURS": "0"}):
             self.assertIsNone(store.load("t"))
 
     def test_stamp_is_not_returned_to_callers(self):
@@ -137,16 +137,16 @@ class LogTests(unittest.TestCase):
 
     def test_log_goes_next_to_the_executable_and_is_scrubbed(self):
         with tempfile.TemporaryDirectory() as tmp:
-            logger = logging.getLogger("miunlock")
+            logger = logging.getLogger("mitoolkit")
             old = (list(logger.handlers), log._path)
             logger.handlers, log._path = [], None
             try:
-                with mock.patch.object(log.sys, "frozen", True, create=True),                         mock.patch.object(log.sys, "executable", str(Path(tmp) / "miunlock.exe")):
+                with mock.patch.object(log.sys, "frozen", True, create=True),                         mock.patch.object(log.sys, "executable", str(Path(tmp) / "mitoolkit.exe")):
                     path = log.setup()
                     log.get("t").info("ssecurity=%s", SECRET)
                     for h in logger.handlers:
                         h.flush()
-                    self.assertEqual(path, (Path(tmp) / "miunlock.log").resolve())
+                    self.assertEqual(path, (Path(tmp) / "mitoolkit.log").resolve())
                     text = path.read_text(encoding="utf-8")
                     self.assertIn("started", text)
                     self.assertNotIn(SECRET, text)

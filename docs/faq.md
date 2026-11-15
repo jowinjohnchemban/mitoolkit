@@ -8,7 +8,7 @@ Follow the [unlock guide](unlock-guide.md).
 
 ### Does this tool skip the waiting period?
 
-No. `miunlock` follows the same official process as Xiaomi's own tool, so it is
+No. `mitoolkit` follows the same official process as Xiaomi's own tool, so it is
 only an alternative client. Xiaomi's server decides when you are eligible.
 
 ### Do I need to add my account in Developer options?
@@ -25,7 +25,7 @@ region, which can block this step.
 
 ### Will my data be erased?
 
-Almost always. `miunlock` tells you before it proceeds, using Xiaomi's own answer
+Almost always. `mitoolkit` tells you before it proceeds, using Xiaomi's own answer
 for your device.
 
 > [!WARNING]
@@ -58,7 +58,7 @@ See the [safety model](safety.md).
 
 ### How do I log out?
 
-Delete `~/.miunlocksession/` and review the signed-in devices on your Mi Account.
+Delete `~/.mitoolkitsession/` and review the signed-in devices on your Mi Account.
 Deleting the file does not end the session on Xiaomi's side.
 
 ### Can I script it or use it from an automation tool?
@@ -69,8 +69,8 @@ Yes: use the [JSON subcommands](usage.md#command-line) or the
 
 ### Why isn't it on PyPI?
 
-A package on PyPI named `miunlock` is a different project. Install from this repository so
-the code you run is the code you can read. See [installation](installation.md).
+Install from this repository so the code you run is the code you can read. A package with a
+similar name on PyPI, if there is one, is not this project. See [installation](installation.md).
 
 ## Installation and devices
 
@@ -83,7 +83,7 @@ Python 3.9 or newer.
 - On Windows, the device should appear in Device Manager without a warning icon.
   Install the drivers if it does not:
   - Google's USB driver: in the GUI choose *Help > USB driver help*, or run
-    `miunlock driver-help --open`. It lists the steps and opens Google's download page; you
+    `mitoolkit driver-help --open`. It lists the steps and opens Google's download page; you
     install the driver with Device Manager (*Update driver > Browse my computer > Let me pick
     > Have Disk*, then `android_winusb.inf` and *Android Bootloader Interface*). Google's
     driver does not list Xiaomi's USB IDs, so Windows will not pick it by itself.
@@ -99,7 +99,7 @@ Python 3.9 or newer.
 - Try a different USB data cable. A bad or charge-only cable is the most common
   cause; prefer the original.
 - Unplug and replug the cable and check it is seated properly.
-- Remove any other installed ADB/Fastboot and let `miunlock` use its own.
+- Remove any other installed ADB/Fastboot and let `mitoolkit` use its own.
 
 ### `status` or `check` seems to hang
 
@@ -113,5 +113,5 @@ Tkinter is missing. On Debian or Ubuntu run `sudo apt install python3-tk`.
 ---
 
 Still stuck? Look through the
-[closed issues](https://github.com/jowinjohnchemban/miunlock/issues?q=is%3Aissue+is%3Aclosed)
-or [open a new one](https://github.com/jowinjohnchemban/miunlock/issues/new).
+[closed issues](https://github.com/jowinjohnchemban/mitoolkit/issues?q=is%3Aissue+is%3Aclosed)
+or [open a new one](https://github.com/jowinjohnchemban/mitoolkit/issues/new).

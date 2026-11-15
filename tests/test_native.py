@@ -1,4 +1,4 @@
-"""Tests for miunlock's own adb and fastboot clients, against a fake USB device.
+"""Tests for mitoolkit's own adb and fastboot clients, against a fake USB device.
 
 Nothing here touches a real phone or USB. The adb key test makes a real (temporary) key.
 """
@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from miunlock import adb_usb, adbkey, bloat, fastboot_usb, usbio
+from mitoolkit import adb_usb, adbkey, bloat, fastboot_usb, usbio
 
 
 class FakeHandle:
@@ -225,7 +225,7 @@ class FastbootProtocolTests(unittest.TestCase):
 
 class AppManagerTests(unittest.TestCase):
     def test_package_names_are_validated(self):
-        from miunlock import adb
+        from mitoolkit import adb
         for bad in ("com.x; reboot", "com.x && rm", "../x", "x", "com.x$(id)"):
             with self.assertRaises(adb.AdbError):
                 adb._valid(bad)

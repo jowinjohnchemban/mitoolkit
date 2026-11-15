@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from tkhelper import make_root  # noqa: E402
 
-from miunlock.ui import placement  # noqa: E402
+from mitoolkit.ui import placement  # noqa: E402
 
 try:
     _r = tk.Tk()

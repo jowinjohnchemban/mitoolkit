@@ -1,10 +1,10 @@
-"""Tests for the phone security check (miunlock.security) with a fake phone and fake OSV data.
+"""Tests for the phone security check (mitoolkit.security) with a fake phone and fake OSV data.
 Nothing touches the network or a real phone."""
 import datetime
 import unittest
 from unittest import mock
 
-from miunlock import security
+from mitoolkit import security
 
 TODAY = datetime.date(2026, 11, 15)
 

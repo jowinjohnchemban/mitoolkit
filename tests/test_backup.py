@@ -8,8 +8,8 @@ from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from miunlock import adb  # noqa: E402
-from miunlock.adb import AdbError  # noqa: E402
+from mitoolkit import adb  # noqa: E402
+from mitoolkit.adb import AdbError  # noqa: E402
 
 FILES = {"/sdcard/DCIM/a.jpg": (b"aaaa", 1_700_000_000), "/sdcard/DCIM/b.jpg": (b"bbbbbb", 1_700_000_100)}
 

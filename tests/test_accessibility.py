@@ -2,7 +2,7 @@
 and text resizing up to 200% (1.4.4)."""
 import unittest
 
-from miunlock.ui import theme as t
+from mitoolkit.ui import theme as t
 
 WINDOW_BG, WHITE = "#fafafa", "#ffffff"
 NATIVE_BG = "#f0f0f0"  # Windows' own window colour (the native theme)
@@ -101,7 +101,7 @@ class ComponentContrastTests(unittest.TestCase):
         self.assertGreaterEqual(contrast(fg, bg), ratio, f"{name}: {fg} on {bg} is {contrast(fg, bg):.2f}")
 
     def test_buttons_in_every_state(self):
-        from miunlock.ui.components import buttons as b
+        from mitoolkit.ui.components import buttons as b
         for face in (b.FACE, b.HOVER, b.PRESSED):
             self.check("button text", b.TEXT, face)
         for face in (b.PRIMARY, b.PRIMARY_HOVER, b.PRIMARY_PRESSED):
@@ -114,13 +114,13 @@ class ComponentContrastTests(unittest.TestCase):
             self.check("expander text", b.ACCENT, face)
 
     def test_selector_bar(self):
-        from miunlock.ui.components import selector as s
+        from mitoolkit.ui.components import selector as s
         for bg in (NATIVE_BG, s.HOVER_FILL):
             self.check("selector text", s.TEXT, bg)
             self.check("selector muted text", s.MUTED_TEXT, bg)
 
     def test_text_in_chart_colours_is_readable_on_the_card(self):
-        from miunlock.ui.components import charts, shapes
+        from mitoolkit.ui.components import charts, shapes
         for name in ("BLUE", "GREEN", "RED", "ORANGE", "PURPLE", "OK_COLOUR", "WARN_COLOUR", "CRIT_COLOUR"):
             colour = getattr(charts, name)
             self.check(f"{name} as text", shapes.text_colour(colour), shapes.CARD)
@@ -128,13 +128,13 @@ class ComponentContrastTests(unittest.TestCase):
         self.check("card text", charts.TEXT, shapes.CARD)
 
     def test_status_marks_in_the_connections_window(self):
-        from miunlock.ui.components.shapes import CARD
-        from miunlock.ui.connect_dialog import MARKS
+        from mitoolkit.ui.components.shapes import CARD
+        from mitoolkit.ui.connect_dialog import MARKS
         for mark, colour, word in MARKS.values():
             self.check(f"mark {word}", colour, CARD)
 
     def test_text_colour_only_darkens_when_it_must(self):
-        from miunlock.ui.components.shapes import text_colour
+        from mitoolkit.ui.components.shapes import text_colour
         self.assertEqual(text_colour("#1b1b1b"), "#1b1b1b")          # already dark: unchanged
         self.assertNotEqual(text_colour("#91cc75"), "#91cc75")       # a light green is darkened
         self.check("darkened light green", text_colour("#91cc75"), WHITE)
@@ -144,7 +144,7 @@ class ChartColourTests(unittest.TestCase):
     """Graph lines and gauge arcs must stand out from the white plot (WCAG 1.4.11: 3:1)."""
 
     def test_chart_colours_contrast_with_white(self):
-        from miunlock.ui.components import charts
+        from mitoolkit.ui.components import charts
         for name in ("BLUE", "GREEN", "RED", "ORANGE", "PURPLE", "OK_COLOUR", "WARN_COLOUR", "CRIT_COLOUR"):
             colour = getattr(charts, name)
             self.assertGreaterEqual(contrast(colour, "#ffffff"), 3.0, f"{name} {colour}")

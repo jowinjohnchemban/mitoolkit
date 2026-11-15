@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from tkhelper import make_root  # noqa: E402
 
-from miunlock import build, settings, updater  # noqa: E402
+from mitoolkit import build, settings, updater  # noqa: E402
 
 try:
     import tkinter as tk
@@ -21,7 +21,7 @@ try:
 except Exception:
     HAVE_DISPLAY = False
 
-NAME = "miunlock-linux-x64"
+NAME = "mitoolkit-linux-x64"
 BASE = updater.DOWNLOADS + "v9.9.9/"
 
 
@@ -130,7 +130,7 @@ class DownloadAndInstallTests(unittest.TestCase):
             updater.download(r, self.dir / "new")
 
     def test_install_swaps_and_keeps_the_old_copy_until_next_start(self):
-        exe, new = self.dir / "miunlock", self.dir / "miunlock.new"
+        exe, new = self.dir / "mitoolkit", self.dir / "mitoolkit.new"
         exe.write_bytes(b"old")
         new.write_bytes(b"new")
         updater.install(new, exe)
@@ -139,7 +139,7 @@ class DownloadAndInstallTests(unittest.TestCase):
         self.assertFalse(new.exists())
 
     def test_a_failed_swap_puts_the_old_program_back(self):
-        exe, new = self.dir / "miunlock", self.dir / "miunlock.new"
+        exe, new = self.dir / "mitoolkit", self.dir / "mitoolkit.new"
         exe.write_bytes(b"old")
         new.write_bytes(b"new")
         real = os.replace
@@ -183,7 +183,7 @@ class SettingsAndScheduleTests(unittest.TestCase):
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class UpdateWindowTests(unittest.TestCase):
     def setUp(self):
-        from miunlock import gui
+        from mitoolkit import gui
         self.root = make_root()
         self.app = gui.App(self.root)
         self.app._polling = True
@@ -193,7 +193,7 @@ class UpdateWindowTests(unittest.TestCase):
         self.root.destroy()
 
     def dialog(self, rel):
-        from miunlock.ui.update_dialog import UpdateDialog
+        from mitoolkit.ui.update_dialog import UpdateDialog
         return UpdateDialog(self.app, rel, start=True)
 
     def test_newer_release_offers_the_right_button(self):

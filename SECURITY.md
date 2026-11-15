@@ -21,7 +21,7 @@ a small volunteer project, so there is no guaranteed response time.
 In scope:
 
 - Anything that could leak, log or weaken the protection of a Mi Account password,
-  session token or `~/.miunlocksession/session.json`
+  session token or `~/.mitoolkitsession/session.json`
 - Any way to run `fastboot oem unlock` without the explicit confirmation described
   in [docs/safety.md](docs/safety.md)
 - Command injection or unsafe subprocess use
@@ -36,5 +36,5 @@ Out of scope:
 
 ## Handling your own data
 
-If you use this tool, delete `~/.miunlocksession/` when you finish and check the
+If you use this tool, delete `~/.mitoolkitsession/` when you finish and check the
 signed-in devices on your Mi Account. See [docs/safety.md](docs/safety.md).

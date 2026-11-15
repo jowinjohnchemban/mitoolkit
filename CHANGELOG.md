@@ -38,11 +38,11 @@ The first release.
 - Accessible (WCAG 2.2 AA contrast checked by tests, keyboard access, text up to 200%), native-feeling on each
   system, windows that stay inside the free part of the screen.
 - Built to stay up: a watchdog, timeouts on phone calls, crash logging, memory hygiene, debug logging
-  (`--debug`, `MIUNLOCK_DEBUG=1`, or Help > Debug logging).
+  (`--debug`, `MITOOLKIT_DEBUG=1`, or Help > Debug logging).
 
 ### Security
-- The saved session is stored in the OS credential store (with `miunlock[secure]`) or encrypted with Windows DPAPI,
-  and expires after 24 hours. A scrubbed `miunlock.log` is written next to the program.
+- The saved session is stored in the OS credential store (with `mitoolkit[secure]`) or encrypted with Windows DPAPI,
+  and expires after 24 hours. A scrubbed `mitoolkit.log` is written next to the program.
 - Error messages and logs never contain tokens or one-time login URLs; URLs from Xiaomi are opened without a shell
   and only if they are https; the signed unlock token goes to a private temporary file.
 - No password login. CI pins its actions to commits and uses read-only token permissions.

@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from miunlock import diagnostics as d  # noqa: E402
+from mitoolkit import diagnostics as d  # noqa: E402
 
 WIFI = ('WifiInfo: SSID: "Home Net", BSSID: a4:50:46:11:22:33, MAC: 02:00:00:aa:bb:cc, Security type: 4, '
         'Supplicant state: COMPLETED, Wi-Fi standard: 6, RSSI: -61, Link speed: 866Mbps, Tx Link speed: 866Mbps, '

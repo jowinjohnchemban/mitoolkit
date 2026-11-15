@@ -21,7 +21,7 @@ except tk.TclError:
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class ButtonStateTests(unittest.TestCase):
     def setUp(self):
-        from miunlock.ui.components.buttons import ModernButton
+        from mitoolkit.ui.components.buttons import ModernButton
         self.root = make_root()
         self.clicks = []
         self.button = ModernButton(self.root, "Back up files...", lambda: self.clicks.append(1))
@@ -68,7 +68,7 @@ class ButtonStateTests(unittest.TestCase):
         self.assertEqual(self.clicks, [])
 
     def test_state_kinds_have_colours(self):
-        from miunlock.ui.components.buttons import KINDS
+        from mitoolkit.ui.components.buttons import KINDS
         for kind in ("danger", "warn", "good"):
             self.button.configure(kind=kind)
             face, border, text = self.button._colours()
@@ -82,7 +82,7 @@ class NativeButtonTests(unittest.TestCase):
 
     def test_native_buttons_accept_the_same_options(self):
         from unittest import mock
-        from miunlock.ui.components import buttons
+        from mitoolkit.ui.components import buttons
         root = make_root()
         try:
             with mock.patch.object(buttons.sys, "platform", "darwin"):

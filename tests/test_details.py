@@ -5,7 +5,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from miunlock import details  # noqa: E402
+from mitoolkit import details  # noqa: E402
 
 
 def parcel(text: str) -> str:
@@ -58,7 +58,7 @@ class FakePhone:
         self.props, self.imei_reply = props, imei_reply
 
     def shell(self, command, timeout_ms=60000):
-        parts = command.split("echo @@miunlock@@; ")[1:]
+        parts = command.split("echo @@mitoolkit@@; ")[1:]
         out = []
         for part in parts:
             cmd = part.rstrip("; ").replace(" 2>/dev/null", "").strip()
@@ -92,7 +92,7 @@ class FakePhone:
                 out.append("Thermal Status: 1")
             else:
                 out.append("null")
-        return "".join("@@miunlock@@\n" + o + "\n" for o in out)
+        return "".join("@@mitoolkit@@\n" + o + "\n" for o in out)
 
 
 class PhoneDetailsTests(unittest.TestCase):
@@ -214,7 +214,7 @@ class SensorTests(unittest.TestCase):
 
 class LogViewerTests(unittest.TestCase):
     def test_parse_and_filter(self):
-        from miunlock.ui import log_dialog
+        from mitoolkit.ui import log_dialog
         text = ("--------- beginning of main\n"
                 "11-15 13:20:01.123  1000  1001 I ActivityManager: Start proc com.example\n"
                 "11-15 13:20:02.456  1000  1002 W WifiService: slow scan\n"
@@ -228,7 +228,7 @@ class LogViewerTests(unittest.TestCase):
         self.assertEqual(len([r for r in rows if log_dialog.keep(r, "E", "")]), 2)    # header kept, error
 
     def test_adb_log_and_reboot_arguments_are_checked(self):
-        from miunlock import adb
+        from mitoolkit import adb
 
         class Dev:
             serial = "X"

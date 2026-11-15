@@ -112,7 +112,7 @@ Wait for the displayed time to expire(7days (utc +8)), then run the tool again.
 
 **Cause:** The tool is using an outdated `clientVersion`.
 
-**Solution:** Update miunlock to the latest version, or if you use Xiaomi's official tool, download its latest version.
+**Solution:** Update mitoolkit to the latest version, or if you use Xiaomi's official tool, download its latest version.
 
 ---
 

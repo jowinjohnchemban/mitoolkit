@@ -6,8 +6,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from miunlock import monitor  # noqa: E402
-from miunlock.ui.components.charts import nice_ceiling  # noqa: E402
+from mitoolkit import monitor  # noqa: E402
+from mitoolkit.ui.components.charts import nice_ceiling  # noqa: E402
 
 TOP = """Tasks: 500 total,   1 running, 499 sleeping
 800%cpu  42%user   0%nice  18%sys 735%idle

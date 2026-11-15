@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from test_diagnostics import ReportTests  # noqa: E402
 from tkhelper import make_root  # noqa: E402
 
-from miunlock import diagnostics  # noqa: E402
+from mitoolkit import diagnostics  # noqa: E402
 
 try:
     _r = tk.Tk()
@@ -23,8 +23,8 @@ except tk.TclError:
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class ConnectionsDialogTests(unittest.TestCase):
     def setUp(self):
-        from miunlock import gui
-        from miunlock.ui.connect_dialog import ConnectionsDialog
+        from mitoolkit import gui
+        from mitoolkit.ui.connect_dialog import ConnectionsDialog
         self.root = make_root()
         self.app = gui.App(self.root)
         self.app.busy = True

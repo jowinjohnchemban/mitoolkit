@@ -1,4 +1,4 @@
-miunlock (standalone, hardened fork)
+MiToolkit
 
 This project is licensed under the Apache License, Version 2.0 (see LICENSE).
 
@@ -7,7 +7,7 @@ It is derived from the following projects, both by offici5l:
   * MiUnlockTool  https://github.com/MiForge/MiUnlockTool  (Apache-2.0)
   * migate        https://github.com/MiForge/migate        (MIT)
 
-The code that originated in migate now lives in src/miunlock/auth/ and is
+The code that originated in migate now lives in src/mitoolkit/auth/ and is
 distributed here under this project's Apache-2.0 license. As the MIT
 License requires, its original copyright and permission notice is
 reproduced below and applies to that code.

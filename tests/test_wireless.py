@@ -6,8 +6,8 @@ from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from miunlock import adb, adb_server  # noqa: E402
-from miunlock.adb_usb import AdbError  # noqa: E402
+from mitoolkit import adb, adb_server  # noqa: E402
+from mitoolkit.adb_usb import AdbError  # noqa: E402
 
 
 class FakeDev:

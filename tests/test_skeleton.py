@@ -28,7 +28,7 @@ def run(root, seconds):
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class SkeletonTests(unittest.TestCase):
     def setUp(self):
-        from miunlock.ui.components import skeleton
+        from mitoolkit.ui.components import skeleton
         self.skeleton = skeleton
         self._reduced = skeleton.REDUCED
         skeleton.REDUCED = False         # a runner with animations switched off would never tick

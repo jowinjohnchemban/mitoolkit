@@ -41,7 +41,7 @@ def settle(root, seconds=0.3):
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class SmokeTests(unittest.TestCase):
     def setUp(self):
-        from miunlock import gui
+        from mitoolkit import gui
         self.errors = []
         self.root = make_root()
         self.app = gui.App(self.root)
@@ -90,13 +90,13 @@ class SmokeTests(unittest.TestCase):
         self.app._activity_win.close()
 
     def test_live_status_and_connections_and_log_windows_open_and_close(self):
-        from miunlock import diagnostics
-        from miunlock.ui.connect_dialog import ConnectionsDialog
-        from miunlock.ui.live_dialog import LiveStatusDialog
-        from miunlock.ui.log_dialog import LogDialog
+        from mitoolkit import diagnostics
+        from mitoolkit.ui.connect_dialog import ConnectionsDialog
+        from mitoolkit.ui.live_dialog import LiveStatusDialog
+        from mitoolkit.ui.log_dialog import LogDialog
         live = LiveStatusDialog(self.app, SERIAL, "POCO M2 Pro", start=False)
         conn = ConnectionsDialog(self.app, SERIAL, "POCO M2 Pro", start=False)
-        with mock.patch("miunlock.adb.logcat", return_value="11-15 13:20:01.123  1  2 E Tag: boom\n"):
+        with mock.patch("mitoolkit.adb.logcat", return_value="11-15 13:20:01.123  1  2 E Tag: boom\n"):
             log = LogDialog(self.app, SERIAL, "POCO M2 Pro")
             settle(self.root, 0.6)
         from test_diagnostics import ReportTests
@@ -115,14 +115,14 @@ class SmokeTests(unittest.TestCase):
         self.assertClean()
 
     def test_security_backup_and_app_manager_windows_open(self):
-        from miunlock import security
-        from miunlock.ui.apps_dialog import AppManagerDialog
-        from miunlock.ui.backup_dialog import BackupDialog
-        from miunlock.ui.security_dialog import SecurityDialog
+        from mitoolkit import security
+        from mitoolkit.ui.apps_dialog import AppManagerDialog
+        from mitoolkit.ui.backup_dialog import BackupDialog
+        from mitoolkit.ui.security_dialog import SecurityDialog
         report = security.Report()
         report.add(security.OK, "Phone software", "Security patch is recent", "")
-        with mock.patch("miunlock.security.run", return_value=report), \
-                mock.patch("miunlock.adb.list_packages", return_value=[]):
+        with mock.patch("mitoolkit.security.run", return_value=report), \
+                mock.patch("mitoolkit.adb.list_packages", return_value=[]):
             security_window = SecurityDialog(self.app, SERIAL)
             backup = BackupDialog(self.app, SERIAL, "POCO M2 Pro")
             apps = AppManagerDialog(self.app, SERIAL)

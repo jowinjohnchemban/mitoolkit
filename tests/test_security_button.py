@@ -20,7 +20,7 @@ except tk.TclError:
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class SecurityButtonTests(unittest.TestCase):
     def setUp(self):
-        from miunlock import gui
+        from mitoolkit import gui
         self.root = make_root()
         self.app = gui.App(self.root)
         self.app.busy = True                      # no real USB scan during the test

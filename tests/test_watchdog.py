@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from miunlock import watchdog  # noqa: E402
+from mitoolkit import watchdog  # noqa: E402
 
 
 class CallWithTimeoutTests(unittest.TestCase):

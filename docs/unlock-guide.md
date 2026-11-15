@@ -1,7 +1,7 @@
 # Unlock guide
 
 How to prepare a Xiaomi, Redmi or POCO device and unlock its bootloader with
-`miunlock`.
+`mitoolkit`.
 
 > [!WARNING]
 > Unlocking erases all user data on most devices, voids the warranty and removes
@@ -18,8 +18,8 @@ How to prepare a Xiaomi, Redmi or POCO device and unlock its bootloader with
 - **Back up everything you care about.** Photos and files, app data you cannot
   re-download, and chat history. For chats, use the app's own backup: a local
   backup file on the device is erased by the unlock too, so copy it to a computer.
-- **Copy your files with miunlock.** While the phone is on with USB debugging allowed, the
-  GUI's **Back up files...** button (step 2) (or `miunlock backup --dest <folder>`) copies photos,
+- **Copy your files with mitoolkit.** While the phone is on with USB debugging allowed, the
+  GUI's **Back up files...** button (step 2) (or `mitoolkit backup --dest <folder>`) copies photos,
   videos, documents, downloads, chat-app media or all shared storage to your computer. It
   only reads from the phone, and it also saves a list of installed apps. It does **not**
   cover app data, contacts or SMS.
@@ -29,7 +29,7 @@ How to prepare a Xiaomi, Redmi or POCO device and unlock its bootloader with
 - **Export two-factor codes** from authenticator apps that do not sync, or you may
   be locked out of accounts after the wipe.
 - Use a good USB data cable and charge the phone above 50%.
-- Install [`miunlock`](installation.md).
+- Install [`mitoolkit`](installation.md).
 
 ## 2. Add your account in Mi Unlock status
 
@@ -51,9 +51,9 @@ Mi Unlock status").
 ## 3. Wait out the waiting period
 
 Xiaomi makes you wait before it will issue an unlock token. The length depends on
-the device and account; 168 hours (7 days) is common. While it runs, `miunlock
+the device and account; 168 hours (7 days) is common. While it runs, `mitoolkit
 check` reports error `20036` ("Please unlock *N* hours later"). This is normal.
-`miunlock` does not shorten the wait.
+`mitoolkit` does not shorten the wait.
 
 Some devices running **HyperOS** also need permission through the Xiaomi
 Community app. That app is not offered in every region.
@@ -81,7 +81,7 @@ detected, see the [FAQ](faq.md#why-is-my-device-not-detected).
 In the GUI, click **Check eligibility** (step 2). On the command line:
 
 ```sh
-miunlock check
+mitoolkit check
 ```
 
 A response with `"eligible": true` means Xiaomi will issue a token. It also tells
@@ -97,8 +97,8 @@ In the GUI, step 3 stays disabled until the check passes. Tick the backup box, t
 phone's name exactly and click **Unlock bootloader**. Or run either of:
 
 ```sh
-miunlock                           # interactive: press Enter when prompted
-miunlock unlock --confirm-wipe     # non-interactive
+mitoolkit                           # interactive: press Enter when prompted
+mitoolkit unlock --confirm-wipe     # non-interactive
 ```
 
 Log in with the **same** Mi Account you added in step 2. When the unlock
@@ -107,7 +107,7 @@ command finishes the device resets. The first boot can take several minutes.
 ## 7. Afterwards
 
 - Set the phone up again and restore your data.
-- Delete the saved session: remove `~/.miunlocksession/`, then check the signed-in
+- Delete the saved session: remove `~/.mitoolkitsession/`, then check the signed-in
   devices on your Mi Account.
 - Restoring a chat app's local backup usually requires placing the backup file back
   in the app's folder **before** you open the app for the first time.

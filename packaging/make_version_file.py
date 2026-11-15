@@ -8,7 +8,7 @@ tools than an anonymous one. The release workflow runs this on Windows:
 import re
 from pathlib import Path
 
-version = re.search(r'__version__ = "(.+?)"', (Path(__file__).parent.parent / "src/miunlock/__init__.py").read_text()).group(1)
+version = re.search(r'__version__ = "(.+?)"', (Path(__file__).parent.parent / "src/mitoolkit/__init__.py").read_text()).group(1)
 numbers = tuple(int(x) for x in version.split(".")) + (0,) * 4
 quad = numbers[:4]
 
@@ -17,12 +17,12 @@ print(f"""VSVersionInfo(
   kids=[
     StringFileInfo([StringTable('040904B0', [
       StringStruct('CompanyName', 'Jowin John Chemban'),
-      StringStruct('FileDescription', 'miunlock: unlock and look after Xiaomi, Redmi and POCO phones'),
+      StringStruct('FileDescription', 'mitoolkit: unlock and look after Xiaomi, Redmi and POCO phones'),
       StringStruct('FileVersion', '{version}'),
-      StringStruct('InternalName', 'miunlock'),
+      StringStruct('InternalName', 'mitoolkit'),
       StringStruct('LegalCopyright', 'Apache License 2.0'),
-      StringStruct('OriginalFilename', 'miunlock.exe'),
-      StringStruct('ProductName', 'miunlock'),
+      StringStruct('OriginalFilename', 'mitoolkit.exe'),
+      StringStruct('ProductName', 'mitoolkit'),
       StringStruct('ProductVersion', '{version}')])]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

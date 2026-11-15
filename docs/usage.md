@@ -1,13 +1,13 @@
 # Usage
 
-`miunlock` is one program with three ways to drive it:
+`mitoolkit` is one program with three ways to drive it:
 
 | Run | You get |
 |---|---|
-| `miunlock` | The GUI |
-| `miunlock --cli` | The interactive prompt |
-| `miunlock <command>` (optionally `--cli <command>`) | Scriptable commands that print JSON |
-| `miunlock --mcp` | An interface for AI agents, see [agents](agents.md) |
+| `mitoolkit` | The GUI |
+| `mitoolkit --cli` | The interactive prompt |
+| `mitoolkit <command>` (optionally `--cli <command>`) | Scriptable commands that print JSON |
+| `mitoolkit --mcp` | An interface for AI agents, see [agents](agents.md) |
 
 The Windows program has no console window when it opens the GUI; for `--cli`, commands and `--mcp` it
 uses the terminal that started it. All three talk to the same code and the same Xiaomi
@@ -19,7 +19,7 @@ and device in *Mi Unlock status*, and read the [safety model](safety.md).
 ## Interactive mode
 
 ```sh
-miunlock --cli
+mitoolkit --cli
 ```
 
 It walks through the whole process:
@@ -42,12 +42,12 @@ and exits with status `0` on success and `1` on failure.
 
 | Command | What it does | Changes the device? |
 |---|---|---|
-| `miunlock login [--method 1\|3] [--force]` | Log in, or reuse a saved session | No |
-| `miunlock devices` | Phones seen by adb (model, MIUI, lock state) and fastboot | No |
-| `miunlock reboot-fastboot [--serial S]` | adb: reboot a running phone into fastboot | Restarts only |
-| `miunlock status` | Account, region and device codename | No |
-| `miunlock check` | Ask Xiaomi if the device is eligible right now | No |
-| `miunlock unlock --confirm-wipe` | Unlock the bootloader | **Yes, erases data** |
+| `mitoolkit login [--method 1\|3] [--force]` | Log in, or reuse a saved session | No |
+| `mitoolkit devices` | Phones seen by adb (model, MIUI, lock state) and fastboot | No |
+| `mitoolkit reboot-fastboot [--serial S]` | adb: reboot a running phone into fastboot | Restarts only |
+| `mitoolkit status` | Account, region and device codename | No |
+| `mitoolkit check` | Ask Xiaomi if the device is eligible right now | No |
+| `mitoolkit unlock --confirm-wipe` | Unlock the bootloader | **Yes, erases data** |
 
 `--method 1` is browser login (default) and `--method 3` is QR code. `--force`
 ignores a saved session and logs in again. First-time login still needs a person
@@ -56,7 +56,7 @@ to finish logging in on Xiaomi's page; there is no unattended login.
 `unlock` refuses to run without `--confirm-wipe`:
 
 ```text
-$ miunlock unlock
+$ mitoolkit unlock
 {
   "success": false,
   "error": "Refusing to unlock: --confirm-wipe was not passed. ..."
@@ -66,7 +66,7 @@ $ miunlock unlock
 ### Example output
 
 ```sh
-$ miunlock status
+$ mitoolkit status
 {
   "logged_in": true,
   "userId": "1234567890",
@@ -76,7 +76,7 @@ $ miunlock status
 ```
 
 ```sh
-$ miunlock check
+$ mitoolkit check
 {
   "eligible": false,
   "product": "example",
@@ -96,7 +96,7 @@ When eligible, `check` returns `"eligible": true` together with
 ### backup
 
 ```sh
-miunlock backup --dest D:\\phone-backup --only photos,documents
+mitoolkit backup --dest D:\\phone-backup --only photos,documents
 ```
 
 Copies folders from a phone running Android to your computer over adb, and writes
@@ -106,21 +106,21 @@ Copies folders from a phone running Android to your computer over adb, and write
 ### apps
 
 ```sh
-miunlock apps list --known                       # known bloat on the phone, with ratings
-miunlock apps list                               # every app
-miunlock apps remove com.miui.msa.global         # remove for your user (restorable)
-miunlock apps restore com.miui.msa.global        # bring it back
+mitoolkit apps list --known                       # known bloat on the phone, with ratings
+mitoolkit apps list                               # every app
+mitoolkit apps remove com.miui.msa.global         # remove for your user (restorable)
+mitoolkit apps restore com.miui.msa.global        # bring it back
 ```
 
 Removing uses `pm uninstall -k --user 0`: a preinstalled app is hidden for your user and
 can be restored; an app you installed yourself is uninstalled. Unlocking resets the phone,
 which brings removed apps back. Ratings: `recommended`, `optional`, `advanced`, `avoid`,
-`unknown` (see `src/miunlock/bloat.py`).
+`unknown` (see `src/mitoolkit/bloat.py`).
 
 ### security-check
 
 ```sh
-miunlock security-check
+mitoolkit security-check
 ```
 
 Read-only check of a phone running Android, printed as JSON:
@@ -141,7 +141,7 @@ It is not an antivirus; keep Google Play Protect on. The GUI has the same check 
 ### details
 
 ```sh
-miunlock details [--serial S]
+mitoolkit details [--serial S]
 ```
 
 Everything a phone running Android reports over USB (what **Show more** shows), as JSON: identity
@@ -152,7 +152,7 @@ Only what the phone reports is included.
 ### connections
 
 ```sh
-miunlock connections [--serial S] [--network-test]
+mitoolkit connections [--serial S] [--network-test]
 ```
 
 Wi-Fi, mobile network (modem), SIM, Bluetooth, USB and power readings with plain-language `findings`
@@ -163,17 +163,17 @@ traffic is sent.
 ### driver-help
 
 ```sh
-miunlock driver-help          # Windows: how to install Google's USB driver
-miunlock driver-help --open   # ... and open Google's download page
+mitoolkit driver-help          # Windows: how to install Google's USB driver
+mitoolkit driver-help --open   # ... and open Google's download page
 ```
 
-miunlock does not download or install drivers; you install Google's driver with Device
+mitoolkit does not download or install drivers; you install Google's driver with Device
 Manager. The same help is in the GUI under *Help > USB driver help*.
 
 ## GUI
 
 ```sh
-miunlock          # or: miunlock --gui
+mitoolkit          # or: mitoolkit --gui
 ```
 
 Three steps run in order: **Sign in**, **Check** and **Unlock**. The GUI detects a
@@ -278,15 +278,15 @@ Handy features:
   instead. Once a day the app also looks quietly and says in the status line when there is a newer version;
   turn that off with **Help > Check for updates automatically**. Versions read `v1.0.0 (build: DDMMYYYY-commit)`:
   the release number, then the date and short id of the commit it was built from (shown in the title bar,
-  About and `miunlock --version`).
-- **Debug logging** (Help menu, `--debug`, or `MIUNLOCK_DEBUG=1`) adds step-by-step lines to `miunlock.log`:
+  About and `mitoolkit --version`).
+- **Debug logging** (Help menu, `--debug`, or `MITOOLKIT_DEBUG=1`) adds step-by-step lines to `mitoolkit.log`:
   each adb and fastboot request with its timing, scans, connections. Tokens stay hidden. Off by default.
 - **Wireless adb...** (Phone menu) uses the phone over Wi-Fi instead of a cable. With the phone plugged
   in once, **Turn on Wi-Fi debugging** switches its adb to the network and connects; after that you can
   unplug it. A phone already set up for wireless debugging can be connected by its address (for example
-  `192.168.1.5`). It needs Google's `adb` (platform-tools) on this computer, because miunlock's own adb
+  `192.168.1.5`). It needs Google's `adb` (platform-tools) on this computer, because mitoolkit's own adb
   speaks USB only, and the phone returns to USB-only when it restarts. **Fastboot and unlocking work over
-  a USB cable only**: the bootloader has no Wi-Fi, so miunlock asks you to plug the phone in before it
+  a USB cable only**: the bootloader has no Wi-Fi, so mitoolkit asks you to plug the phone in before it
   reboots into fastboot. When a phone is both plugged in and on Wi-Fi, it is listed once, by USB.
 - The window looks for the phone every second, and Live status and Connections show at once when it is
   unplugged and carry on when it is back. Automatic updates change only the readings, not the text bar.
@@ -298,5 +298,5 @@ The session is stored encrypted where the system allows it (credential store or 
 DPAPI), expires after 24 hours, and is removed by logging out. Details, including how to
 change the expiry, are in the [safety model](safety.md#saved-session).
 
-Everything the program does is also recorded in `miunlock.log`, next to the executable.
+Everything the program does is also recorded in `mitoolkit.log`, next to the executable.
 It contains no tokens. In the GUI, **File > Show log file** opens its folder.

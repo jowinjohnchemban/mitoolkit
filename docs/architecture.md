@@ -1,13 +1,13 @@
 # Architecture
 
-`miunlock` is one Python package with a `src/` layout. The Xiaomi login code lives in
-`miunlock.auth`.
+`mitoolkit` is one Python package with a `src/` layout. The Xiaomi login code lives in
+`mitoolkit.auth`.
 
 ## Layout
 
 ```text
-src/miunlock/
-├── __main__.py        python -m miunlock
+src/mitoolkit/
+├── __main__.py        python -m mitoolkit
 ├── cli.py             entry point: GUI by default, --cli, JSON subcommands (@json_command), --mcp
 ├── gui.py             main window (App)
 ├── ui/                the other windows, one class each, built from the components
@@ -42,7 +42,7 @@ src/miunlock/
 ├── mcp.py             MCP server for AI agents (no unlock tool)
 ├── api.py             programmatic API used by the subcommands, GUI and MCP
 ├── xiaomi.py          UnlockServer: the requests to Xiaomi's unlock server, shared
-├── errors.py          MiunlockError, the base of every expected error
+├── errors.py          MitoolkitError, the base of every expected error
 ├── adb.py             Phone: details, reboot, backup, app manager (+ short functions)
 ├── adb_usb.py         built-in adb client (USB protocol, auth, shell, sync)
 ├── adb_server.py      adb through Google's adb server, when one is running
@@ -55,7 +55,7 @@ src/miunlock/
 ├── bloat.py           known Xiaomi bloat, with ratings, for the app manager
 ├── security.py        read-only security check (OSV bulletins, Play Protect, app access, stalkerware)
 ├── guide.py           the in-app step-by-step guide
-├── log.py             scrubbed miunlock.log next to the executable
+├── log.py             scrubbed mitoolkit.log next to the executable
 ├── hints.py           plain-English explanations of Xiaomi error codes
 ├── assets/logo.png    window icon
 ├── unlock.py          InteractiveUnlock: the prompting command-line flow
@@ -88,18 +88,18 @@ src/miunlock/
   `adb_usb.AdbDevice` and `fastboot_usb.FastbootDevice` wrap the USB sessions;
   `adbkey.Key` is the RSA key. Module-level functions in `adb.py` are one-line short forms
   kept for the CLI, API and MCP.
-- **One error base.** Every expected failure derives from `errors.MiunlockError` and has a
+- **One error base.** Every expected failure derives from `errors.MitoolkitError` and has a
   readable message. Each layer has one type (`AdbError`, `FastbootError`, `UsbError`,
   `UnlockError`); `api.py` turns lower-layer errors into `UnlockError`.
 - **Windows as classes.** Each secondary window is a `ui.base.Dialog` subclass. They only
   use the App's small public interface: `root`, `fonts`, `run()`, `log()`, `call_soon()`.
 - **CLI commands are plain functions** wrapped by `@json_command`, which prints the result
-  as JSON and turns any `MiunlockError` into `{"error": ...}` with exit status 1.
+  as JSON and turns any `MitoolkitError` into `{"error": ...}` with exit status 1.
 
 ## Request flow
 
 ```text
-login (browser or QR)  ──►  passToken saved to ~/.miunlocksession
+login (browser or QR)  ──►  passToken saved to ~/.mitoolkitsession
         │
         ▼
 service token  ──►  account region  ──►  data center  ──►  unlock server
@@ -121,14 +121,14 @@ POST /api/v3/ahaUnlock                returns encryptData
 download (stage) encryptData  ──►  oem unlock
 ```
 
-The fastboot steps are miunlock's own USB client (`fastboot_usb.py`); `encryptData` goes
+The fastboot steps are mitoolkit's own USB client (`fastboot_usb.py`); `encryptData` goes
 from memory straight to the phone and is never written to disk.
 
 ## Choosing how to reach the phone
 
-Only one program can open a phone's USB interface, so miunlock picks the way that works:
+Only one program can open a phone's USB interface, so mitoolkit picks the way that works:
 
-- **adb**: if Google's adb server is running (it owns every phone in adb mode), miunlock
+- **adb**: if Google's adb server is running (it owns every phone in adb mode), mitoolkit
   asks it, over `127.0.0.1:5037`, exactly like the `adb` command does. Otherwise it uses its
   own USB connection and keeps it open between scans (it never re-probes a phone it already
   holds, which Windows would answer with "access denied").
@@ -171,8 +171,8 @@ The account region selects the unlock server:
 
 Defined in `pyproject.toml`:
 
-- `miunlock` → `miunlock.cli:main`
-- `miunlock-gui` → `miunlock.gui:main` (alias; `miunlock` alone opens the GUI too)
+- `mitoolkit` → `mitoolkit.cli:main`
+- `mitoolkit-gui` → `mitoolkit.gui:main` (alias; `mitoolkit` alone opens the GUI too)
 
-With no arguments `miunlock` opens the GUI; `--cli` alone runs the interactive flow;
-a subcommand uses `miunlock.api`; `--mcp` starts the agent interface.
+With no arguments `mitoolkit` opens the GUI; `--cli` alone runs the interactive flow;
+a subcommand uses `mitoolkit.api`; `--mcp` starts the agent interface.

@@ -1,12 +1,12 @@
 name: Release
 
-# A release is made automatically when the version in src/miunlock/__init__.py changes on main
+# A release is made automatically when the version in src/mitoolkit/__init__.py changes on main
 # (bump it, update CHANGELOG.md, push). Pushing a tag like v1.8.1 by hand, or running the
 # workflow from the Actions tab, does the same. A version that already has a release is skipped.
 on:
   push:
     branches: [main]
-    paths: ["src/miunlock/__init__.py"]
+    paths: ["src/mitoolkit/__init__.py"]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -28,7 +28,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          V=$(python3 -c "import re;print(re.search(r'__version__ = \"(.+?)\"',open('src/miunlock/__init__.py').read()).group(1))")
+          V=$(python3 -c "import re;print(re.search(r'__version__ = \"(.+?)\"',open('src/mitoolkit/__init__.py').read()).group(1))")
           TAG="v$V"
           if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$TAG" ]; then
             echo "tag $GITHUB_REF_NAME != package version $TAG"; exit 1
@@ -50,7 +50,7 @@ jobs:
           persist-credentials: false
       - name: Stamp the build (date and commit shown in the app)
         shell: bash
-        run: printf 'DATE = "%s"\nCOMMIT = "%s"\n' "$(git log -1 --format=%cd --date=format:%d%m%Y)" "$(git rev-parse --short HEAD)" > src/miunlock/_build.py
+        run: printf 'DATE = "%s"\nCOMMIT = "%s"\n' "$(git log -1 --format=%cd --date=format:%d%m%Y)" "$(git rev-parse --short HEAD)" > src/mitoolkit/_build.py
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
@@ -81,7 +81,7 @@ jobs:
           persist-credentials: false
       - name: Stamp the build (date and commit shown in the app)
         shell: bash
-        run: printf 'DATE = "%s"\nCOMMIT = "%s"\n' "$(git log -1 --format=%cd --date=format:%d%m%Y)" "$(git rev-parse --short HEAD)" > src/miunlock/_build.py
+        run: printf 'DATE = "%s"\nCOMMIT = "%s"\n' "$(git log -1 --format=%cd --date=format:%d%m%Y)" "$(git rev-parse --short HEAD)" > src/mitoolkit/_build.py
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
@@ -95,7 +95,7 @@ jobs:
         shell: bash
         run: python packaging/make_version_file.py > packaging/version_info.txt
       - name: Build
-        run: pyinstaller --onefile ${{ matrix.mode }} ${{ matrix.extra }} --name miunlock --icon assets/icon.ico --collect-data miunlock --collect-all libusb_package --hidden-import usb.backend.libusb1 --hidden-import PIL._tkinter_finder packaging/app.py
+        run: pyinstaller --onefile ${{ matrix.mode }} ${{ matrix.extra }} --name mitoolkit --icon assets/icon.ico --collect-data mitoolkit --collect-all libusb_package --hidden-import usb.backend.libusb1 --hidden-import PIL._tkinter_finder packaging/app.py
       - name: Sign the Windows program (when a certificate is configured)
         if: runner.os == 'Windows' && env.CERT != ''
         shell: pwsh
@@ -104,21 +104,21 @@ jobs:
         run: |
           [IO.File]::WriteAllBytes("cert.pfx", [Convert]::FromBase64String($env:CERT))
           $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1).FullName
-          & $signtool sign /f cert.pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /d "miunlock" dist\miunlock.exe
+          & $signtool sign /f cert.pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /d "mitoolkit" dist\mitoolkit.exe
           if ($LASTEXITCODE -ne 0) { throw "signing failed" }
-          & $signtool verify /pa dist\miunlock.exe
+          & $signtool verify /pa dist\mitoolkit.exe
           if ($LASTEXITCODE -ne 0) { throw "signature check failed" }
           Remove-Item cert.pfx
       - name: Smoke test
         shell: bash
         run: |
-          ./dist/miunlock${{ matrix.ext }} --version
-          if ./dist/miunlock${{ matrix.ext }} unlock; then echo "gate failed"; exit 1; fi
+          ./dist/mitoolkit${{ matrix.ext }} --version
+          if ./dist/mitoolkit${{ matrix.ext }} unlock; then echo "gate failed"; exit 1; fi
       - name: Name artifacts
         shell: bash
         run: |
           mkdir out
-          cp dist/miunlock${{ matrix.ext }}     out/miunlock-${{ matrix.tag }}${{ matrix.ext }}
+          cp dist/mitoolkit${{ matrix.ext }}     out/mitoolkit-${{ matrix.tag }}${{ matrix.ext }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: exe-${{ matrix.tag }}
@@ -148,7 +148,7 @@ jobs:
           {
             echo
             echo "### Downloads"
-            echo "- \`miunlock-*\` program for Windows, Linux and macOS: opens the GUI, or runs on the command line with \`--cli\`. The app updates itself from here (Help > Check for updates)."
+            echo "- \`mitoolkit-*\` program for Windows, Linux and macOS: opens the GUI, or runs on the command line with \`--cli\`. The app updates itself from here (Help > Check for updates)."
             echo "- \`.whl\` / \`.tar.gz\`: Python packages (\`pip install <file>\`)"
             echo "- \`SHA256SUMS.txt\`: verify downloads with \`sha256sum -c SHA256SUMS.txt\`"
             echo

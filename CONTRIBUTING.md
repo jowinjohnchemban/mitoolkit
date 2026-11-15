@@ -4,28 +4,28 @@ Contributions of any size are welcome: code, documentation, bug reports and idea
 
 ## Reporting issues
 
-Open an [issue](https://github.com/jowinjohnchemban/miunlock/issues) with:
+Open an [issue](https://github.com/jowinjohnchemban/mitoolkit/issues) with:
 
 - your operating system and Python version (`python --version`)
-- the `miunlock` command you ran and its output
+- the `mitoolkit` command you ran and its output
 - the device codename, if the problem involves a device
 
 **Remove personal data first.** Do not paste your Mi Account ID, session files,
-tokens, or the contents of `~/.miunlocksession/`. For security problems, follow
+tokens, or the contents of `~/.mitoolkitsession/`. For security problems, follow
 [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
 ## Development setup
 
 ```sh
-git clone https://github.com/jowinjohnchemban/miunlock.git
-cd miunlock
+git clone https://github.com/jowinjohnchemban/mitoolkit.git
+cd mitoolkit
 python -m venv .venv
 # activate it: source .venv/bin/activate   or   .venv\Scripts\Activate.ps1
 pip install -e .
-miunlock --help
+mitoolkit --help
 ```
 
-The code is in `src/miunlock/`; see [docs/architecture.md](docs/architecture.md).
+The code is in `src/mitoolkit/`; see [docs/architecture.md](docs/architecture.md).
 Run the tests with `python -m unittest discover -s tests -v`. They use only dummy values and
 never touch the network, a real session or a device. Please add a test with any fix that
 touches credentials, logging or the unlock confirmation.
@@ -37,7 +37,7 @@ touches credentials, logging or the unlock confirmation.
 - Keep changes working on Windows, macOS and Linux.
 - Keep it clean and concise, and prefer small files over large ones.
 - Do not add dependencies without a good reason.
-- `src/miunlock/unlock.py` and `src/miunlock/api.py` repeat the same request
+- `src/mitoolkit/unlock.py` and `src/mitoolkit/api.py` repeat the same request
   sequence. If you change one, change the other.
 
 **Safety rules.** Pull requests that break these will not be merged:
@@ -71,7 +71,7 @@ fit the direction of the project.
 
 Releases are automatic. To publish one:
 
-1. Change `__version__` in `src/miunlock/__init__.py` (major.minor.patch).
+1. Change `__version__` in `src/mitoolkit/__init__.py` (major.minor.patch).
 2. Add a `## [x.y.z] - date` section to `CHANGELOG.md`: it becomes the release notes.
 3. Push to `main`.
 
@@ -86,7 +86,7 @@ An unsigned Windows program makes SmartScreen show "Windows protected your PC". 
 certificate (an OV or EV certificate from a certificate authority) is the only way to avoid that. To turn
 signing on, add two repository secrets (Settings > Secrets and variables > Actions): `WINDOWS_CERT_PFX_BASE64`
 (the `.pfx` file, base64-encoded) and `WINDOWS_CERT_PASSWORD`. The Release workflow then signs and verifies
-`miunlock.exe` before it is checksummed and published; without the secrets it builds unsigned. A new OV
+`mitoolkit.exe` before it is checksummed and published; without the secrets it builds unsigned. A new OV
 certificate still needs some downloads to build reputation; an EV certificate is trusted at once.
 
 ## License

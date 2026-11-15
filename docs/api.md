@@ -1,18 +1,18 @@
 # Python API
 
-`miunlock.api` exposes the unlock process as plain functions. They return
+`mitoolkit.api` exposes the unlock process as plain functions. They return
 dictionaries and raise `UnlockError` instead of printing or waiting on `input()`,
 so they can be used from scripts, CI jobs and other tools. The command line
 subcommands are a thin wrapper around this module.
 
 ```python
-from miunlock import api
+from mitoolkit import api
 ```
 
 ## Example
 
 ```python
-from miunlock import api
+from mitoolkit import api
 
 try:
     token = api.login()                          # reuses a saved session if present
@@ -59,14 +59,14 @@ mode. With `wait=True` it waits for one to be connected; with `wait=False` it ra
 
 ### Lower-level building blocks
 
-- `miunlock.xiaomi.UnlockServer(service, zone)`: `device_clear(product)` and
+- `mitoolkit.xiaomi.UnlockServer(service, zone)`: `device_clear(product)` and
   `unlock_data(product, device_token)`, the two requests to Xiaomi's unlock server.
-- `miunlock.adb.Phone(serial=None)`: `info()`, `reboot_to_bootloader()`, `packages()`,
+- `mitoolkit.adb.Phone(serial=None)`: `info()`, `reboot_to_bootloader()`, `packages()`,
   `uninstall_for_user(pkg)`, `restore_for_user(pkg)`, `backup(dest, sets)`.
-- `miunlock.fastboot`: `devices()`, `info()`, `get_product()`, `get_token()`,
+- `mitoolkit.fastboot`: `devices()`, `info()`, `get_product()`, `get_token()`,
   `stage_and_unlock(data)`, `reboot()`, on the backend for this system.
 
-All of them raise subclasses of `miunlock.errors.MiunlockError`.
+All of them raise subclasses of `mitoolkit.errors.MitoolkitError`.
 
 ### `check_unlock_eligibility(passtoken, zone=None) -> dict`
 

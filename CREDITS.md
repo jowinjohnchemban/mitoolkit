@@ -1,6 +1,6 @@
 # Credits
 
-miunlock began as inspiration from two projects by [offici5l](https://github.com/offici5l):
+mitoolkit began as inspiration from two projects by [offici5l](https://github.com/offici5l):
 [MiUnlockTool](https://github.com/MiForge/MiUnlockTool) and
 [migate](https://github.com/MiForge/migate). From there it grew into its own tool: a built-in adb
 and fastboot client, a phone toolkit (details, live status, connections, backup, apps, security
@@ -10,7 +10,7 @@ It is developed and maintained by [Jowin John Chemban](https://github.com/jowinj
 
 ## MiUnlockTool contributors
 
-Thank you to everyone whose work is in the code miunlock started from (the first commit of this
+Thank you to everyone whose work is in the code mitoolkit started from (the first commit of this
 repository lists the details): offici5l (author and maintainer, 492 commits), Petr Hodina (packaging),
 IEatChange (install guide), Dgmtnz (virtual environment setup), Dzmitry Neviadomski (fastboot on macOS
 and Linux), Kserviceunlocker (README and CI), Sn0r1ax (Windows USB driver install), Apip (password input),

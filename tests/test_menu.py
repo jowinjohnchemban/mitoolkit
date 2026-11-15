@@ -28,7 +28,7 @@ def labels(menu):
 @unittest.skipUnless(HAVE_DISPLAY, "needs a display")
 class MenuTests(unittest.TestCase):
     def setUp(self):
-        from miunlock import gui
+        from mitoolkit import gui
         self.root = make_root()
         self.app = gui.App(self.root)
         self.bar = self.root.nametowidget(self.root.cget("menu"))
@@ -96,7 +96,7 @@ class MenuTests(unittest.TestCase):
         calls = []
         self.app._check = lambda: calls.append(1)
         # the menu captured the original method, so test the guard directly
-        from miunlock.ui.menu import MenuBar
+        from mitoolkit.ui.menu import MenuBar
         self.assertEqual(MenuBar._fire(lambda: calls.append(1), lambda: False), "break")
         self.assertEqual(calls, [])
         MenuBar._fire(lambda: calls.append(1), lambda: True)
