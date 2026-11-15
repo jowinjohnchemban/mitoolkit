@@ -9,6 +9,10 @@ How to prepare a Xiaomi, Redmi or POCO device and unlock its bootloader with
 > malware. Banking and payment apps may refuse to run on an unlocked device.
 > Continue only if you accept this.
 
+> [!TIP]
+> The GUI contains this guide: **Help > Step-by-step guide** (or press **F1**). It works
+> offline and follows the same steps.
+
 ## 1. Before you start
 
 - **Back up everything you care about.** Photos and files, app data you cannot
@@ -51,6 +55,10 @@ If the wait seems to reset or never decreases, see the notes under `20036` in th
 
 ## 4. Put the device in fastboot mode
 
+The GUI shows a dot next to the phone: green when it is in fastboot mode, orange when it is
+running Android and seen by adb (click **Reboot to fastboot**, nothing is erased), grey when
+nothing is found.
+
 Either:
 
 - Power the phone off, then hold **Volume Down + Power** until the fastboot screen
@@ -61,6 +69,8 @@ Connect it by USB. It must be in **fastboot** mode, not *fastbootd*. If it is no
 detected, see the [FAQ](faq.md#why-is-my-device-not-detected).
 
 ## 5. Check eligibility (read-only)
+
+In the GUI, click **Check eligibility** (step 2). On the command line:
 
 ```sh
 miunlock check
@@ -73,7 +83,10 @@ not change the device.
 
 ## 6. Unlock
 
-Make sure your backup is complete and copied off the device. Then run either:
+Make sure your backup is complete and copied off the device.
+
+In the GUI, step 3 stays disabled until the check passes. Tick the backup box, type the
+phone's name exactly and click **Unlock bootloader**. Or run either of:
 
 ```sh
 miunlock                           # interactive: press Enter when prompted

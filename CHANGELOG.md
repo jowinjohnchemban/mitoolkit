@@ -8,6 +8,21 @@ is kept in [docs/upstream-changelog.md](docs/upstream-changelog.md).
 
 ## [Unreleased]
 
+### Added
+
+- GUI shows device details when a phone is connected: model, codename, Android and HyperOS/MIUI
+  version, security patch, bootloader state, battery and a masked serial (fastboot mode shows
+  codename, bootloader state and version, and active slot).
+- Step-by-step guide inside the GUI (Help menu or F1), available offline.
+- GUI: scrollable page with a scrollbar and mouse wheel, Copy and Clear for the details
+  panel, step badges that show what to do next, Ctrl+Q to quit.
+
+### Changed
+
+- The Windows program is built without a console, so opening the GUI no longer flashes a
+  command window. Command-line use still prints to the terminal that started it.
+- Updated the unlock guide and usage docs for the GUI.
+
 ## [1.8.0] - 2026-11-15
 
 First release of this fork. It starts from MiUnlockTool 1.7.5 and migate 1.1.11,

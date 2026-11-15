@@ -157,24 +157,45 @@ def _start_gui() -> bool:
         print("The graphical app needs Tkinter, which is not installed. Using the command line instead.\n"
               "(Linux: sudo apt install python3-tk)", file=sys.stderr)
         return False
-    _hide_console()
     gui.main()
     return True
 
 
-def _hide_console():
-    """A built Windows program opens a console window; close it when only we are using it."""
-    if sys.platform == "win32" and getattr(sys, "frozen", False):
-        try:
-            import ctypes
-            ids = (ctypes.c_uint * 2)()
-            if ctypes.windll.kernel32.GetConsoleProcessList(ids, 2) <= 1:
-                ctypes.windll.kernel32.FreeConsole()
-        except Exception:
-            pass
+def _attach_console():
+    """The Windows program is built without a console, so double-clicking it opens only
+    the GUI (no black window). For command-line use, borrow the console of the terminal
+    that started us, or the redirected pipes, and point the standard streams at it."""
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return
+    try:
+        import ctypes
+        import msvcrt
+        import os
+        k32 = ctypes.windll.kernel32
+        k32.GetStdHandle.restype = ctypes.c_void_p
+        k32.AttachConsole(-1)  # ATTACH_PARENT_PROCESS; harmless if it fails or is already attached
+
+        def stream(std_handle, fallback, mode, fd_flags):
+            handle = k32.GetStdHandle(std_handle)
+            if handle in (None, 0, ctypes.c_void_p(-1).value):
+                return open(fallback, mode, encoding="utf-8", errors="replace", buffering=1 if "w" in mode else -1)
+            fd = msvcrt.open_osfhandle(handle, fd_flags)
+            return os.fdopen(fd, mode, encoding="utf-8", errors="replace", buffering=1 if "w" in mode else -1)
+
+        if sys.stdout is None:
+            sys.stdout = stream(-11, "CONOUT$", "w", 0)
+        if sys.stderr is None:
+            sys.stderr = stream(-12, "CONOUT$", "w", 0)
+        if sys.stdin is None:
+            sys.stdin = stream(-10, "CONIN$", "r", os.O_RDONLY)
+    except Exception:
+        pass
 
 
 def main():
+    argv = sys.argv[1:]
+    if "--gui" not in argv and (argv or "--cli" in argv):
+        _attach_console()  # command-line use needs a console; the GUI must not have one
     log.setup()
     # One program, two modes: the GUI by default, the command line with --cli
     # (a subcommand such as `check` also means command line).

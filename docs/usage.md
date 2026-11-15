@@ -9,7 +9,8 @@
 | `miunlock <command>` (optionally `--cli <command>`) | Scriptable commands that print JSON |
 | `miunlock --mcp` | An interface for AI agents, see [agents](agents.md) |
 
-The built Windows program closes its console window when it opens the GUI. All three talk to the same code and the same Xiaomi
+The Windows program has no console window when it opens the GUI; for `--cli`, commands and `--mcp` it
+uses the terminal that started it. All three talk to the same code and the same Xiaomi
 servers.
 
 Before you start, follow the [unlock guide](unlock-guide.md) to add your account
@@ -105,6 +106,15 @@ confirmation box and you type the phone's name exactly. There is no "don't ask a
 
 The GUI uses Tkinter, which ships with Python on Windows and macOS. On some Linux
 distributions install it separately, for example `sudo apt install python3-tk`.
+
+Handy features:
+
+- **Help > Step-by-step guide** (F1) opens the unlock guide inside the program, offline.
+- The page scrolls, with a scrollbar and mouse wheel, so nothing is cut off on small or
+  scaled screens.
+- **Show details** reveals what the program is doing, with **Copy** and **Clear** buttons.
+- The numbered badges are grey (not yet), orange (do this next) and green (done).
+- Ctrl+Q quits.
 
 ## Saved session and log
 

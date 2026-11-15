@@ -22,6 +22,17 @@ _PROPS = {
     "miui": "ro.miui.ui.version.name",
     "hyperos": "ro.mi.os.version.name",
     "bootloader_locked": "ro.boot.flash.locked",
+    "brand": "ro.product.brand",
+    "security_patch": "ro.build.version.security_patch",
+}
+
+# Read-only fastboot variables worth showing. "unlocked" is the bootloader state.
+_FASTBOOT_VARS = {
+    "product": "product",
+    "unlocked": "unlocked",
+    "bootloader_version": "version-bootloader",
+    "slot": "current-slot",
+    "serial": "serialno",
 }
 
 
@@ -85,6 +96,34 @@ def device_info(serial: str, adb: Optional[str] = None) -> Dict[str, Optional[st
         info[key] = value or None
     flag = info.pop("bootloader_locked")
     info["bootloader_locked"] = None if flag is None else flag == "1"
+    info["battery"] = None
+    try:  # charge level, so you can check the phone is above 50%
+        for line in _run(adb, "-s", serial, "shell", "dumpsys", "battery").splitlines():
+            if line.strip().startswith("level:"):
+                info["battery"] = int(line.split(":", 1)[1])
+                break
+    except (AdbError, ValueError):
+        pass
+    return info
+
+
+def fastboot_info(fastboot: str, serial: Optional[str] = None) -> Dict[str, Optional[str]]:
+    """Read-only facts about a phone in fastboot mode: codename, whether the bootloader is
+    already unlocked, bootloader version, active slot. Uses ``fastboot getvar`` only."""
+    info: Dict[str, Optional[str]] = {}
+    base = [fastboot] + (["-s", serial] if serial else [])
+    for key, var in _FASTBOOT_VARS.items():
+        value = None
+        try:
+            done = subprocess.run(base + ["getvar", var], capture_output=True, text=True,
+                                  timeout=8, creationflags=NO_WINDOW)
+            for line in (done.stderr + done.stdout).splitlines():  # fastboot prints "var: value" on stderr
+                if line.startswith(var + ":"):
+                    value = line.split(":", 1)[1].strip() or None
+                    break
+        except (subprocess.SubprocessError, OSError):
+            pass
+        info[key] = value
     return info
 
 

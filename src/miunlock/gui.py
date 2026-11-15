@@ -25,7 +25,7 @@ from tkinter import font as tkfont
 from tkinter import messagebox, ttk
 from typing import Callable, Optional
 
-from miunlock import __version__, adb, api, log
+from miunlock import __version__, adb, api, guide, log
 from miunlock.auth import store
 from miunlock.auth.redact import mask_id
 from miunlock.fastboot import get_fastboot
@@ -70,8 +70,8 @@ class App:
     def __init__(self, root: tk.Tk):
         self.root = root
         root.title(f"miunlock {__version__}")
-        root.geometry("780x660")
-        root.minsize(700, 560)
+        root.geometry("780x700")
+        root.minsize(560, 420)
         try:
             icon = Path(__file__).parent / "assets" / "logo.png"
             self._icon = tk.PhotoImage(file=str(icon))  # keep a reference
@@ -91,6 +91,8 @@ class App:
         self.android: Optional[dict] = None  # phone seen by adb while running Android
         self._adb: Optional[str] = None
         self._info: dict = {}
+        self._fbinfo: dict = {}
+        self.fb_info: Optional[dict] = None
         self._wrap_labels: list[ttk.Label] = []
 
         self._style()
@@ -98,7 +100,6 @@ class App:
         self._layout()
         self._refresh()
 
-        root.bind("<Configure>", self._on_resize)
         root.after(100, self._pump)
         root.after(300, self._prepare_fastboot)
 
@@ -132,7 +133,8 @@ class App:
         bar.add_cascade(label="File", menu=file_menu)
 
         help_menu = tk.Menu(bar, tearoff=0)
-        help_menu.add_command(label="Unlock guide", command=lambda: webbrowser.open(DOCS + "unlock-guide.md"))
+        help_menu.add_command(label="Step-by-step guide (F1)", command=self._open_guide)
+        help_menu.add_command(label="Full unlock guide (web)", command=lambda: webbrowser.open(DOCS + "unlock-guide.md"))
         help_menu.add_command(label="Safety model", command=lambda: webbrowser.open(DOCS + "safety.md"))
         help_menu.add_command(label="Error codes", command=lambda: webbrowser.open(DOCS + "error-codes.md"))
         help_menu.add_command(label="FAQ", command=lambda: webbrowser.open(DOCS + "faq.md"))
@@ -161,11 +163,11 @@ class App:
         return card, body, status, badge
 
     def _layout(self):
-        outer = ttk.Frame(self.root, padding=(18, 14))
-        outer.pack(fill="both", expand=True)
+        shell = ttk.Frame(self.root, padding=(18, 14, 8, 10))
+        shell.pack(fill="both", expand=True)
 
         # Status bar: packed first so it always keeps its space at the bottom.
-        bottom = ttk.Frame(outer)
+        bottom = ttk.Frame(shell)
         bottom.pack(fill="x", side="bottom", pady=(6, 0))
         self.progress = ttk.Progressbar(bottom, mode="indeterminate", length=120)
         self.status = ttk.Label(bottom, text="Ready.", foreground=MUTED)
@@ -173,6 +175,25 @@ class App:
         self.details_open = False
         self.details_btn = ttk.Button(bottom, text="Show details", command=self._toggle_details)
         self.details_btn.pack(side="right")
+
+        # Everything else scrolls, so nothing is cut off on a small or scaled screen.
+        self.scroll_wrap = ttk.Frame(shell)
+        self.scroll_wrap.pack(fill="both", expand=True)
+        self.canvas = tk.Canvas(self.scroll_wrap, highlightthickness=0, borderwidth=0)
+        self.vbar = ttk.Scrollbar(self.scroll_wrap, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self._on_scrolled)
+        self.vbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        outer = ttk.Frame(self.canvas, padding=(0, 0, 12, 0))
+        self._content = outer
+        self._content_id = self.canvas.create_window((0, 0), window=outer, anchor="nw")
+        outer.bind("<Configure>", lambda _e: self._sync_scroll())
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
+        self.root.bind_all("<MouseWheel>", self._on_wheel)
+        self.root.bind_all("<Button-4>", self._on_wheel)  # Linux
+        self.root.bind_all("<Button-5>", self._on_wheel)
+        self.root.bind("<Control-q>", lambda _e: self.root.destroy())
+        self.root.bind("<F1>", lambda _e: self._open_guide())
 
         ttk.Label(outer, text="miunlock", font=self.f_title).pack(anchor="w")
         ttk.Label(
@@ -188,10 +209,10 @@ class App:
             text="Unlocking erases the phone's data and can't be undone. Back up first.",
             bg=WARN_BG, fg=WARN_FG, font=self.f_bold, anchor="w",
         ).pack(side="left")
-        link = tk.Label(banner, text="Read the guide", bg=WARN_BG, fg=WARN_FG, cursor="hand2", font=self.f_base)
+        link = tk.Label(banner, text="Open the guide (F1)", bg=WARN_BG, fg=WARN_FG, cursor="hand2", font=self.f_base)
         link.configure(font=tkfont.Font(font=self.f_base, underline=True))
         link.pack(side="right")
-        link.bind("<Button-1>", lambda _e: webbrowser.open(DOCS + "unlock-guide.md"))
+        link.bind("<Button-1>", lambda _e: self._open_guide())
 
         # Step 1 ---------------------------------------------------------
         self.c1, b1, self.s1, self.n1 = self._card(outer, "1", "Sign in to your Mi Account")
@@ -223,7 +244,9 @@ class App:
         self.dev_text = ttk.Label(drow, text="Preparing fastboot...", foreground=MUTED)
         self.dev_text.pack(side="left", padx=6)
         self.fb_btn = ttk.Button(drow, text="Reboot to fastboot", command=self._to_fastboot)
+        self.info_box = ttk.Frame(b2)  # device details, filled in when a phone is seen
         row2 = ttk.Frame(b2)
+        self._row2 = row2
         row2.pack(fill="x", pady=(10, 0))
         self.check_btn = ttk.Button(row2, text="Check eligibility", style="Primary.TButton", command=self._check)
         self.check_btn.pack(side="left")
@@ -261,7 +284,11 @@ class App:
         self.reboot_btn = ttk.Button(row3, text="Reboot phone", command=self._reboot)
         self.r3 = self._wrap(b3, "")
 
-        self.details_frame = ttk.Frame(outer)
+        self.details_frame = ttk.Frame(shell)
+        tools = ttk.Frame(self.details_frame)
+        tools.pack(side="bottom", fill="x", pady=(4, 0))
+        ttk.Button(tools, text="Copy", command=self._copy_details).pack(side="right")
+        ttk.Button(tools, text="Clear", command=self._clear_details).pack(side="right", padx=6)
         self.details = tk.Text(self.details_frame, height=9, wrap="word", state="disabled", font=("Consolas", 9))
         sb = ttk.Scrollbar(self.details_frame, command=self.details.yview)
         self.details.configure(yscrollcommand=sb.set)
@@ -269,11 +296,41 @@ class App:
         sb.pack(side="right", fill="y")
 
     # --------------------------------------------------------------- helpers
-    def _on_resize(self, event):
-        if event.widget is self.root:
-            width = max(event.width - 130, 400)
-            for lab in self._wrap_labels:
-                lab.configure(wraplength=width)
+    def _on_canvas_resize(self, event):
+        self.canvas.itemconfigure(self._content_id, width=event.width)
+        width = max(event.width - 120, 320)
+        for lab in self._wrap_labels:
+            lab.configure(wraplength=width)
+        self._sync_scroll()
+
+    def _sync_scroll(self):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_scrolled(self, first, last):
+        """Show the scrollbar only when there is something to scroll to."""
+        self.vbar.set(first, last)
+        if float(first) <= 0.0 and float(last) >= 1.0:
+            self.vbar.pack_forget()
+        elif not self.vbar.winfo_ismapped():
+            self.vbar.pack(side="right", fill="y", before=self.canvas)
+
+    def _on_wheel(self, event):
+        # Let the details box scroll itself; scroll the page everywhere else.
+        if str(event.widget).startswith(str(self.details_frame)):
+            return
+        if self.vbar.winfo_ismapped():
+            step = -1 if (getattr(event, "num", 0) == 4 or getattr(event, "delta", 0) > 0) else 1
+            self.canvas.yview_scroll(step * 3, "units")
+
+    def _copy_details(self):
+        self.root.clipboard_clear()
+        self.root.clipboard_append(self.details.get("1.0", "end").strip())
+        self._set_status("Details copied to the clipboard.")
+
+    def _clear_details(self):
+        self.details.configure(state="normal")
+        self.details.delete("1.0", "end")
+        self.details.configure(state="disabled")
 
     def _log(self, text: str):
         self.q.put(("log", text))
@@ -285,15 +342,12 @@ class App:
         self.details.configure(state="disabled")
 
     def _toggle_details(self):
-        w, h = self.root.winfo_width(), self.root.winfo_height()
         if self.details_open:
             self.details_frame.pack_forget()
             self.details_btn.configure(text="Show details")
-            self.root.geometry(f"{w}x{max(h - 190, 560)}")
         else:
-            self.details_frame.pack(fill="both", expand=True, pady=(8, 0))
+            self.details_frame.pack(side="bottom", fill="x", pady=(8, 0), before=self.scroll_wrap)
             self.details_btn.configure(text="Hide details")
-            self.root.geometry(f"{w}x{h + 190}")
         self.details_open = not self.details_open
 
     def _set_status(self, text: str):
@@ -337,7 +391,8 @@ class App:
                 elif kind == "fastboot":
                     self._fastboot_ready(*rest)
                 elif kind == "device":
-                    self._device_seen(rest[0], rest[1] if len(rest) > 1 else None)
+                    self._device_seen(rest[0], rest[1] if len(rest) > 1 else None,
+                                      rest[2] if len(rest) > 2 else None)
         except queue.Empty:
             pass
         self.root.after(100, self._pump)
@@ -367,6 +422,12 @@ class App:
             self.s2.configure(text="✓ Eligible", foreground=GREEN)
         else:
             self.s2.configure(text="", foreground=MUTED)
+
+        # badges: green = done, orange = do this next, grey = not yet
+        self.n1.configure(bg=GREEN if logged else ACCENT)
+        done2 = bool(self.eligibility and self.eligibility.get("eligible"))
+        self.n2.configure(bg=GREEN if done2 else (ACCENT if logged else "#9aa0a6"))
+        self.n3.configure(bg=GREEN if self.unlocked else (ACCENT if ready else "#9aa0a6"))
 
         # step 3
         on = "normal" if ready else "disabled"
@@ -447,17 +508,67 @@ class App:
                                 android.update(self._info[android["serial"]])
                     except Exception:
                         android = None
+                fbinfo = None
+                if serial:
+                    try:
+                        if serial not in self._fbinfo:
+                            self._fbinfo[serial] = adb.fastboot_info(self.fastboot, serial)
+                        fbinfo = self._fbinfo[serial]
+                    except Exception:
+                        fbinfo = None
                 self._polling = False
-                self.q.put(("device", serial, android))
+                self.q.put(("device", serial, android, fbinfo))
 
             threading.Thread(target=work, daemon=True).start()
         self.root.after(2000, self._poll_device)
 
-    def _device_seen(self, serial: Optional[str], android: Optional[dict] = None):
-        if serial == self.device and android == self.android:
+    def _show_info(self, pairs):
+        """Show a small table of device facts (label, value), or hide it when empty."""
+        for child in self.info_box.winfo_children():
+            child.destroy()
+        pairs = [(k, v) for k, v in pairs if v not in (None, "")]
+        self.info_box.pack_forget()
+        if not pairs:
+            return
+        for r, (label, value) in enumerate(pairs):
+            ttk.Label(self.info_box, text=label, foreground=MUTED).grid(row=r, column=0, sticky="w", padx=(0, 14))
+            ttk.Label(self.info_box, text=str(value)).grid(row=r, column=1, sticky="w")
+        self.info_box.pack(fill="x", pady=(8, 0), before=self._row2)
+
+    def _device_pairs(self, serial, android, fb):
+        if serial and fb:
+            state = {"yes": "Already unlocked", "no": "Locked"}.get(str(fb.get("unlocked")).lower())
+            return [
+                ("Device", fb.get("product")),
+                ("Mode", "Fastboot"),
+                ("Bootloader", state),
+                ("Bootloader version", fb.get("bootloader_version")),
+                ("Active slot", fb.get("slot")),
+                ("Serial", mask_id(fb["serial"]) if fb.get("serial") else None),
+            ]
+        if android and android.get("state") == "device":
+            lock = {True: "Locked", False: "Already unlocked"}.get(android.get("bootloader_locked"))
+            ver = android.get("hyperos") or android.get("miui")
+            battery = android.get("battery")
+            return [
+                ("Device", " ".join(x for x in (android.get("brand"), android.get("model")) if x)),
+                ("Codename", android.get("codename")),
+                ("Mode", "Android (adb)"),
+                ("Android", android.get("android")),
+                ("HyperOS / MIUI", ver),
+                ("Security patch", android.get("security_patch")),
+                ("Bootloader", lock),
+                ("Battery", None if battery is None else f"{battery}%" + ("  (charge above 50% first)" if battery < 50 else "")),
+                ("Serial", mask_id(android["serial"])),
+            ]
+        return []
+
+    def _device_seen(self, serial: Optional[str], android: Optional[dict] = None, fb: Optional[dict] = None):
+        if serial == self.device and android == self.android and fb == self.fb_info:
             return
         was_connected = self.device is not None
-        self.device, self.android = serial, android
+        self.device, self.android, self.fb_info = serial, android, fb
+        self._show_info(self._device_pairs(serial, android, fb))
         self.fb_btn.pack_forget()
         if serial:
             self.dev_dot.configure(fg=GREEN)
@@ -608,6 +719,7 @@ class App:
             self._log(f"Unlock failed: {result}")
             return
         self.unlocked = True
+        self._fbinfo.clear()
         self._set_r3(
             "Bootloader unlocked. The phone is resetting; the first start can take several "
             "minutes. If it stays on the fastboot screen, use Reboot phone.",
@@ -657,6 +769,83 @@ class App:
                     webbrowser.open(path.parent.as_uri())
             except Exception as err:
                 self._log(f"Could not open the folder: {err}")
+
+    def _open_guide(self):
+        """Offline step-by-step guide in its own window; one copy at a time."""
+        win = getattr(self, "_guide_win", None)
+        if win is not None and win.winfo_exists():
+            win.deiconify()
+            win.lift()
+            win.focus_force()
+            return
+        win = self._guide_win = tk.Toplevel(self.root)
+        win.title("miunlock guide")
+        win.geometry("760x520")
+        win.minsize(520, 340)
+        win.transient(self.root)
+        win.bind("<Escape>", lambda _e: win.destroy())
+
+        body = ttk.Frame(win, padding=10)
+        body.pack(fill="both", expand=True)
+        side = tk.Listbox(body, width=30, exportselection=False, activestyle="none",
+                          borderwidth=0, highlightthickness=1, highlightbackground=BORDER)
+        side.pack(side="left", fill="y")
+        right = ttk.Frame(body)
+        right.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        sbar = ttk.Scrollbar(right)
+        sbar.pack(side="right", fill="y")
+        text = tk.Text(right, wrap="word", padx=14, pady=10, borderwidth=0, highlightthickness=0,
+                       font=self.f_base, yscrollcommand=sbar.set, cursor="arrow", spacing3=6)
+        text.pack(side="left", fill="both", expand=True)
+        sbar.configure(command=text.yview)
+        text.tag_configure("h", font=self.f_title, spacing3=10)
+        text.tag_configure("b", lmargin1=18, lmargin2=36)
+        text.tag_configure("w", background=WARN_BG, foreground=WARN_FG, font=self.f_bold,
+                           lmargin1=8, lmargin2=8, rmargin=8, spacing1=4, spacing3=10)
+
+        def show(index: int):
+            title, blocks = guide.TOPICS[index]
+            text.configure(state="normal")
+            text.delete("1.0", "end")
+            text.insert("end", title + "\n", "h")
+            for kind, content in blocks:
+                if kind == "b":
+                    text.insert("end", "\u2022  " + content + "\n", "b")
+                elif kind == "w":
+                    text.insert("end", "\u26a0  " + content + "\n", "w")
+                else:
+                    text.insert("end", content + "\n")
+            text.configure(state="disabled")
+            text.yview_moveto(0)
+
+        for title, _ in guide.TOPICS:
+            side.insert("end", "  " + title)
+
+        def pick(i: int):
+            side.selection_clear(0, "end")
+            side.selection_set(i)
+            side.see(i)
+            show(i)
+
+        def on_pick(_e=None):
+            sel = side.curselection()
+            if sel:
+                show(sel[0])
+
+        def step(delta: int):
+            sel = side.curselection()
+            pick(min(max((sel[0] if sel else 0) + delta, 0), len(guide.TOPICS) - 1))
+
+        side.bind("<<ListboxSelect>>", on_pick)
+        pick(0)
+
+        nav = ttk.Frame(win, padding=(10, 0, 10, 10))
+        nav.pack(fill="x")
+        ttk.Button(nav, text="Close", command=win.destroy).pack(side="right")
+        ttk.Button(nav, text="Next \u25b6", command=lambda: step(1)).pack(side="right", padx=6)
+        ttk.Button(nav, text="\u25c0 Back", command=lambda: step(-1)).pack(side="right")
+        ttk.Button(nav, text="Open full guide in browser",
+                   command=lambda: webbrowser.open(DOCS + "unlock-guide.md")).pack(side="left")
 
     def _about(self):
         messagebox.showinfo(
