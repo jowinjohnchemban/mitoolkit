@@ -10,6 +10,7 @@ erases the phone and must be a person's decision, made in the GUI or with
 ``mitoolkit --cli unlock --confirm-wipe``. That is deliberate, see docs/safety.md.
 """
 import json
+import re
 import sys
 from typing import Any, Dict
 
@@ -57,8 +58,23 @@ def _t_details(args: dict) -> dict:
     """Device details for an agent: everything except what identifies the phone or its owner
     (serial number, IMEI, Android ID, Wi-Fi and Bluetooth addresses)."""
     from mitoolkit import adb
-    return {"sections": [{"title": title, "rows": [{"label": k, "value": v} for k, v in rows]}
+    return {"sections": [{"title": title, "rows": _anonymous(rows)}
                          for title, rows in adb.more_details(args.get("serial")) if title != "Identity"]}
+
+
+_IDENTIFYING_LABEL = re.compile(r"address|serial|imei|meid|android id|\bid\b", re.I)
+_ADDRESS_IN_TEXT = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b|\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b")
+
+
+def _anonymous(rows) -> list:
+    """The rows of one section without what names the phone or its network: rows that are an address, serial or ID are
+    left out (whatever section they sit in), and an IP or MAC address inside any other value is replaced."""
+    out = []
+    for label, value in rows:
+        if _IDENTIFYING_LABEL.search(str(label)):
+            continue
+        out.append({"label": label, "value": _ADDRESS_IN_TEXT.sub("(hidden)", value) if isinstance(value, str) else value})
+    return out
 
 
 def _t_connections(args: dict) -> dict:

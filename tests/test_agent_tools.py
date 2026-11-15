@@ -32,6 +32,22 @@ class McpToolTests(unittest.TestCase):
         self.assertEqual(titles, ["Hardware"])
         self.assertNotIn("356831091234565", json.dumps(result))
 
+    def test_addresses_are_left_out_in_every_section_not_only_identity(self):
+        """The real phone's "Connectivity and state" section had a "Wi-Fi IP address" row that reached agents."""
+        sections = [("Connectivity and state", [("Wi-Fi IP address", "192.168.1.5"), ("Wi-Fi switch", "On"),
+                                                ("Default route", "via 192.168.1.1 dev wlan0"),
+                                                ("Bluetooth address", "AA:BB:CC:DD:EE:FF"),
+                                                ("Hardware serial", "6a81a217"), ("Link speed", "866 Mbps")]),
+                    ("Hardware", [("Board", "gram"), ("Device ID", "abc123")])]
+        with mock.patch("mitoolkit.adb.more_details", return_value=sections):
+            result = mcp._t_details({})
+        text = json.dumps(result)
+        for private in ("192.168.1.5", "192.168.1.1", "AA:BB:CC:DD:EE:FF", "6a81a217", "abc123"):
+            self.assertNotIn(private, text)
+        rows = {r["label"]: r["value"] for s in result["sections"] for r in s["rows"]}
+        self.assertEqual(rows, {"Wi-Fi switch": "On", "Default route": "via (hidden) dev wlan0",
+                                "Link speed": "866 Mbps", "Board": "gram"})
+
     def test_connections_hides_network_and_device_names(self):
         report = diagnostics.build(ReportTests().raw(**{
             "dumpsys bluetooth_manager | head -n 160": "  enabled: true\n  name: My Phone\n"
