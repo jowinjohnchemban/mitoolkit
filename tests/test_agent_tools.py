@@ -63,6 +63,17 @@ class McpToolTests(unittest.TestCase):
         self.assertIn("-61 dBm", hidden)                                 # the state and signal stay
         self.assertIn("Jio 4G", hidden)
 
+    def test_a_failing_tool_is_logged_on_one_line_without_details(self):
+        boom = mock.Mock(side_effect=ValueError("secret"))
+        tools = {"odd\nname": ("", {}, boom)}
+        with mock.patch.dict(mcp.TOOLS, tools, clear=False), \
+                mock.patch.object(mcp.log, "get") as get:
+            result = mcp._call("odd\nname", {})
+        self.assertTrue(result["isError"])
+        logged = get.return_value.error.call_args.args
+        self.assertNotIn("\n", logged[1])
+        self.assertNotIn("secret", str(logged))
+
     def test_redact_does_not_change_the_original(self):
         report = diagnostics.build(ReportTests().raw())
         before = json.dumps(report)

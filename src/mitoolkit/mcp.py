@@ -143,7 +143,8 @@ def _call(name: str, args: dict) -> dict:
     except api.UnlockError as err:
         return {"isError": True, "content": [{"type": "text", "text": json.dumps({"error": str(err)})}]}
     except Exception as err:  # keep the server alive; never leak a traceback with data in it
-        log.get("mcp").error("tool %s failed: %s", name, type(err).__name__)
+        safe_name = name.replace("\r", "").replace("\n", "")  # name is a known tool, but never trust a log line
+        log.get("mcp").error("tool %s failed: %s", safe_name, type(err).__name__)
         return {"isError": True, "content": [{"type": "text", "text": json.dumps({"error": type(err).__name__})}]}
 
 
